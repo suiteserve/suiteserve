@@ -58,23 +58,6 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-
-	// Logging middleware.
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("%s %s\n", r.Method, r.URL.Path)
-			next.ServeHTTP(w, r)
-		})
-	})
-
-	// Headers middleware.
-	router.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			next.ServeHTTP(w, r)
-		})
-	})
-
 	handlers.Init(router, db)
 
 	host := getEnv("HOST", "localhost")
