@@ -1,10 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"git.blazey.dev/tests/auth"
+	"git.blazey.dev/tests/handlers"
 	"github.com/gorilla/mux"
 	"github.com/tidwall/buntdb"
 	"log"
@@ -76,72 +75,7 @@ func main() {
 		})
 	})
 
-	router.HandleFunc("/users/{name}", func(w http.ResponseWriter, r *http.Request) {
-		user, err := auth.FindUserByName(db, mux.Vars(r)["name"])
-		if err != nil {
-			handleErr(w, err)
-			return
-		}
-
-		userJson, err := json.Marshal(user)
-		if err != nil {
-			handleErr(w, err)
-			return
-		}
-		if _, err := fmt.Fprintln(w, string(userJson)); err != nil {
-			handleErr(w, err)
-			return
-		}
-	}).Methods(http.MethodGet).Name("user")
-
-	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		name := r.FormValue("name")
-		pass := r.FormValue("pass")
-		role := auth.Role(r.FormValue("role"))
-
-		if _, err := auth.CreateUser(db, name, pass, role); err != nil {
-			handleErr(w, err)
-			return
-		}
-
-		loc, err := router.Get("user").URL("name", name)
-		if err != nil {
-			handleErr(w, err)
-			return
-		}
-
-		w.Header().Set("Location", loc.String())
-		w.Header().Del("Content-Type")
-		w.WriteHeader(http.StatusCreated)
-	}).Methods(http.MethodPost)
-
-	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
-		users, err := auth.FindAllUsers(db)
-		if err != nil {
-			handleErr(w, err)
-			return
-		}
-
-		usersJson, err := json.Marshal(users)
-		if err != nil {
-			handleErr(w, err)
-			return
-		}
-		if _, err := fmt.Fprintln(w, string(usersJson)); err != nil {
-			handleErr(w, err)
-			return
-		}
-	}).Methods(http.MethodGet)
-
-	router.HandleFunc("/users/{name}", func(w http.ResponseWriter, r *http.Request) {
-		if err := auth.DeleteUser(db, mux.Vars(r)["name"]); err != nil {
-			handleErr(w, err)
-			return
-		}
-
-		w.Header().Del("Content-Type")
-		w.WriteHeader(http.StatusNoContent)
-	}).Methods(http.MethodDelete)
+	handlers.Init(router, db)
 
 	host := getEnv("HOST", "localhost")
 	port := getEnv("PORT", "8080")
@@ -158,29 +92,5 @@ func getEnv(key, def string) string {
 		return val
 	} else {
 		return def
-	}
-}
-
-func handleErr(w http.ResponseWriter, err error) {
-	status := http.StatusInternalServerError
-	switch err {
-	case auth.ErrUserExists:
-		status = http.StatusConflict
-	case auth.ErrUserNotFound:
-		status = http.StatusNotFound
-	default:
-		log.Println(err.Error())
-	}
-
-	errJson, err := json.Marshal(map[string]string{
-		"error": err.Error(),
-	})
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	w.WriteHeader(status)
-	if _, err := fmt.Fprintln(w, string(errJson)); err != nil {
-		log.Println(err)
 	}
 }
