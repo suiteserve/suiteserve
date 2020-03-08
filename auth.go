@@ -26,21 +26,12 @@ const (
 )
 
 type user struct {
-	Hash []byte `json:"hash"`
+	Name string `json:"name,omitempty"`
+	Pass []byte `json:"pass,omitempty"`
 	Role role   `json:"role"`
 }
 
-func (s srv) getUser(name string) (user, error) {
-	var user user
-	userJson, err := s.getUserJson(name)
-	if err != nil {
-		return user, err
-	}
-	err = json.Unmarshal([]byte(userJson), &user)
-	return user, err
-}
-
-func (s srv) getUserJson(name string) (string, error) {
+func (s srv) findUser(name string) (user, error) {
 	var userJson string
 	err := s.db.View(func(tx *buntdb.Tx) error {
 		var err error
@@ -48,37 +39,44 @@ func (s srv) getUserJson(name string) (string, error) {
 		return err
 	})
 	if err == buntdb.ErrNotFound {
-		return "", StatusError{
-			fmt.Errorf("user '%s' not found", name),
-			http.StatusNotFound,
+		return user{}, statusError{
+			error:  fmt.Errorf("user '%s' not found", name),
+			Status: http.StatusNotFound,
 		}
 	}
-	return userJson, err
+
+	var u user
+	if err := json.Unmarshal([]byte(userJson), &u); err != nil {
+		return user{}, err
+	}
+	u.Name = name
+	u.Pass = nil
+	return u, nil
 }
 
 func (s srv) createUser(name, pass string, role role) error {
 	// Validate name and password.
 	if len(name) < minNameLen || len(name) > maxNameLen {
-		return StatusError{
-			fmt.Errorf("user name '%s' must be between %d and %d characters",
+		return statusError{
+			error: fmt.Errorf("user name '%s' must be between %d and %d characters",
 				name, minNameLen, maxNameLen),
-			http.StatusBadRequest,
+			Status: http.StatusBadRequest,
 		}
 	}
 	if valid, err := regexp.MatchString(nameRegexp, name); err != nil {
 		return err
 	} else if !valid {
-		return StatusError{
-			fmt.Errorf("user name '%s' must match regex %s",
+		return statusError{
+			error: fmt.Errorf("user name '%s' must match regex %s",
 				name, nameRegexp),
-			http.StatusBadRequest,
+			Status: http.StatusBadRequest,
 		}
 	}
 	if len(pass) < minPassLen {
-		return StatusError{
-			fmt.Errorf("user pass must be at least %d characters",
+		return statusError{
+			error: fmt.Errorf("user pass must be at least %d characters",
 				minPassLen),
-			http.StatusBadRequest,
+			Status: http.StatusBadRequest,
 		}
 	}
 
@@ -88,7 +86,7 @@ func (s srv) createUser(name, pass string, role role) error {
 	}
 
 	user := user{
-		Hash: hash,
+		Pass: hash,
 		Role: role,
 	}
 	userJson, err := json.Marshal(user)
@@ -99,14 +97,28 @@ func (s srv) createUser(name, pass string, role role) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		key := usersKey + name
 		if _, err := tx.Get(key); err == nil {
-			return StatusError{
-				fmt.Errorf("user '%s' already exists", name),
-				http.StatusBadRequest,
+			return statusError{
+				error:  fmt.Errorf("user '%s' already exists", name),
+				Status: http.StatusBadRequest,
 			}
 		} else if err != buntdb.ErrNotFound {
 			return err
 		}
+
 		_, _, err = tx.Set(key, string(userJson), nil)
 		return err
+	})
+}
+
+func (s srv) deleteUser(name string) error {
+	return s.db.Update(func(tx *buntdb.Tx) error {
+		if _, err := tx.Delete(usersKey + name); err == buntdb.ErrNotFound {
+			return statusError{
+				error: fmt.Errorf("user '%s' not found", name),
+				Status: http.StatusNotFound,
+			}
+		} else {
+			return err
+		}
 	})
 }
