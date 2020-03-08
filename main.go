@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"git.blazey.dev/tests/auth"
 	"github.com/gorilla/mux"
 	"github.com/tidwall/buntdb"
 	"log"
@@ -41,30 +42,18 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := db.ReplaceIndex("users.role", "users:*",
-		buntdb.IndexJSON("role")); err != nil {
+	// Create default admin user when necessary.
+	admins, err := auth.FindUsersByRole(db, auth.AdminRole)
+	if err != nil {
 		log.Fatalln(err)
 	}
-
-	srv := srv{db}
-
-	var foundAdmin bool
-	if err := db.View(func(tx *buntdb.Tx) error {
-		return tx.AscendEqual("users.role", `{"role":"`+adminRole+`"}`,
-			func(key, val string) bool {
-				foundAdmin = true
-				return false
-			})
-	}); err != nil {
-		log.Fatalln(err)
-	}
-	if *createDefAdmin || !foundAdmin {
+	if *createDefAdmin || len(admins) == 0 {
 		if *createDefAdmin {
 			log.Println("Creating default admin user now")
-		} else if !foundAdmin {
+		} else if len(admins) == 0 {
 			log.Println("No admin user found; creating default now")
 		}
-		if err := srv.createUser(defAdminUser, defAdminPass, adminRole); err != nil {
+		if _, err := auth.CreateUser(db, defAdminUser, defAdminPass, auth.AdminRole); err != nil {
 			log.Println(err)
 		}
 	}
@@ -88,8 +77,7 @@ func main() {
 	})
 
 	router.HandleFunc("/users/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := mux.Vars(r)["name"]
-		user, err := srv.findUser(name)
+		user, err := auth.FindUserByName(db, mux.Vars(r)["name"])
 		if err != nil {
 			handleErr(w, err)
 			return
@@ -109,9 +97,9 @@ func main() {
 	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
 		name := r.FormValue("name")
 		pass := r.FormValue("pass")
-		role := role(r.FormValue("role"))
+		role := auth.Role(r.FormValue("role"))
 
-		if err := srv.createUser(name, pass, role); err != nil {
+		if _, err := auth.CreateUser(db, name, pass, role); err != nil {
 			handleErr(w, err)
 			return
 		}
@@ -121,14 +109,32 @@ func main() {
 			handleErr(w, err)
 			return
 		}
+
 		w.Header().Set("Location", loc.String())
 		w.Header().Del("Content-Type")
 		w.WriteHeader(http.StatusCreated)
 	}).Methods(http.MethodPost)
 
+	router.HandleFunc("/users", func(w http.ResponseWriter, r *http.Request) {
+		users, err := auth.FindAllUsers(db)
+		if err != nil {
+			handleErr(w, err)
+			return
+		}
+
+		usersJson, err := json.Marshal(users)
+		if err != nil {
+			handleErr(w, err)
+			return
+		}
+		if _, err := fmt.Fprintln(w, string(usersJson)); err != nil {
+			handleErr(w, err)
+			return
+		}
+	}).Methods(http.MethodGet)
+
 	router.HandleFunc("/users/{name}", func(w http.ResponseWriter, r *http.Request) {
-		name := mux.Vars(r)["name"]
-		if err := srv.deleteUser(name); err != nil {
+		if err := auth.DeleteUser(db, mux.Vars(r)["name"]); err != nil {
 			handleErr(w, err)
 			return
 		}
@@ -140,8 +146,11 @@ func main() {
 	host := getEnv("HOST", "localhost")
 	port := getEnv("PORT", "8080")
 	addr := net.JoinHostPort(host, port)
+	tlsCert := getEnv("TLS_CERT", "tls/cert.pem")
+	tlsKey := getEnv("TLS_KEY", "tls/key.pem")
+
 	log.Println("Binding to", addr)
-	log.Fatalln(http.ListenAndServe(addr, router))
+	log.Fatalln(http.ListenAndServeTLS(addr, tlsCert, tlsKey, router))
 }
 
 func getEnv(key, def string) string {
@@ -154,21 +163,24 @@ func getEnv(key, def string) string {
 
 func handleErr(w http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
-	switch err := err.(type) {
-	case httpError:
-		status = err.Status
+	switch err {
+	case auth.ErrUserExists:
+		status = http.StatusConflict
+	case auth.ErrUserNotFound:
+		status = http.StatusNotFound
 	default:
 		log.Println(err.Error())
 	}
 
-	errorJson, err := json.Marshal(struct {
-		Error string `json:"error"`
-	}{err.Error()})
+	errJson, err := json.Marshal(map[string]string{
+		"error": err.Error(),
+	})
 	if err != nil {
-		log.Panicln(err)
+		log.Println(err)
+		return
 	}
 	w.WriteHeader(status)
-	if _, err := fmt.Fprintln(w, string(errorJson)); err != nil {
-		log.Panicln(err)
+	if _, err := fmt.Fprintln(w, string(errJson)); err != nil {
+		log.Println(err)
 	}
 }
