@@ -39,7 +39,7 @@ func (s srv) findUser(name string) (user, error) {
 		return err
 	})
 	if err == buntdb.ErrNotFound {
-		return user{}, statusError{
+		return user{}, httpError{
 			error:  fmt.Errorf("user '%s' not found", name),
 			Status: http.StatusNotFound,
 		}
@@ -57,7 +57,7 @@ func (s srv) findUser(name string) (user, error) {
 func (s srv) createUser(name, pass string, role role) error {
 	// Validate name and password.
 	if len(name) < minNameLen || len(name) > maxNameLen {
-		return statusError{
+		return httpError{
 			error: fmt.Errorf("user name '%s' must be between %d and %d characters",
 				name, minNameLen, maxNameLen),
 			Status: http.StatusBadRequest,
@@ -66,14 +66,14 @@ func (s srv) createUser(name, pass string, role role) error {
 	if valid, err := regexp.MatchString(nameRegexp, name); err != nil {
 		return err
 	} else if !valid {
-		return statusError{
+		return httpError{
 			error: fmt.Errorf("user name '%s' must match regex %s",
 				name, nameRegexp),
 			Status: http.StatusBadRequest,
 		}
 	}
 	if len(pass) < minPassLen {
-		return statusError{
+		return httpError{
 			error: fmt.Errorf("user pass must be at least %d characters",
 				minPassLen),
 			Status: http.StatusBadRequest,
@@ -97,9 +97,9 @@ func (s srv) createUser(name, pass string, role role) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		key := usersKey + name
 		if _, err := tx.Get(key); err == nil {
-			return statusError{
+			return httpError{
 				error:  fmt.Errorf("user '%s' already exists", name),
-				Status: http.StatusBadRequest,
+				Status: http.StatusConflict,
 			}
 		} else if err != buntdb.ErrNotFound {
 			return err
@@ -113,7 +113,7 @@ func (s srv) createUser(name, pass string, role role) error {
 func (s srv) deleteUser(name string) error {
 	return s.db.Update(func(tx *buntdb.Tx) error {
 		if _, err := tx.Delete(usersKey + name); err == buntdb.ErrNotFound {
-			return statusError{
+			return httpError{
 				error: fmt.Errorf("user '%s' not found", name),
 				Status: http.StatusNotFound,
 			}
