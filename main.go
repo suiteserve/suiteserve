@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/tmazeika/testpass/store"
 	"log"
 	"net"
 	"net/http"
@@ -9,6 +10,12 @@ import (
 )
 
 func main() {
+	_, err := store.New(config("MONGO_HOST", ""), config("MONGO_USER", ""),
+		config("MONGO_PASS", ""))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	r := mux.NewRouter()
 	// TODO
 
