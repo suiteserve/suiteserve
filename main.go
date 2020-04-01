@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
-	"github.com/tmazeika/testpass/store"
+	"github.com/tmazeika/testpass/persist"
+	"github.com/tmazeika/testpass/route"
 	"log"
 	"net"
 	"net/http"
@@ -10,15 +10,18 @@ import (
 )
 
 func main() {
-	_, err := store.New(config("MONGO_HOST", ""), config("MONGO_USER", ""),
+	db, err := persist.New(config("MONGO_HOST", ""), config("MONGO_USER", ""),
 		config("MONGO_PASS", ""))
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
 
-	r := mux.NewRouter()
-	// TODO
-
+	r := route.Router(db)
 	host := config("HOST", "localhost")
 	port := config("PORT", "8080")
 	addr := net.JoinHostPort(host, port)
