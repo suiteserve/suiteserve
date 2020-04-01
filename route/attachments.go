@@ -1,6 +1,8 @@
 package route
 
 import (
+	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
 	"log"
 	"net/http"
 )
@@ -8,6 +10,18 @@ import (
 func (res *res) attachmentHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		id, ok := mux.Vars(r)["attachmentId"]
+		if !ok {
+			http.Error(w, "No ID provided", http.StatusBadRequest)
+			return
+		}
+
+		if err := res.db.GetAttachment(id, w); err == gridfs.ErrFileNotFound {
+			http.Error(w, "Attachment not found", http.StatusNotFound)
+		} else if err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	case http.MethodDelete:
 	}
 }
