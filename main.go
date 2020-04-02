@@ -1,38 +1,31 @@
 package main
 
 import (
-	"github.com/tmazeika/testpass/persist"
-	"github.com/tmazeika/testpass/route"
+	"github.com/tmazeika/testpass/config"
+	"github.com/tmazeika/testpass/database"
+	"github.com/tmazeika/testpass/handlers"
 	"log"
 	"net"
 	"net/http"
-	"os"
 )
 
 func main() {
-	db, err := persist.New(config("MONGO_HOST", ""), config("MONGO_USER", ""),
-		config("MONGO_PASS", ""))
+	db, err := database.Open()
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("failed to open DB: %v\n", err)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Println(err)
+			log.Printf("failed to close DB: %v\n", err)
 		}
 	}()
 
-	r := route.Router(db)
-	host := config("HOST", "localhost")
-	port := config("PORT", "8080")
+	router := handlers.Router(db)
+	host := config.Get(config.Host, "localhost")
+	port := config.Get(config.Port, "8080")
 	addr := net.JoinHostPort(host, port)
-	log.Println("Binding to", addr)
-	log.Fatalln(http.ListenAndServeTLS(addr, "tls/cert.pem", "tls/key.pem", r))
-}
 
-func config(key, def string) string {
-	if val, ok := os.LookupEnv(key); ok {
-		return val
-	} else {
-		return def
-	}
+	log.Println("Binding to", addr)
+	// TODO: implement proper error handling for ListenAndServeTLS
+	log.Fatalln(http.ListenAndServeTLS(addr, "tls/cert.pem", "tls/key.pem", router))
 }
