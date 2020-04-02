@@ -19,6 +19,11 @@ func Router(db *database.Database) *mux.Router {
 	router := mux.NewRouter()
 	srv := &srv{router, db}
 
+	// Serve static files.
+	publicSrv := http.FileServer(http.Dir("public/"))
+	router.Handle("/", publicSrv)
+	router.PathPrefix("/static/").Handler(publicSrv)
+
 	router.HandleFunc("/attachments/{attachmentId}", srv.attachmentHandler).
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("attachment")

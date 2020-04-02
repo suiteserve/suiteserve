@@ -56,27 +56,27 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 	case http.MethodPost:
 		src, header, err := req.FormFile("file")
 		if err != nil {
-			log.Println(err)
-			http.Error(res, err.Error(), http.StatusInternalServerError)
+			log.Printf("failed to get form file: %v\n", err)
+			http.Error(res, internalErrorTxt, http.StatusInternalServerError)
 			return
 		}
 		defer func() {
 			if err := src.Close(); err != nil {
-				log.Println(err)
+				log.Printf("failed to close form file: %v\n", err)
 			}
 		}()
 
 		id, err := s.db.SaveAttachment(header.Filename, src)
 		if err != nil {
-			log.Println(err)
-			http.Error(res, err.Error(), http.StatusInternalServerError)
+			log.Printf("failed to save attachment: %v\n", err)
+			http.Error(res, internalErrorTxt, http.StatusInternalServerError)
 			return
 		}
 
 		loc, err := s.router.Get("attachment").URL("attachmentId", id)
 		if err != nil {
-			log.Println(err)
-			http.Error(res, err.Error(), http.StatusInternalServerError)
+			log.Printf("failed to build URL to attachment: %v\n", err)
+			http.Error(res, internalErrorTxt, http.StatusInternalServerError)
 			return
 		}
 
