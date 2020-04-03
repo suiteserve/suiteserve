@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/tmazeika/testpass/database"
 	"io"
@@ -39,7 +40,7 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Content-Length", strconv.FormatInt(attachment.Length, 10))
 		res.Header().Set("Content-Disposition", "inline; filename="+
 			strconv.Quote(attachment.Name))
-		res.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		res.Header().Set("Content-Type", attachment.Metadata.ContentType)
 
 		if _, err := io.Copy(res, attachment); err != nil {
 			log.Printf("failed to copy attachment to response: %v\n", err)
@@ -81,6 +82,15 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 		}
 
 		res.Header().Set("Location", loc.String())
+		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusCreated)
+
+		if err := json.NewEncoder(res).Encode(struct {
+			Id string `json:"id"`
+		}{id}); err != nil {
+			log.Printf("failed to encode JSON: %v\n", err)
+			http.Error(res, internalErrorTxt, http.StatusInternalServerError)
+			return
+		}
 	}
 }

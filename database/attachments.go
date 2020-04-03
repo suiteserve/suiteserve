@@ -1,25 +1,48 @@
 package database
 
 import (
+	"bytes"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"io"
 	"log"
+	"mime"
+	"net/http"
+	"path"
 	"time"
 )
 
 type Attachment struct {
 	*gridfs.DownloadStream
 
-	Name   string `bson:"filename"`
-	Length int64  `bson:"length"`
+	Name     string `bson:"filename"`
+	Length   int64  `bson:"length"`
+	Metadata struct {
+		ContentType string `bson:"contentType"`
+	} `bson:"metadata"`
 }
 
 func (d *Database) SaveAttachment(name string, src io.Reader) (string, error) {
 	oid := primitive.NewObjectID()
-	dst, err := d.mgoBucket.OpenUploadStreamWithID(oid, name)
+
+	// Sniff content type.
+	var buf bytes.Buffer
+	contentType := mime.TypeByExtension(path.Ext(name))
+	if contentType == "" {
+		if _, err := io.CopyN(&buf, src, 512); err != nil {
+			return "", fmt.Errorf("failed to copy source to buffer: %v", err)
+		}
+		contentType = http.DetectContentType(buf.Bytes())
+	}
+
+	opts := options.GridFSUpload().SetMetadata(bson.M{
+		"contentType": contentType,
+	})
+
+	dst, err := d.mgoBucket.OpenUploadStreamWithID(oid, name, opts)
 	if err != nil {
 		return "", fmt.Errorf("failed to open GridFS upload stream: %v", err)
 	}
@@ -33,6 +56,10 @@ func (d *Database) SaveAttachment(name string, src io.Reader) (string, error) {
 		return "", fmt.Errorf("failed to set GridFS upload deadline: %v", err)
 	}
 
+	_, err = io.Copy(dst, &buf)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy buffer to GridFS: %v", err)
+	}
 	_, err = io.Copy(dst, src)
 	if err != nil {
 		return "", fmt.Errorf("failed to copy source to GridFS: %v", err)
@@ -76,29 +103,5 @@ func (d *Database) GetAttachment(id string) (*Attachment, error) {
 		return nil, fmt.Errorf("failed to decode GridFS cursor: %v", err)
 	}
 
-	//if err := src.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-	//	return nil, err
-	//}
-
 	return attachment, nil
-
-	//dst.Header().Set("Content-Disposition",
-	//	fmt.Sprintf("attachment; filename=%s", strconv.Quote(file.Name)))
-	//dst.Header().Set("Content-Length", strconv.FormatInt(file.Length, 10))
-	//contentType := mime.TypeByExtension(path.Ext(file.Name))
-	//if contentType == "" {
-	//	var b bytes.Buffer
-	//	if _, err := io.CopyN(&b, src, 512); err != nil {
-	//		return err
-	//	}
-	//
-	//	dst.Header().Set("Content-Type", http.DetectContentType(b.Bytes()))
-	//	if _, err := io.Copy(dst, &b); err != nil {
-	//		return err
-	//	}
-	//} else {
-	//	dst.Header().Set("Content-Type", contentType)
-	//}
-	//_, err = io.Copy(dst, src)
-	//return err
 }
