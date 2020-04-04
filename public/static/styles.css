@@ -1,3 +1,8 @@
 * {
   box-sizing: border-box;
 }
+
+form input {
+  display: block;
+  margin: 1em 0;
+}

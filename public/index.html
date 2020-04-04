@@ -15,6 +15,17 @@
       <input type="file" name="file"/>
       <input type="submit" value="Upload"/>
     </form>
+
+    <h2>Delete Attachment</h2>
+
+    <form id="delete-attachment-form" method="post" :action="`/attachments/${deleteAttachmentId}`">
+      <input type="hidden" name="_method" value="DELETE">
+      <div>
+        <label for="delete-attachment-form-id">ID</label>
+        <input id="delete-attachment-form-id" type="text" name="id" v-model="deleteAttachmentId"/>
+      </div>
+      <input type="submit" value="Delete"/>
+    </form>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>

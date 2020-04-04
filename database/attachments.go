@@ -25,12 +25,14 @@ type Attachment struct {
 	} `bson:"metadata"`
 }
 
-func (d *Database) SaveAttachment(name string, src io.Reader) (string, error) {
+func (d *Database) SaveAttachment(name, contentType string, src io.Reader) (string, error) {
 	oid := primitive.NewObjectID()
 
 	// Sniff content type.
 	var buf bytes.Buffer
-	contentType := mime.TypeByExtension(path.Ext(name))
+	if contentType == "" {
+		contentType = mime.TypeByExtension(path.Ext(name))
+	}
 	if contentType == "" {
 		if _, err := io.CopyN(&buf, src, 512); err != nil {
 			return "", fmt.Errorf("failed to copy source to buffer: %v", err)
@@ -71,7 +73,7 @@ func (d *Database) SaveAttachment(name string, src io.Reader) (string, error) {
 func (d *Database) GetAttachment(id string) (*Attachment, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, ErrBadId
+		return nil, ErrNotFound
 	}
 
 	src, err := d.mgoBucket.OpenDownloadStream(oid)
@@ -104,4 +106,18 @@ func (d *Database) GetAttachment(id string) (*Attachment, error) {
 	}
 
 	return attachment, nil
+}
+
+func (d *Database) DeleteAttachment(id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	if err := d.mgoBucket.Delete(oid); err == gridfs.ErrFileNotFound {
+		return ErrNotFound
+	} else if err != nil {
+		return fmt.Errorf("failed to delete within GridFS: %v", err)
+	}
+	return nil
 }

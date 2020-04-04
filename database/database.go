@@ -18,7 +18,6 @@ const dbName = "testpass"
 const timeout = 10 * time.Second
 
 var (
-	ErrBadId    = errors.New("bad ID format")
 	ErrNotFound = errors.New("entity not found")
 )
 

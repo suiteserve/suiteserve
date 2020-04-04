@@ -20,12 +20,12 @@ func main() {
 		}
 	}()
 
-	router := handlers.Router(db)
+	handler := handlers.Handler(db)
 	host := config.Get(config.Host, "localhost")
 	port := config.Get(config.Port, "8080")
 	addr := net.JoinHostPort(host, port)
 
 	log.Println("Binding to", addr)
 	// TODO: implement proper error handling for ListenAndServeTLS
-	log.Fatalln(http.ListenAndServeTLS(addr, "tls/cert.pem", "tls/key.pem", router))
+	log.Fatalln(http.ListenAndServeTLS(addr, "tls/cert.pem", "tls/key.pem", handler))
 }
