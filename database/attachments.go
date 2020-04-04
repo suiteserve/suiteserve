@@ -18,11 +18,12 @@ import (
 type Attachment struct {
 	*gridfs.DownloadStream
 
-	Name     string `bson:"filename"`
-	Length   int64  `bson:"length"`
+	Id       string `json:"id" bson:"_id"`
+	Name     string `json:"name" bson:"filename"`
+	Size     int64  `json:"size" bson:"length"`
 	Metadata struct {
-		ContentType string `bson:"contentType"`
-	} `bson:"metadata"`
+		ContentType string `json:"content_type" bson:"contentType"`
+	} `json:"metadata" bson:"metadata"`
 }
 
 func (d *Database) SaveAttachment(name, contentType string, src io.Reader) (string, error) {
@@ -94,8 +95,7 @@ func (d *Database) GetAttachment(id string) (*Attachment, error) {
 	}()
 
 	if ok := cursor.Next(newCtx()); !ok {
-		return nil, fmt.Errorf("failed to traverse GridFS cursor: %v",
-			cursor.Err())
+		return nil, fmt.Errorf("failed to traverse GridFS cursor: %v", cursor.Err())
 	}
 
 	attachment := &Attachment{
@@ -108,6 +108,24 @@ func (d *Database) GetAttachment(id string) (*Attachment, error) {
 	return attachment, nil
 }
 
+func (d *Database) GetAllAttachments() ([]Attachment, error) {
+	cursor, err := d.mgoBucket.Find(bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to find within GridFS: %v", err)
+	}
+	defer func() {
+		if err := cursor.Close(newCtx()); err != nil {
+			log.Printf("failed to close GridFS cursor: %v\n", err)
+		}
+	}()
+
+	attachments := make([]Attachment, 0)
+	if err := cursor.All(newCtx(), &attachments); err != nil {
+		return nil, fmt.Errorf("failed to traverse and decode GridFS cursor: %v", err)
+	}
+	return attachments, nil
+}
+
 func (d *Database) DeleteAttachment(id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -118,6 +136,13 @@ func (d *Database) DeleteAttachment(id string) error {
 		return ErrNotFound
 	} else if err != nil {
 		return fmt.Errorf("failed to delete within GridFS: %v", err)
+	}
+	return nil
+}
+
+func (d *Database) DeleteAllAttachments() error {
+	if err := d.mgoBucket.Drop(); err != nil {
+		return fmt.Errorf("failed to drop GridFS bucket: %v", err)
 	}
 	return nil
 }

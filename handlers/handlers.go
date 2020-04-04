@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/tmazeika/testpass/database"
+	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
 	"time"
@@ -40,7 +41,7 @@ func Handler(db *database.Database) http.Handler {
 		Name("attachment")
 	router.Path("/attachments").
 		HandlerFunc(srv.attachmentsHandler).
-		Methods(http.MethodGet, http.MethodPost)
+		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
 	return methodOverrideHandler(router)
 }
@@ -58,19 +59,20 @@ func methodOverrideHandler(h http.Handler) http.Handler {
 }
 
 func httpError(w http.ResponseWriter, error string, code int) {
-	errorJson, err := json.Marshal(struct {
-		Error string `json:"error"`
-	}{error})
-	if err != nil {
-		panic(err)
-	}
+	httpJson(w, bson.M{"error": error}, code)
+}
 
+func httpJson(w http.ResponseWriter, v interface{}, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(code)
 
-	_, err = fmt.Fprintln(w, string(errorJson))
-	if err != nil {
-		log.Printf("failed to write error: %v\n", err)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("failed to encode JSON: %v\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err := fmt.Fprintf(w, `{"error":"`+http.StatusText(http.StatusInternalServerError)+`"}"`)
+		if err != nil {
+			log.Printf("failed to send HTTP response: %v\n", err)
+		}
 	}
 }

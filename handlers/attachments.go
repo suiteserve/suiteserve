@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/tmazeika/testpass/database"
+	"go.mongodb.org/mongo-driver/bson"
 	"io"
 	"log"
 	"mime"
@@ -34,7 +34,7 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 		}
 
 		res.Header().Set("Cache-Control", "private, max-age=31536000")
-		res.Header().Set("Content-Length", strconv.FormatInt(attachment.Length, 10))
+		res.Header().Set("Content-Size", strconv.FormatInt(attachment.Size, 10))
 		res.Header().Set("Content-Disposition", "inline; filename="+
 			strconv.Quote(attachment.Name))
 		res.Header().Set("Content-Type", attachment.Metadata.ContentType)
@@ -54,7 +54,6 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
-
 		res.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -62,6 +61,13 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
+		attachments, err := s.db.GetAllAttachments()
+		if err != nil {
+			log.Printf("failed to get attachments: %v\n", err)
+			httpError(res, errUnknown, http.StatusInternalServerError)
+			return
+		}
+		httpJson(res, attachments, http.StatusOK)
 	case http.MethodPost:
 		src, header, err := req.FormFile("file")
 		if err == http.ErrMissingFile {
@@ -101,16 +107,13 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 		}
 
 		res.Header().Set("Location", loc.String())
-		res.Header().Set("Content-Type", "application/json")
-		res.Header().Set("X-Content-Type-Options", "nosniff")
-		res.WriteHeader(http.StatusCreated)
-
-		if err := json.NewEncoder(res).Encode(struct {
-			Id string `json:"id"`
-		}{id}); err != nil {
-			log.Printf("failed to encode JSON: %v\n", err)
+		httpJson(res, bson.M{"id": id}, http.StatusCreated)
+	case http.MethodDelete:
+		if err := s.db.DeleteAllAttachments(); err != nil {
+			log.Printf("failed to delete attachments: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
+		res.WriteHeader(http.StatusNoContent)
 	}
 }
