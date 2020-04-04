@@ -15,18 +15,20 @@ import (
 	"time"
 )
 
+type AttachmentMetadata struct {
+	ContentType string `json:"content_type" bson:"contentType"`
+}
+
 type Attachment struct {
 	*gridfs.DownloadStream
 
-	Id       string `json:"id" bson:"_id"`
-	Name     string `json:"name" bson:"filename"`
-	Size     int64  `json:"size" bson:"length"`
-	Metadata struct {
-		ContentType string `json:"content_type" bson:"contentType"`
-	} `json:"metadata" bson:"metadata"`
+	Id                 string `json:"id" bson:"_id,omitempty"`
+	Name               string `json:"name" bson:"filename"`
+	Size               int64  `json:"size" bson:"length"`
+	AttachmentMetadata `bson:"metadata"`
 }
 
-func (d *Database) SaveAttachment(name, contentType string, src io.Reader) (string, error) {
+func (d *Database) NewAttachment(name, contentType string, src io.Reader) (string, error) {
 	oid := primitive.NewObjectID()
 
 	// Sniff content type.

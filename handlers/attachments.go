@@ -40,7 +40,7 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Content-Size", strconv.FormatInt(attachment.Size, 10))
 		res.Header().Set("Content-Disposition", "inline; filename="+
 			strconv.Quote(attachment.Name))
-		res.Header().Set("Content-Type", attachment.Metadata.ContentType)
+		res.Header().Set("Content-Type", attachment.ContentType)
 		res.Header().Set("X-Content-Type-Options", "nosniff")
 
 		if _, err := io.Copy(res, attachment); err != nil {
@@ -95,7 +95,7 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		id, err := s.db.SaveAttachment(header.Filename, contentType, src)
+		id, err := s.db.NewAttachment(header.Filename, contentType, src)
 		if err != nil {
 			log.Printf("failed to save attachment: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)

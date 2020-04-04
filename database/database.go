@@ -19,6 +19,7 @@ const timeout = 10 * time.Second
 
 var (
 	ErrNotFound = errors.New("entity not found")
+	ErrBadJson  = errors.New("bad JSON")
 )
 
 type Database struct {

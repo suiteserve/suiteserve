@@ -15,6 +15,7 @@ const timeout = 10 * time.Second
 
 const (
 	errUnknown = "unknown"
+	errBadJson = "bad_json"
 
 	errNoAttachmentFile   = "no_attachment_file"
 	errAttachmentNotFound = "attachment_not_found"
@@ -29,18 +30,28 @@ func Handler(db *database.Database) http.Handler {
 	router := mux.NewRouter()
 	srv := &srv{router, db}
 
-	// Serve static files.
+	// Static files.
 	publicSrv := http.FileServer(http.Dir("public/"))
 	router.Path("/").Handler(publicSrv)
 	router.Path("/favicon.ico").Handler(publicSrv)
 	router.PathPrefix("/static/").Handler(publicSrv)
 
+	// Attachments.
 	router.Path("/attachments/{attachmentId}").
 		HandlerFunc(srv.attachmentHandler).
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("attachment")
 	router.Path("/attachments").
 		HandlerFunc(srv.attachmentsHandler).
+		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
+
+	// Suites.
+	router.Path("/suites/{suiteId}").
+		HandlerFunc(srv.suiteHandler).
+		Methods(http.MethodGet, http.MethodDelete).
+		Name("suite")
+	router.Path("/suites").
+		HandlerFunc(srv.suitesHandler).
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
 	return methodOverrideHandler(router)
