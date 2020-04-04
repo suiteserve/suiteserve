@@ -13,11 +13,14 @@ import (
 )
 
 func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
-	id := mux.Vars(req)["attachmentId"]
+	id, ok := mux.Vars(req)["attachmentId"]
+	if !ok {
+		panic("request parameter 'attachmentId' not found")
+	}
 
 	switch req.Method {
 	case http.MethodGet:
-		attachment, err := s.db.GetAttachment(id)
+		attachment, err := s.db.Attachment(id)
 		if err == database.ErrNotFound {
 			httpError(res, errAttachmentNotFound, http.StatusNotFound)
 			return
@@ -61,7 +64,7 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		attachments, err := s.db.GetAllAttachments()
+		attachments, err := s.db.AllAttachments()
 		if err != nil {
 			log.Printf("failed to get attachments: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)

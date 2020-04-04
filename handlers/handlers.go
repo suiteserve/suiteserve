@@ -70,8 +70,7 @@ func httpJson(w http.ResponseWriter, v interface{}, code int) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		log.Printf("failed to encode JSON: %v\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		_, err := fmt.Fprintf(w, `{"error":"`+http.StatusText(http.StatusInternalServerError)+`"}"`)
-		if err != nil {
+		if _, err := fmt.Fprintf(w, `{"error":"`+errUnknown+`"}"`); err != nil {
 			log.Printf("failed to send HTTP response: %v\n", err)
 		}
 	}

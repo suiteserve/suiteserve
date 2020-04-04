@@ -71,7 +71,7 @@ func (d *Database) SaveAttachment(name, contentType string, src io.Reader) (stri
 	return oid.Hex(), nil
 }
 
-func (d *Database) GetAttachment(id string) (*Attachment, error) {
+func (d *Database) Attachment(id string) (*Attachment, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, ErrNotFound
@@ -108,7 +108,7 @@ func (d *Database) GetAttachment(id string) (*Attachment, error) {
 	return attachment, nil
 }
 
-func (d *Database) GetAllAttachments() ([]Attachment, error) {
+func (d *Database) AllAttachments() ([]Attachment, error) {
 	cursor, err := d.mgoBucket.Find(bson.M{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to find within GridFS: %v", err)
