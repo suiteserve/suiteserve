@@ -13,9 +13,9 @@ import (
 )
 
 func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
-	id, ok := mux.Vars(req)["attachmentId"]
+	id, ok := mux.Vars(req)["attachment_id"]
 	if !ok {
-		panic("request parameter 'attachmentId' not found")
+		panic("request parameter 'attachment_id' not found")
 	}
 
 	switch req.Method {
@@ -102,7 +102,7 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		loc, err := s.router.Get("attachment").URL("attachmentId", id)
+		loc, err := s.router.Get("attachment").URL("attachment_id", id)
 		if err != nil {
 			log.Printf("failed to build URL to attachment: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)

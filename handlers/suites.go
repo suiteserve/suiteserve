@@ -12,9 +12,9 @@ import (
 )
 
 func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
-	id, ok := mux.Vars(req)["suiteId"]
+	id, ok := mux.Vars(req)["suite_id"]
 	if !ok {
-		panic("request parameter 'suiteId' not found")
+		panic("request parameter 'suite_id' not found")
 	}
 
 	switch req.Method {
@@ -81,7 +81,7 @@ func (s *srv) suitesHandler(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		loc, err := s.router.Get("suite").URL("suiteId", id)
+		loc, err := s.router.Get("suite").URL("suite_id", id)
 		if err != nil {
 			log.Printf("failed to build URL to suite: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)

@@ -40,7 +40,7 @@ func Handler(db *database.Database) http.Handler {
 	router.PathPrefix("/static/").Handler(publicSrv)
 
 	// Attachments.
-	router.Path("/attachments/{attachmentId}").
+	router.Path("/attachments/{attachment_id}").
 		HandlerFunc(srv.attachmentHandler).
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("attachment")
@@ -49,7 +49,7 @@ func Handler(db *database.Database) http.Handler {
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
 	// Suites.
-	router.Path("/suites/{suiteId}").
+	router.Path("/suites/{suite_id}").
 		HandlerFunc(srv.suiteHandler).
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("suite")
