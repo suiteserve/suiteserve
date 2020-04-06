@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
@@ -43,13 +45,24 @@ func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
 func (s *srv) suitesHandler(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		//attachments, err := s.db.AllAttachments()
-		//if err != nil {
-		//	log.Printf("failed to get attachments: %v\n", err)
-		//	httpError(res, errUnknown, http.StatusInternalServerError)
-		//	return
-		//}
-		//httpJson(res, attachments, http.StatusOK)
+		sinceStr := req.FormValue("since")
+		var sinceTime time.Time
+		if sinceStr != "" {
+			sinceInt, err := strconv.ParseInt(sinceStr, 10, 64)
+			if err != nil {
+				httpError(res, errBadQuery, http.StatusBadRequest)
+				return
+			}
+			sinceTime = time.Unix(sinceInt, 0)
+		}
+
+		suiteRuns, err := s.db.AllSuiteRuns(sinceTime)
+		if err != nil {
+			log.Printf("failed to get suite runs: %v\n", err)
+			httpError(res, errUnknown, http.StatusInternalServerError)
+			return
+		}
+		httpJson(res, suiteRuns, http.StatusOK)
 	case http.MethodPost:
 		b, err := ioutil.ReadAll(req.Body)
 		if err != nil {

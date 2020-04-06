@@ -110,7 +110,7 @@ func (d *Database) Attachment(id string) (*Attachment, error) {
 	return attachment, nil
 }
 
-func (d *Database) AllAttachments() ([]Attachment, error) {
+func (d *Database) AllAttachments() ([]*Attachment, error) {
 	cursor, err := d.mgoBucket.Find(bson.M{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to find within GridFS: %v", err)
@@ -121,7 +121,7 @@ func (d *Database) AllAttachments() ([]Attachment, error) {
 		}
 	}()
 
-	attachments := make([]Attachment, 0)
+	attachments := make([]*Attachment, 0)
 	if err := cursor.All(newCtx(), &attachments); err != nil {
 		return nil, fmt.Errorf("failed to traverse and decode GridFS cursor: %v", err)
 	}

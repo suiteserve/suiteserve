@@ -6,6 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
 )
 
@@ -97,4 +98,23 @@ func (d *Database) SuiteRun(id string) (*SuiteRun, error) {
 		return nil, fmt.Errorf("failed to decode suite run result: %v", err)
 	}
 	return &suiteRun, nil
+}
+
+func (d *Database) AllSuiteRuns(since time.Time) ([]*SuiteRun, error) {
+	ctx := newCtx()
+	cursor, err := d.mgoDb.Collection(suiteRunsCollection).Find(ctx, bson.M{
+		"created_at": bson.M{"$gte": since.Unix()},
+	}, options.Find().SetSort(bson.D{
+		{"created_at", -1},
+		{"_id", -1},
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("failed to find suite runs: %v", err)
+	}
+
+	suiteRuns := make([]*SuiteRun, 0)
+	if err := cursor.All(ctx, &suiteRuns); err != nil {
+		return nil, fmt.Errorf("failed to traverse and decode suite run cursor: %v", err)
+	}
+	return suiteRuns, nil
 }

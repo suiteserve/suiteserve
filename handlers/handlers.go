@@ -14,8 +14,9 @@ import (
 const timeout = 10 * time.Second
 
 const (
-	errUnknown = "unknown"
-	errBadJson = "bad_json"
+	errUnknown  = "unknown"
+	errBadJson  = "bad_json"
+	errBadQuery = "bad_query"
 
 	errNoAttachmentFile   = "no_attachment_file"
 	errAttachmentNotFound = "attachment_not_found"
