@@ -118,3 +118,20 @@ func (d *Database) AllSuiteRuns(since time.Time) ([]*SuiteRun, error) {
 	}
 	return suiteRuns, nil
 }
+
+func (d *Database) DeleteSuiteRun(id string) error {
+	oid, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	res, err := d.mgoDb.Collection(suiteRunsCollection).DeleteOne(newCtx(), bson.M{
+		"_id": oid,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete suite run: %v", err)
+	} else if res.DeletedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

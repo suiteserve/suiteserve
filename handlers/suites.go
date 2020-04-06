@@ -30,15 +30,15 @@ func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
 		}
 		httpJson(res, suiteRun, http.StatusOK)
 	case http.MethodDelete:
-		//	if err := s.db.DeleteAttachment(id); err == database.ErrNotFound {
-		//		httpError(res, errAttachmentNotFound, http.StatusNotFound)
-		//		return
-		//	} else if err != nil {
-		//		log.Printf("failed to delete attachment: %v\n", err)
-		//		httpError(res, errUnknown, http.StatusInternalServerError)
-		//		return
-		//	}
-		//	res.WriteHeader(http.StatusNoContent)
+		if err := s.db.DeleteSuiteRun(id); err == database.ErrNotFound {
+			httpError(res, errSuiteRunNotFound, http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("failed to delete suite run: %v\n", err)
+			httpError(res, errUnknown, http.StatusInternalServerError)
+			return
+		}
+		res.WriteHeader(http.StatusNoContent)
 	}
 }
 
