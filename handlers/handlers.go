@@ -19,6 +19,8 @@ const (
 
 	errNoAttachmentFile   = "no_attachment_file"
 	errAttachmentNotFound = "attachment_not_found"
+
+	errSuiteRunNotFound = "suite_run_not_found"
 )
 
 type srv struct {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/gorilla/mux"
 	"github.com/tmazeika/testpass/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"io/ioutil"
@@ -9,41 +10,23 @@ import (
 )
 
 func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
-	//id, ok := mux.Vars(req)["suiteId"]
-	//if !ok {
-	//	panic("request parameter 'suiteId' not found")
-	//}
+	id, ok := mux.Vars(req)["suiteId"]
+	if !ok {
+		panic("request parameter 'suiteId' not found")
+	}
 
 	switch req.Method {
 	case http.MethodGet:
-	//	attachment, err := s.db.Attachment(id)
-	//	if err == database.ErrNotFound {
-	//		httpError(res, errAttachmentNotFound, http.StatusNotFound)
-	//		return
-	//	} else if err != nil {
-	//		log.Printf("failed to get attachment: %v\n", err)
-	//		httpError(res, errUnknown, http.StatusInternalServerError)
-	//		return
-	//	}
-	//
-	//	if err := attachment.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-	//		log.Printf("failed to set attachment download deadline: %v\n", err)
-	//		http.Error(res, errUnknown, http.StatusInternalServerError)
-	//		return
-	//	}
-	//
-	//	res.Header().Set("Cache-Control", "private, max-age=31536000")
-	//	res.Header().Set("Content-Size", strconv.FormatInt(attachment.Size, 10))
-	//	res.Header().Set("Content-Disposition", "inline; filename="+
-	//		strconv.Quote(attachment.Name))
-	//	res.Header().Set("Content-Type", attachment.Metadata.ContentType)
-	//	res.Header().Set("X-Content-Type-Options", "nosniff")
-	//
-	//	if _, err := io.Copy(res, attachment); err != nil {
-	//		log.Printf("failed to copy attachment to response: %v\n", err)
-	//		httpError(res, errUnknown, http.StatusInternalServerError)
-	//		return
-	//	}
+		suiteRun, err := s.db.SuiteRun(id)
+		if err == database.ErrNotFound {
+			httpError(res, errSuiteRunNotFound, http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("failed to get suite run: %v\n", err)
+			httpError(res, errUnknown, http.StatusInternalServerError)
+			return
+		}
+		httpJson(res, suiteRun, http.StatusOK)
 	case http.MethodDelete:
 		//	if err := s.db.DeleteAttachment(id); err == database.ErrNotFound {
 		//		httpError(res, errAttachmentNotFound, http.StatusNotFound)
