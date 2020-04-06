@@ -135,3 +135,10 @@ func (d *Database) DeleteSuiteRun(id string) error {
 	}
 	return nil
 }
+
+func (d *Database) DeleteAllSuiteRuns() error {
+	if err := d.mgoDb.Collection(suiteRunsCollection).Drop(newCtx()); err != nil {
+		return fmt.Errorf("failed to drop suite_runs collection: %v", err)
+	}
+	return nil
+}

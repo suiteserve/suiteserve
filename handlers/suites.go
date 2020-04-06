@@ -91,11 +91,11 @@ func (s *srv) suitesHandler(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Location", loc.String())
 		httpJson(res, bson.M{"id": id}, http.StatusCreated)
 	case http.MethodDelete:
-		//if err := s.db.DeleteAllAttachments(); err != nil {
-		//	log.Printf("failed to delete attachments: %v\n", err)
-		//	httpError(res, errUnknown, http.StatusInternalServerError)
-		//	return
-		//}
-		//res.WriteHeader(http.StatusNoContent)
+		if err := s.db.DeleteAllSuiteRuns(); err != nil {
+			log.Printf("failed to delete suite runs: %v\n", err)
+			httpError(res, errUnknown, http.StatusInternalServerError)
+			return
+		}
+		res.WriteHeader(http.StatusNoContent)
 	}
 }
