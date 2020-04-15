@@ -4,24 +4,20 @@ import (
 	"time"
 )
 
-type CaseLinkType string
+type (
+	CaseLinkType string
+	CaseArgType  string
+	CaseStatus   string
+)
 
 const (
 	CaseLinkTypeIssue CaseLinkType = "issue"
 	CaseLinkTypeOther              = "other"
-)
 
-type CaseArgType string
-
-const (
 	CaseArgTypeString  CaseArgType = "string"
 	CaseArgTypeNumber              = "number"
 	CaseArgTypeBoolean             = "boolean"
-)
 
-type CaseStatus string
-
-const (
 	CaseStatusDisabled CaseStatus = "disabled"
 	CaseStatusCreated             = "created"
 	CaseStatusRunning             = "running"
@@ -33,7 +29,7 @@ const (
 type CaseLink struct {
 	Type CaseLinkType `json:"type"`
 	Name string       `json:"name"`
-	URL  string       `json:"url"`
+	Url  string       `json:"url"`
 }
 
 type CaseArg struct {
@@ -43,14 +39,23 @@ type CaseArg struct {
 }
 
 type CaseRun struct {
-	Id          string     `json:"id"`
-	Name        string     `json:"name"`
-	Description string     `json:"description,omitempty"`
-	Links       []CaseLink `json:"links"`
-	Tags        []string   `json:"tags"`
-	Args        []CaseArg  `json:"args"`
-	Status      string     `json:"status"`
-	StartedAt   time.Time  `json:"started_at,omitempty"`
-	FinishedAt  time.Time  `json:"finished_at,omitempty"`
-	RetryOf     string     `json:"retry_of,omitempty"`
+	Id          interface{} `json:"id" bson:"_id,omitempty"`
+	Name        string      `json:"name"`
+	Description string      `json:"description,omitempty" bson:",omitempty"`
+	Attachments []string    `json:"attachments,omitempty" bson:",omitempty"`
+	Links       []CaseLink  `json:"links,omitempty" bson:",omitempty"`
+	Tags        []string    `json:"tags,omitempty" bson:",omitempty"`
+	Args        []CaseArg   `json:"args,omitempty" bson:",omitempty"`
+	Status      string      `json:"status"`
+	StartedAt   int64       `json:"started_at,omitempty" bson:"started_at,omitempty"`
+	FinishedAt  int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+	RetryOf     string      `json:"retry_of,omitempty" bson:"retry_of,omitempty"`
+}
+
+func (c *CaseRun) StartedAtTime() time.Time {
+	return time.Unix(c.StartedAt, 0)
+}
+
+func (c *CaseRun) FinishedAtTime() time.Time {
+	return time.Unix(c.FinishedAt, 0)
 }

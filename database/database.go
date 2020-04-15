@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/tmazeika/testpass/config"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/gridfs"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"net"
@@ -14,17 +13,21 @@ import (
 	"time"
 )
 
-const dbName = "testpass"
-const timeout = 10 * time.Second
+const (
+	dataDir = "data/"
+	timeout = 10 * time.Second
+)
 
 var (
-	ErrNotFound = errors.New("entity not found")
-	ErrBadJson  = errors.New("bad JSON")
+	ErrBadJson  = errors.New("bad json")
+	ErrNotFound = errors.New("not found")
 )
 
 type Database struct {
-	mgoDb     *mongo.Database
-	mgoBucket *gridfs.Bucket
+	mgoDb       *mongo.Database
+	attachments *mongo.Collection
+	cases       *mongo.Collection
+	suites      *mongo.Collection
 }
 
 func Open() (*Database, error) {
@@ -47,25 +50,26 @@ func Open() (*Database, error) {
 
 	client, err := mongo.Connect(newCtx(), opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect MongoDB: %v", err)
+		return nil, fmt.Errorf("connect DB: %v", err)
 	}
 
 	if err := client.Ping(newCtx(), readpref.Primary()); err != nil {
-		return nil, fmt.Errorf("failed to ping MongoDB: %v", err)
+		return nil, fmt.Errorf("ping DB: %v", err)
 	}
 
-	mgoDb := client.Database(dbName)
-	mgoBucket, err := gridfs.NewBucket(mgoDb)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GridFS bucket: %v", err)
-	}
-
-	return &Database{mgoDb, mgoBucket}, nil
+	mgoDb := client.Database("testpass")
+	return &Database{
+		mgoDb:       mgoDb,
+		attachments: mgoDb.Collection("attachments"),
+		cases:       mgoDb.Collection("cases"),
+		suites:      mgoDb.Collection("suites"),
+	}, nil
 }
 
 func (d *Database) Close() error {
-	if err := d.mgoDb.Client().Disconnect(newCtx()); err != nil {
-		return fmt.Errorf("failed to disconnect MongoDB: %v", err)
+	err := d.mgoDb.Client().Disconnect(newCtx())
+	if err != nil {
+		return fmt.Errorf("disconnect DB: %v", err)
 	}
 	return nil
 }

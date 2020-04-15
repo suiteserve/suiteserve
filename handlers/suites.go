@@ -21,20 +21,20 @@ func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
 	case http.MethodGet:
 		suiteRun, err := s.db.SuiteRun(id)
 		if err == database.ErrNotFound {
-			httpError(res, errSuiteRunNotFound, http.StatusNotFound)
+			httpError(res, errNotFound, http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Printf("failed to get suite run: %v\n", err)
+			log.Printf("get suite run: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
 		httpJson(res, suiteRun, http.StatusOK)
 	case http.MethodDelete:
 		if err := s.db.DeleteSuiteRun(id); err == database.ErrNotFound {
-			httpError(res, errSuiteRunNotFound, http.StatusNotFound)
+			httpError(res, errNotFound, http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Printf("failed to delete suite run: %v\n", err)
+			log.Printf("delete suite run: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
@@ -58,7 +58,7 @@ func (s *srv) suitesHandler(res http.ResponseWriter, req *http.Request) {
 
 		suiteRuns, err := s.db.AllSuiteRuns(sinceTime)
 		if err != nil {
-			log.Printf("failed to get suite runs: %v\n", err)
+			log.Printf("get suite runs: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
@@ -66,7 +66,7 @@ func (s *srv) suitesHandler(res http.ResponseWriter, req *http.Request) {
 	case http.MethodPost:
 		b, err := ioutil.ReadAll(req.Body)
 		if err != nil {
-			log.Printf("failed to read HTTP body: %v\n", err)
+			log.Printf("read http body: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
@@ -76,14 +76,14 @@ func (s *srv) suitesHandler(res http.ResponseWriter, req *http.Request) {
 			httpError(res, errBadJson, http.StatusBadRequest)
 			return
 		} else if err != nil {
-			log.Printf("failed to create new suite run: %v\n", err)
+			log.Printf("create suite run: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
 
 		loc, err := s.router.Get("suite").URL("suite_id", id)
 		if err != nil {
-			log.Printf("failed to build URL to suite: %v\n", err)
+			log.Printf("build suite url: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
@@ -92,7 +92,7 @@ func (s *srv) suitesHandler(res http.ResponseWriter, req *http.Request) {
 		httpJson(res, bson.M{"id": id}, http.StatusCreated)
 	case http.MethodDelete:
 		if err := s.db.DeleteAllSuiteRuns(); err != nil {
-			log.Printf("failed to delete suite runs: %v\n", err)
+			log.Printf("delete suite runs: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}

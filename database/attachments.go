@@ -5,125 +5,115 @@ import (
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo/gridfs"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"io"
-	"log"
 	"mime"
 	"net/http"
+	"os"
 	"path"
-	"time"
+	"path/filepath"
 )
 
-type AttachmentMetadata struct {
-	ContentType string `json:"content_type" bson:"contentType"`
-}
-
 type Attachment struct {
-	*gridfs.DownloadStream
-
-	Id                 string `json:"id" bson:"_id,omitempty"`
-	Name               string `json:"name" bson:"filename"`
-	Size               int64  `json:"size" bson:"length"`
-	AttachmentMetadata `bson:"metadata"`
+	Id          interface{} `json:"id" bson:"_id,omitempty"`
+	Filename    string      `json:"filename"`
+	Size        int64       `json:"size"`
+	ContentType string      `json:"content_type" bson:"content_type"`
 }
 
-func (d *Database) NewAttachment(name, contentType string, src io.Reader) (string, error) {
-	oid := primitive.NewObjectID()
+func (a *Attachment) Open() (io.ReadCloser, error) {
+	file, err := os.OpenFile(a.savedFilename(), os.O_RDONLY, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("open attachment file: %v", err)
+	}
+	return file, nil
+}
 
+func (a *Attachment) saveFile(src io.Reader) (err error) {
+	file, err := os.OpenFile(a.savedFilename(), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("open attachment file: %v", err)
+	}
+	defer func() {
+		if err = file.Close(); err != nil {
+			err = fmt.Errorf("close attachment file: %v", err)
+		}
+	}()
+
+	a.Size, err = io.Copy(file, src)
+	if err != nil {
+		return fmt.Errorf("copy attachment to file: %v", err)
+	}
+	return nil
+}
+
+func (a *Attachment) deleteFile() error {
+	if err := os.Remove(a.savedFilename()); err != nil {
+		return fmt.Errorf("delete attachment file: %v", err)
+	}
+	return nil
+}
+
+func (a *Attachment) savedFilename() string {
+	return path.Join(dataDir, a.Id.(primitive.ObjectID).Hex()+".attachment")
+}
+
+func (d *Database) NewAttachment(filename, contentType string, src io.Reader) (string, error) {
 	// Sniff content type.
 	var buf bytes.Buffer
 	if contentType == "" {
-		contentType = mime.TypeByExtension(path.Ext(name))
+		contentType = mime.TypeByExtension(path.Ext(filename))
 	}
 	if contentType == "" {
 		if _, err := io.CopyN(&buf, src, 512); err != nil {
-			return "", fmt.Errorf("failed to copy source to buffer: %v", err)
+			return "", err
 		}
 		contentType = http.DetectContentType(buf.Bytes())
 	}
 
-	opts := options.GridFSUpload().SetMetadata(bson.M{
-		"contentType": contentType,
-	})
-
-	dst, err := d.mgoBucket.OpenUploadStreamWithID(oid, name, opts)
-	if err != nil {
-		return "", fmt.Errorf("failed to open GridFS upload stream: %v", err)
+	oid := primitive.NewObjectID()
+	attachment := &Attachment{
+		Id:          oid,
+		Filename:    filename,
+		ContentType: contentType,
 	}
-	defer func() {
-		if err := dst.Close(); err != nil {
-			log.Printf("failed to close GridFS upload stream: %v\n", err)
-		}
-	}()
-
-	if err := dst.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
-		return "", fmt.Errorf("failed to set GridFS upload deadline: %v", err)
+	if err := attachment.saveFile(io.MultiReader(&buf, src)); err != nil {
+		return "", err
 	}
-
-	_, err = io.Copy(dst, &buf)
-	if err != nil {
-		return "", fmt.Errorf("failed to copy buffer to GridFS: %v", err)
+	if _, err := d.attachments.InsertOne(newCtx(), attachment); err != nil {
+		return "", fmt.Errorf("insert attachment: %v", err)
 	}
-	_, err = io.Copy(dst, src)
-	if err != nil {
-		return "", fmt.Errorf("failed to copy source to GridFS: %v", err)
-	}
-
 	return oid.Hex(), nil
 }
 
 func (d *Database) Attachment(id string) (*Attachment, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, ErrNotFound
+		return nil, fmt.Errorf("parse object id: %w", ErrNotFound)
 	}
 
-	src, err := d.mgoBucket.OpenDownloadStream(oid)
-	if err == gridfs.ErrFileNotFound {
+	cursor := d.attachments.FindOne(newCtx(), bson.M{"_id": oid})
+
+	var attachment Attachment
+	if err := cursor.Decode(&attachment); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to open GridFS download stream: %v", err)
+		return nil, fmt.Errorf("decode attachment: %v", err)
 	}
-
-	cursor, err := d.mgoBucket.Find(bson.M{"_id": oid})
-	if err != nil {
-		return nil, fmt.Errorf("failed to find within GridFS: %v", err)
-	}
-	defer func() {
-		if err := cursor.Close(newCtx()); err != nil {
-			log.Printf("failed to close GridFS cursor: %v\n", err)
-		}
-	}()
-
-	if ok := cursor.Next(newCtx()); !ok {
-		return nil, fmt.Errorf("failed to traverse GridFS cursor: %v", cursor.Err())
-	}
-
-	attachment := &Attachment{
-		DownloadStream: src,
-	}
-	if err := cursor.Decode(attachment); err != nil {
-		return nil, fmt.Errorf("failed to decode GridFS cursor: %v", err)
-	}
-
-	return attachment, nil
+	return &attachment, nil
 }
 
-func (d *Database) AllAttachments() ([]*Attachment, error) {
-	cursor, err := d.mgoBucket.Find(bson.M{})
+func (d *Database) Attachments() ([]*Attachment, error) {
+	ctx := newCtx()
+	cursor, err := d.attachments.Find(ctx, bson.M{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to find within GridFS: %v", err)
+		return nil, fmt.Errorf("find attachments: %v", err)
 	}
-	defer func() {
-		if err := cursor.Close(newCtx()); err != nil {
-			log.Printf("failed to close GridFS cursor: %v\n", err)
-		}
-	}()
 
 	attachments := make([]*Attachment, 0)
-	if err := cursor.All(newCtx(), &attachments); err != nil {
-		return nil, fmt.Errorf("failed to traverse and decode GridFS cursor: %v", err)
+	if err := cursor.All(ctx, &attachments); err != nil {
+		return nil, fmt.Errorf("decode attachments: %v", err)
 	}
 	return attachments, nil
 }
@@ -131,20 +121,36 @@ func (d *Database) AllAttachments() ([]*Attachment, error) {
 func (d *Database) DeleteAttachment(id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return ErrNotFound
+		return fmt.Errorf("parse object id: %w", ErrNotFound)
 	}
 
-	if err := d.mgoBucket.Delete(oid); err == gridfs.ErrFileNotFound {
-		return ErrNotFound
-	} else if err != nil {
-		return fmt.Errorf("failed to delete within GridFS: %v", err)
+	res := d.attachments.FindOneAndDelete(newCtx(), bson.M{
+		"_id": oid,
+	}, options.FindOneAndDelete().SetProjection(bson.D{
+		{"_id", 1},
+	}))
+
+	var attachment Attachment
+	if err := res.Decode(&attachment); err != nil {
+		return fmt.Errorf("decode attachment: %v", err)
 	}
-	return nil
+	return attachment.deleteFile()
 }
 
-func (d *Database) DeleteAllAttachments() error {
-	if err := d.mgoBucket.Drop(); err != nil {
-		return fmt.Errorf("failed to drop GridFS bucket: %v", err)
+func (d *Database) DeleteAttachments() error {
+	_, err := d.attachments.DeleteMany(newCtx(), bson.M{})
+	if err != nil {
+		return fmt.Errorf("delete attachments: %v", err)
+	}
+
+	attachments, err := filepath.Glob(filepath.Join(dataDir, "*.attachment"))
+	if err != nil {
+		panic(err)
+	}
+	for _, filename := range attachments {
+		if err := os.Remove(filename); err != nil {
+			return fmt.Errorf("delete attachment file: %v", err)
+		}
 	}
 	return nil
 }

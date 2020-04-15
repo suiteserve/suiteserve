@@ -12,5 +12,5 @@ ENV HOST 0.0.0.0
 ENV PORT 8080
 ENV MONGO_HOST mongo
 EXPOSE $PORT
-VOLUME /app/tls/
+VOLUME /app/data/ /app/tls/
 ENTRYPOINT ["./testpass"]

@@ -9,7 +9,6 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
@@ -22,38 +21,44 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 	case http.MethodGet:
 		attachment, err := s.db.Attachment(id)
 		if err == database.ErrNotFound {
-			httpError(res, errAttachmentNotFound, http.StatusNotFound)
+			httpError(res, errNotFound, http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Printf("failed to get attachment: %v\n", err)
+			log.Printf("get attachment: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
-			return
-		}
-
-		if err := attachment.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			log.Printf("failed to set attachment download deadline: %v\n", err)
-			http.Error(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
 
 		res.Header().Set("Cache-Control", "private, max-age=31536000")
 		res.Header().Set("Content-Size", strconv.FormatInt(attachment.Size, 10))
 		res.Header().Set("Content-Disposition", "inline; filename="+
-			strconv.Quote(attachment.Name))
+			strconv.Quote(attachment.Filename))
 		res.Header().Set("Content-Type", attachment.ContentType)
 		res.Header().Set("X-Content-Type-Options", "nosniff")
 
-		if _, err := io.Copy(res, attachment); err != nil {
-			log.Printf("failed to copy attachment to response: %v\n", err)
+		attachmentFile, err := attachment.Open()
+		if err != nil {
+			log.Printf("open attachment: %v\n", err)
+			httpError(res, errUnknown, http.StatusInternalServerError)
+			return
+		}
+		defer func() {
+			if err := attachmentFile.Close(); err != nil {
+				log.Printf("close attachment: %v\n", err)
+			}
+		}()
+
+		if _, err := io.Copy(res, attachmentFile); err != nil {
+			log.Printf("copy attachment to response: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
 	case http.MethodDelete:
 		if err := s.db.DeleteAttachment(id); err == database.ErrNotFound {
-			httpError(res, errAttachmentNotFound, http.StatusNotFound)
+			httpError(res, errNotFound, http.StatusNotFound)
 			return
 		} else if err != nil {
-			log.Printf("failed to delete attachment: %v\n", err)
+			log.Printf("delete attachment: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
@@ -64,9 +69,9 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) {
 func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		attachments, err := s.db.AllAttachments()
+		attachments, err := s.db.Attachments()
 		if err != nil {
-			log.Printf("failed to get attachments: %v\n", err)
+			log.Printf("get attachments: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
@@ -74,16 +79,16 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 	case http.MethodPost:
 		src, header, err := req.FormFile("file")
 		if err == http.ErrMissingFile {
-			httpError(res, errNoAttachmentFile, http.StatusBadRequest)
+			httpError(res, errNotFound, http.StatusBadRequest)
 			return
 		} else if err != nil {
-			log.Printf("failed to get form file: %v\n", err)
+			log.Printf("get form file: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
 		defer func() {
 			if err := src.Close(); err != nil {
-				log.Printf("failed to close form file: %v\n", err)
+				log.Printf("close form file: %v\n", err)
 			}
 		}()
 
@@ -97,14 +102,14 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 
 		id, err := s.db.NewAttachment(header.Filename, contentType, src)
 		if err != nil {
-			log.Printf("failed to save attachment: %v\n", err)
+			log.Printf("save attachment: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
 
 		loc, err := s.router.Get("attachment").URL("attachment_id", id)
 		if err != nil {
-			log.Printf("failed to build URL to attachment: %v\n", err)
+			log.Printf("build attachment url: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
@@ -112,8 +117,8 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 		res.Header().Set("Location", loc.String())
 		httpJson(res, bson.M{"id": id}, http.StatusCreated)
 	case http.MethodDelete:
-		if err := s.db.DeleteAllAttachments(); err != nil {
-			log.Printf("failed to delete attachments: %v\n", err)
+		if err := s.db.DeleteAttachments(); err != nil {
+			log.Printf("delete attachments: %v\n", err)
 			httpError(res, errUnknown, http.StatusInternalServerError)
 			return
 		}
