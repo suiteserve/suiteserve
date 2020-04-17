@@ -7,12 +7,10 @@ import (
 	"github.com/tmazeika/testpass/database"
 	"log"
 	"net/http"
-	"time"
 )
 
 const (
 	publicDir = "public/"
-	timeout   = 10 * time.Second
 
 	errBadJson  = "bad_json"
 	errBadQuery = "bad_query"
