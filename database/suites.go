@@ -10,19 +10,12 @@ import (
 	"time"
 )
 
-type (
-	SuiteStatus  string
-	SuiteEnvType string
-)
+type SuiteStatus string
 
 const (
 	SuiteStatusCreated  SuiteStatus = "created"
 	SuiteStatusRunning              = "running"
 	SuiteStatusFinished             = "finished"
-
-	SuiteEnvTypeString  SuiteEnvType = "string"
-	SuiteEnvTypeNumber               = "number"
-	SuiteEnvTypeBoolean              = "boolean"
 )
 
 type SuiteFailureType struct {
@@ -31,9 +24,8 @@ type SuiteFailureType struct {
 }
 
 type SuiteEnvVar struct {
-	Type  SuiteEnvType `json:"type"`
-	Key   string       `json:"key"`
-	Value string       `json:"value"`
+	Key   string      `json:"key"`
+	Value interface{} `json:"value"`
 }
 
 type NewSuiteRun struct {
@@ -50,8 +42,8 @@ func (s *NewSuiteRun) CreatedAtTime() time.Time {
 }
 
 type SuiteRun struct {
-	Id           string `json:"id" bson:"_id,omitempty"`
-	*NewSuiteRun `bson:",inline"`
+	Id           interface{} `json:"id" bson:"_id,omitempty"`
+	NewSuiteRun `bson:",inline"`
 	Status       SuiteStatus `json:"status"`
 	FinishedAt   int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
 }
@@ -61,12 +53,12 @@ func (s *SuiteRun) FinishedAtTime() time.Time {
 }
 
 func (d *Database) NewSuiteRun(b []byte) (string, error) {
-	var newSuiteRun *NewSuiteRun
-	if err := json.Unmarshal(b, newSuiteRun); err != nil {
+	var newSuiteRun NewSuiteRun
+	if err := json.Unmarshal(b, &newSuiteRun); err != nil {
 		return "", ErrBadJson
 	}
 
-	suiteRun := &SuiteRun{
+	suiteRun := SuiteRun{
 		NewSuiteRun: newSuiteRun,
 		Status:      SuiteStatusCreated,
 	}
@@ -81,24 +73,21 @@ func (d *Database) NewSuiteRun(b []byte) (string, error) {
 func (d *Database) SuiteRun(id string) (*SuiteRun, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return nil, ErrNotFound
+		return nil, fmt.Errorf("parse object id: %w", ErrNotFound)
 	}
 
 	res := d.suites.FindOne(newCtx(), bson.M{"_id": oid})
-	if err := res.Err(); err == mongo.ErrNoDocuments {
-		return nil, ErrNotFound
-	} else if err != nil {
-		return nil, fmt.Errorf("find suite run: %v", err)
-	}
 
 	var suiteRun SuiteRun
-	if err := res.Decode(&suiteRun); err != nil {
-		return nil, fmt.Errorf("decode suite run result: %v", err)
+	if err := res.Decode(&suiteRun); err == mongo.ErrNoDocuments {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("decode suite run: %v", err)
 	}
 	return &suiteRun, nil
 }
 
-func (d *Database) AllSuiteRuns(since time.Time) ([]*SuiteRun, error) {
+func (d *Database) AllSuiteRuns(since time.Time) ([]SuiteRun, error) {
 	ctx := newCtx()
 	cursor, err := d.suites.Find(ctx, bson.M{
 		"created_at": bson.M{"$gte": since.Unix()},
@@ -110,7 +99,7 @@ func (d *Database) AllSuiteRuns(since time.Time) ([]*SuiteRun, error) {
 		return nil, fmt.Errorf("find suite runs: %v", err)
 	}
 
-	suiteRuns := make([]*SuiteRun, 0)
+	suiteRuns := make([]SuiteRun, 0)
 	if err := cursor.All(ctx, &suiteRuns); err != nil {
 		return nil, fmt.Errorf("decode suite run: %v", err)
 	}
@@ -120,7 +109,7 @@ func (d *Database) AllSuiteRuns(since time.Time) ([]*SuiteRun, error) {
 func (d *Database) DeleteSuiteRun(id string) error {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return ErrNotFound
+		return fmt.Errorf("parse object id: %w", ErrNotFound)
 	}
 
 	res, err := d.suites.DeleteOne(newCtx(), bson.M{"_id": oid})

@@ -59,3 +59,6 @@ func (c *CaseRun) StartedAtTime() time.Time {
 func (c *CaseRun) FinishedAtTime() time.Time {
 	return time.Unix(c.FinishedAt, 0)
 }
+
+func NewCaseRun() {
+}

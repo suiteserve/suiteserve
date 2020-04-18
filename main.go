@@ -42,7 +42,7 @@ func main() {
 
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
 		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("shutdown http: %v", err)
+			log.Printf("shutdown http: %v\n", err)
 		}
 		close(srvDone)
 	}()

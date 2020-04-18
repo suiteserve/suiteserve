@@ -2,21 +2,26 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/tmazeika/testpass/database"
 	"log"
 	"net/http"
+	"strings"
 )
 
 const (
 	publicDir = "public/"
+)
 
-	errBadJson  = "bad_json"
-	errBadQuery = "bad_query"
-	errNoFile   = "no_file"
-	errNotFound = "not_found"
-	errUnknown  = "unknown"
+var (
+	errBadFile  = errors.New("bad_file")
+	errBadJson  = errors.New("bad_json")
+	errBadQuery = errors.New("bad_query")
+	errNotFound = errors.New("not_found")
+	errUnknown  = errors.New("unknown")
 )
 
 type srv struct {
@@ -28,9 +33,27 @@ func Handler(db *database.Database) http.Handler {
 	router := mux.NewRouter()
 	srv := &srv{db, router}
 
+	router.Use(methodOverrideHandler)
+	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
+	router.Use(func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+			res.Header().Set("Content-Security-Policy",
+				"sandbox; default-src 'none';")
+			h.ServeHTTP(res, req)
+		})
+	})
+
 	// Static files.
 	publicSrv := http.FileServer(http.Dir(publicDir))
-	router.Path("/").Handler(publicSrv)
+	router.Path("/").HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Set("Content-Security-Policy", "block-all-mixed-content;" +
+			"default-src 'none';"+
+			"form-action 'self';"+
+			"img-src 'self';"+
+			"script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net;"+
+			"style-src 'self';")
+		publicSrv.ServeHTTP(res, req)
+	})
 	router.Path("/favicon.ico").Handler(publicSrv)
 	router.PathPrefix("/static/").Handler(publicSrv)
 
@@ -58,7 +81,7 @@ func Handler(db *database.Database) http.Handler {
 func methodOverrideHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		if req.Method == http.MethodPost {
-			m := req.FormValue("_method")
+			m := strings.ToUpper(req.FormValue("_method"))
 			if m == http.MethodPut || m == http.MethodPatch || m == http.MethodDelete {
 				req.Method = m
 			}
@@ -67,8 +90,8 @@ func methodOverrideHandler(h http.Handler) http.Handler {
 	})
 }
 
-func httpError(res http.ResponseWriter, error string, code int) {
-	httpJson(res, map[string]string{"error": error}, code)
+func httpError(res http.ResponseWriter, error error, code int) {
+	httpJson(res, map[string]interface{}{"error": error}, code)
 }
 
 func httpJson(res http.ResponseWriter, v interface{}, code int) {
@@ -79,7 +102,7 @@ func httpJson(res http.ResponseWriter, v interface{}, code int) {
 	if err := json.NewEncoder(res).Encode(v); err != nil {
 		log.Printf("encode json: %v\n", err)
 		res.WriteHeader(http.StatusInternalServerError)
-		if _, err := fmt.Fprintf(res, `{"error":"`+errUnknown+`"}"`); err != nil {
+		if _, err := fmt.Fprintf(res, `{"error":"`+errUnknown.Error()+`"}"`); err != nil {
 			log.Printf("http response: %v\n", err)
 		}
 	}

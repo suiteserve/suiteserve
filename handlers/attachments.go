@@ -78,12 +78,8 @@ func (s *srv) attachmentsHandler(res http.ResponseWriter, req *http.Request) {
 		httpJson(res, attachments, http.StatusOK)
 	case http.MethodPost:
 		src, header, err := req.FormFile("file")
-		if err == http.ErrMissingFile {
-			httpError(res, errNoFile, http.StatusBadRequest)
-			return
-		} else if err != nil {
-			log.Printf("get form file: %v\n", err)
-			httpError(res, errUnknown, http.StatusInternalServerError)
+		if err != nil {
+			httpError(res, errBadFile, http.StatusBadRequest)
 			return
 		}
 		defer func() {

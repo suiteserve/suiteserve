@@ -73,7 +73,7 @@ func (d *Database) NewAttachment(filename, contentType string, src io.Reader) (s
 	}
 
 	oid := primitive.NewObjectID()
-	attachment := &Attachment{
+	attachment := Attachment{
 		Id:          oid,
 		Filename:    filename,
 		ContentType: contentType,
@@ -104,14 +104,14 @@ func (d *Database) Attachment(id string) (*Attachment, error) {
 	return &attachment, nil
 }
 
-func (d *Database) Attachments() ([]*Attachment, error) {
+func (d *Database) Attachments() ([]Attachment, error) {
 	ctx := newCtx()
 	cursor, err := d.attachments.Find(ctx, bson.M{})
 	if err != nil {
 		return nil, fmt.Errorf("find attachments: %v", err)
 	}
 
-	attachments := make([]*Attachment, 0)
+	attachments := make([]Attachment, 0)
 	if err := cursor.All(ctx, &attachments); err != nil {
 		return nil, fmt.Errorf("decode attachments: %v", err)
 	}

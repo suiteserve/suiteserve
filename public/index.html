@@ -8,27 +8,31 @@
   <title>TestPass</title>
 </head>
 <body>
-  <main id="app">
-    <h2>Upload Attachment</h2>
+<main id="app">
+  <h2>Upload Attachment</h2>
 
-    <form method="post" action="/attachments" enctype="multipart/form-data">
-      <input type="file" name="file"/>
-      <input type="submit" value="Upload"/>
-    </form>
+  <form method="post" action="/attachments" enctype="multipart/form-data">
+    <input type="file" name="file"/>
+    <input type="submit" value="Upload"/>
+  </form>
 
-    <h2>Delete Attachment</h2>
+  <a href="/attachments">All Attachments</a>
 
-    <form id="delete-attachment-form" method="post" :action="`/attachments/${deleteAttachmentId}`">
-      <input type="hidden" name="_method" value="DELETE">
-      <div>
-        <label for="delete-attachment-form-id">ID</label>
-        <input id="delete-attachment-form-id" type="text" name="id" v-model="deleteAttachmentId"/>
-      </div>
-      <input type="submit" value="Delete"/>
-    </form>
-  </main>
+  <h2>Delete Attachment</h2>
 
-  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-  <script src="/static/script.js"></script>
+  <form id="delete-attachment-form" method="post" :action="`/attachments/${deleteAttachmentId}`">
+    <input type="hidden" name="_method" value="delete">
+    <div>
+      <label for="delete-attachment-form-id">ID</label>
+      <input id="delete-attachment-form-id" type="text" name="id" v-model="deleteAttachmentId"/>
+    </div>
+    <input type="submit" value="Delete"/>
+  </form>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"
+        integrity="sha384-+jvb+jCJ37FkNjPyYLI3KJzQeD8pPFXUra3B/QJFqQ3txYrUPIP1eOfxK4h3cKZP"
+        crossorigin="anonymous"></script>
+<script src="/static/script.js"></script>
 </body>
 </html>
