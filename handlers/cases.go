@@ -29,6 +29,8 @@ func (s *srv) caseHandler(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 		s.getCaseHandler(res, req, suiteId, uint(caseNum))
+	case http.MethodPatch:
+		s.patchCaseHandler(res, req, suiteId, uint(caseNum))
 	case http.MethodDelete:
 		s.deleteCaseHandler(res, req, suiteId, uint(caseNum))
 	default:
@@ -45,6 +47,23 @@ func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, suiteId
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
 		httpJson(res, caseRuns, http.StatusOK)
+	}
+}
+
+func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, suiteId string, caseNum uint) {
+	var caseRun database.UpdateCaseRun
+	if err := json.NewDecoder(req.Body).Decode(&caseRun); err != nil {
+		httpError(res, errBadJson, http.StatusBadRequest)
+		return
+	}
+	err := s.db.WithContext(req.Context()).UpdateCaseRun(suiteId, caseNum, caseRun)
+	if errors.Is(err, database.ErrInvalidModel) {
+		httpError(res, errBadJson, http.StatusBadRequest)
+	} else if err != nil {
+		log.Printf("update case run: %v\n", err)
+		httpError(res, errUnknown, http.StatusInternalServerError)
+	} else {
+		res.WriteHeader(http.StatusNoContent)
 	}
 }
 

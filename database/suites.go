@@ -25,12 +25,12 @@ type SuiteFailureType struct {
 
 type SuiteEnvVar struct {
 	Key   string      `json:"key" validate:"required"`
-	Value interface{} `json:"value"`
+	Value interface{} `json:"value,omitempty" bson:",omitempty"`
 }
 
 type NewSuiteRun struct {
 	FailureTypes []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty" validate:"dive"`
-	Tags         []string           `json:"tags,omitempty" bson:",omitempty" validate:"dive,required"`
+	Tags         []string           `json:"tags,omitempty" bson:",omitempty" validate:"unique,dive,required"`
 	EnvVars      []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty" validate:"dive"`
 	Attachments  []string           `json:"attachments,omitempty" bson:",omitempty" validate:"dive,required"`
 	PlannedCases uint               `json:"planned_cases" bson:"planned_cases"`

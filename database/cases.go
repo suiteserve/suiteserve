@@ -26,25 +26,30 @@ const (
 )
 
 type CaseLink struct {
-	Type CaseLinkType `json:"type" validate:"required,oneof=issue other"`
+	Type CaseLinkType `json:"type" validate:"oneof=issue other"`
 	Name string       `json:"name" validate:"required"`
-	Url  string       `json:"url" validate:"required"`
+	Url  string       `json:"url" validate:"url"`
 }
 
 type CaseArg struct {
 	Key   string      `json:"key" validate:"required"`
-	Value interface{} `json:"value"`
+	Value interface{} `json:"value,omitempty" bson:",omitempty"`
 }
 
 type NewCaseRun struct {
 	Name        string     `json:"name" validate:"required"`
-	Num         uint       `json:"num" validate:"gte=0"`
+	Num         uint       `json:"num"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`
 	Attachments []string   `json:"attachments,omitempty" bson:",omitempty" validate:"dive,required"`
 	Links       []CaseLink `json:"links,omitempty" bson:",omitempty" validate:"dive"`
-	Tags        []string   `json:"tags,omitempty" bson:",omitempty" validate:"dive,required"`
+	Tags        []string   `json:"tags,omitempty" bson:",omitempty" validate:"unique,dive,required"`
 	Args        []CaseArg  `json:"args,omitempty" bson:",omitempty" validate:"dive"`
 	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty" validate:"gte=0"`
+}
+
+type UpdateCaseRun struct {
+	Status     string `json:"status" validate:"oneof=disabled created running passed failed errored"`
+	FinishedAt int64  `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
 }
 
 func (c *NewCaseRun) StartedAtTime() time.Time {
@@ -52,11 +57,10 @@ func (c *NewCaseRun) StartedAtTime() time.Time {
 }
 
 type CaseRun struct {
-	Id         interface{} `json:"id" bson:"_id,omitempty"`
-	Suite      string      `json:"suite"`
-	NewCaseRun `bson:",inline"`
-	Status     string `json:"status"`
-	FinishedAt int64  `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+	Id            interface{} `json:"id" bson:"_id,omitempty"`
+	Suite         string      `json:"suite"`
+	NewCaseRun    `bson:",inline"`
+	UpdateCaseRun `bson:",inline"`
 }
 
 func (c *CaseRun) FinishedAtTime() time.Time {
@@ -72,8 +76,34 @@ func (d *WithContext) NewCaseRun(suiteId string, c NewCaseRun) (string, error) {
 	return d.insert(d.cases, CaseRun{
 		Suite:      suiteId,
 		NewCaseRun: c,
-		Status:     CaseStatusCreated,
+		UpdateCaseRun: UpdateCaseRun{
+			Status:     CaseStatusCreated,
+			FinishedAt: 0,
+		},
 	})
+}
+
+func (d *WithContext) UpdateCaseRun(suiteId string, caseNum uint, c UpdateCaseRun) error {
+	if err := validate.Struct(&c); err != nil {
+		log.Printf("validate case run: %v\n", err)
+		return ErrInvalidModel
+	}
+
+	ctx, cancel := d.newContext()
+	defer cancel()
+	res := d.cases.FindOneAndUpdate(ctx, bson.M{
+		"suite": suiteId,
+		"num":   caseNum,
+	}, bson.M{
+		"$set": &c,
+	}, options.FindOneAndUpdate().SetSort(bson.D{
+		{"started_at", -1},
+		{"_id", -1},
+	}))
+	if res.Err() != nil {
+		return fmt.Errorf("update case run: %v", res.Err())
+	}
+	return nil
 }
 
 func (d *WithContext) CaseRuns(suiteId string, caseNum uint) ([]CaseRun, error) {

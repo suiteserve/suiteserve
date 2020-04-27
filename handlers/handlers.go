@@ -84,7 +84,7 @@ func Handler(db *database.Database) http.Handler {
 	// Cases.
 	router.Path("/suites/{suite_id}/cases/{case_num:[0-9]+}").
 		HandlerFunc(srv.caseHandler).
-		Methods(http.MethodGet, http.MethodDelete).
+		Methods(http.MethodGet, http.MethodPatch, http.MethodDelete).
 		Name("case")
 	router.Path("/suites/{suite_id}/cases").
 		HandlerFunc(srv.caseCollectionHandler).
