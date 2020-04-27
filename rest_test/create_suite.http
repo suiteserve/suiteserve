@@ -22,7 +22,7 @@ Content-Type: application/json
     "1234567890"
   ],
   "planned_cases": 3,
-  "created_at": 1587256618
+  "created_at": 0
 }
 
 ###
@@ -32,7 +32,7 @@ Content-Type: application/json
 
 {
   "name": "GY checkout",
-  "num": 1,
+  "num": 0,
   "description": "A new feature test",
   "started_at": 1587256716
 }

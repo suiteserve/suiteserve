@@ -29,12 +29,12 @@ type SuiteEnvVar struct {
 }
 
 type NewSuiteRun struct {
-	FailureTypes []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty"`
+	FailureTypes []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty" validate:"dive"`
 	Tags         []string           `json:"tags,omitempty" bson:",omitempty" validate:"dive,required"`
-	EnvVars      []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty"`
+	EnvVars      []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty" validate:"dive"`
 	Attachments  []string           `json:"attachments,omitempty" bson:",omitempty" validate:"dive,required"`
 	PlannedCases uint               `json:"planned_cases" bson:"planned_cases"`
-	CreatedAt    int64              `json:"created_at" bson:"created_at"`
+	CreatedAt    int64              `json:"created_at" bson:"created_at" validate:"gte=0"`
 }
 
 func (s *NewSuiteRun) CreatedAtTime() time.Time {

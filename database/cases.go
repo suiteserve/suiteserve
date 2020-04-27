@@ -41,10 +41,10 @@ type NewCaseRun struct {
 	Num         uint       `json:"num" validate:"required"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`
 	Attachments []string   `json:"attachments,omitempty" bson:",omitempty" validate:"dive,required"`
-	Links       []CaseLink `json:"links,omitempty" bson:",omitempty"`
+	Links       []CaseLink `json:"links,omitempty" bson:",omitempty" validate:"dive"`
 	Tags        []string   `json:"tags,omitempty" bson:",omitempty" validate:"dive,required"`
-	Args        []CaseArg  `json:"args,omitempty" bson:",omitempty"`
-	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty"`
+	Args        []CaseArg  `json:"args,omitempty" bson:",omitempty" validate:"dive"`
+	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty" validate:"gte=0"`
 }
 
 func (c *NewCaseRun) StartedAtTime() time.Time {
