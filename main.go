@@ -17,6 +17,7 @@ import (
 const timeout = 10 * time.Second
 
 func main() {
+	log.Println("Starting up...")
 	db, err := database.Open()
 	if err != nil {
 		log.Fatalf("open DB: %v\n", err)
@@ -39,6 +40,7 @@ func main() {
 		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt)
 		<-sigint
+		log.Println("Shutting down...")
 
 		ctx, _ := context.WithTimeout(context.Background(), timeout)
 		if err := srv.Shutdown(ctx); err != nil {

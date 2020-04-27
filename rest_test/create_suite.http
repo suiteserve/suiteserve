@@ -1,0 +1,40 @@
+POST https://localhost:8080/suites
+Content-Type: application/json
+
+{
+  "failure_types": [
+    {
+      "name": "Selenium Error",
+      "description": "Something went wrong here!"
+    }
+  ],
+  "tags": [
+    "smoke",
+    "gy"
+  ],
+  "env_vars": [
+    {
+      "key": "BROWSER",
+      "value": "CHROME"
+    }
+  ],
+  "attachments": [
+    "1234567890"
+  ],
+  "planned_cases": 3,
+  "created_at": 1587256618
+}
+
+###
+
+POST https://localhost:8080/suites/5ea63a33818dc8578b0c6936/cases
+Content-Type: application/json
+
+{
+  "name": "GY checkout",
+  "num": 1,
+  "description": "A new feature test",
+  "started_at": 1587256716
+}
+
+###

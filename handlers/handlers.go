@@ -37,8 +37,12 @@ func Handler(db *database.Database) http.Handler {
 	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
 	router.Use(func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			res.Header().Set("Content-Security-Policy",
-				"sandbox; default-src 'none';")
+			res.Header().Set("Content-Security-Policy", "sandbox;"+
+				"default-src 'none';"+
+				"base-uri 'none';"+
+				"form-action 'none';"+
+				"frame-ancestors 'none';"+
+				"img-src 'self'")
 			h.ServeHTTP(res, req)
 		})
 	})
@@ -46,9 +50,11 @@ func Handler(db *database.Database) http.Handler {
 	// Static files.
 	publicSrv := http.FileServer(http.Dir(publicDir))
 	router.Path("/").HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		res.Header().Set("Content-Security-Policy", "block-all-mixed-content;" +
+		res.Header().Set("Content-Security-Policy", "block-all-mixed-content;"+
 			"default-src 'none';"+
+			"base-uri 'none';"+
 			"form-action 'self';"+
+			"frame-ancestors 'none';"+
 			"img-src 'self';"+
 			"script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net;"+
 			"style-src 'self';")
@@ -63,7 +69,7 @@ func Handler(db *database.Database) http.Handler {
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("attachment")
 	router.Path("/attachments").
-		HandlerFunc(srv.attachmentsHandler).
+		HandlerFunc(srv.attachmentCollectionHandler).
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
 	// Suites.
@@ -72,10 +78,19 @@ func Handler(db *database.Database) http.Handler {
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("suite")
 	router.Path("/suites").
-		HandlerFunc(srv.suitesHandler).
+		HandlerFunc(srv.suiteCollectionHandler).
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
-	return methodOverrideHandler(router)
+	// Cases.
+	router.Path("/suites/{suite_id}/cases/{case_num:[0-9]+}").
+		HandlerFunc(srv.caseHandler).
+		Methods(http.MethodGet, http.MethodDelete).
+		Name("case")
+	router.Path("/suites/{suite_id}/cases").
+		HandlerFunc(srv.caseCollectionHandler).
+		Methods(http.MethodGet, http.MethodPost)
+
+	return router
 }
 
 func methodOverrideHandler(h http.Handler) http.Handler {
@@ -91,7 +106,7 @@ func methodOverrideHandler(h http.Handler) http.Handler {
 }
 
 func httpError(res http.ResponseWriter, error error, code int) {
-	httpJson(res, map[string]interface{}{"error": error}, code)
+	httpJson(res, map[string]interface{}{"error": error.Error()}, code)
 }
 
 func httpJson(res http.ResponseWriter, v interface{}, code int) {

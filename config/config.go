@@ -2,10 +2,10 @@ package config
 
 import "os"
 
-type key string
+type Key string
 
 const (
-	Host      key = "HOST"
+	Host      Key = "HOST"
 	Port          = "PORT"
 	MongoHost     = "MONGO_HOST"
 	MongoPort     = "MONGO_PORT"
@@ -13,7 +13,7 @@ const (
 	MongoPass     = "MONGO_PASS"
 )
 
-func Get(key key, defVal string) string {
+func Get(key Key, defVal string) string {
 	val, ok := os.LookupEnv(string(key))
 	if !ok {
 		return defVal
