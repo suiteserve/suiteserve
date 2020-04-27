@@ -27,12 +27,19 @@ Content-Type: application/json
 
 ###
 
-POST https://localhost:8080/suites/5ea63a33818dc8578b0c6936/cases
+POST https://localhost:8080/suites/5ea645714f34fbb33044c83b/cases
 Content-Type: application/json
 
 {
   "name": "GY checkout",
   "num": 0,
+  "links": [
+    {
+      "type": "other",
+      "name": "JIRA",
+      "url": "https://jira.derp.com/"
+    }
+  ],
   "description": "A new feature test",
   "started_at": 1587256716
 }

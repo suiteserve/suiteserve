@@ -26,7 +26,7 @@ const (
 )
 
 type CaseLink struct {
-	Type CaseLinkType `json:"type" validate:"required"`
+	Type CaseLinkType `json:"type" validate:"required,oneof=issue other"`
 	Name string       `json:"name" validate:"required"`
 	Url  string       `json:"url" validate:"required"`
 }
@@ -38,7 +38,7 @@ type CaseArg struct {
 
 type NewCaseRun struct {
 	Name        string     `json:"name" validate:"required"`
-	Num         uint       `json:"num" validate:"required"`
+	Num         uint       `json:"num" validate:"gte=0"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`
 	Attachments []string   `json:"attachments,omitempty" bson:",omitempty" validate:"dive,required"`
 	Links       []CaseLink `json:"links,omitempty" bson:",omitempty" validate:"dive"`
