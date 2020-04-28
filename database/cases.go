@@ -3,6 +3,8 @@ package database
 import (
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"time"
@@ -52,6 +54,10 @@ type UpdateCaseRun struct {
 	FinishedAt int64  `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
 }
 
+func (c *UpdateCaseRun) FinishedAtTime() time.Time {
+	return time.Unix(c.FinishedAt, 0)
+}
+
 func (c *NewCaseRun) StartedAtTime() time.Time {
 	return time.Unix(c.StartedAt, 0)
 }
@@ -61,10 +67,6 @@ type CaseRun struct {
 	Suite         string      `json:"suite"`
 	NewCaseRun    `bson:",inline"`
 	UpdateCaseRun `bson:",inline"`
-}
-
-func (c *CaseRun) FinishedAtTime() time.Time {
-	return time.Unix(c.FinishedAt, 0)
 }
 
 func (d *WithContext) NewCaseRun(suiteId string, c NewCaseRun) (string, error) {
@@ -83,7 +85,12 @@ func (d *WithContext) NewCaseRun(suiteId string, c NewCaseRun) (string, error) {
 	})
 }
 
-func (d *WithContext) UpdateCaseRun(suiteId string, caseNum uint, c UpdateCaseRun) error {
+func (d *WithContext) UpdateCaseRun(caseId string, c UpdateCaseRun) error {
+	caseOid, err := primitive.ObjectIDFromHex(caseId)
+	if err != nil {
+		return fmt.Errorf("%w: parse object id", ErrNotFound)
+	}
+
 	if err := validate.Struct(&c); err != nil {
 		log.Printf("validate case run: %v\n", err)
 		return ErrInvalidModel
@@ -91,50 +98,53 @@ func (d *WithContext) UpdateCaseRun(suiteId string, caseNum uint, c UpdateCaseRu
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	res := d.cases.FindOneAndUpdate(ctx, bson.M{
-		"suite": suiteId,
-		"num":   caseNum,
+	_, err = d.cases.UpdateOne(ctx, bson.M{
+		"_id":   caseOid,
 	}, bson.M{
 		"$set": &c,
-	}, options.FindOneAndUpdate().SetSort(bson.D{
-		{"started_at", -1},
-		{"_id", -1},
-	}))
-	if res.Err() != nil {
-		return fmt.Errorf("update case run: %v", res.Err())
+	})
+	if err != nil {
+		return fmt.Errorf("update case run: %v", err)
 	}
 	return nil
 }
 
-func (d *WithContext) CaseRuns(suiteId string, caseNum uint) ([]CaseRun, error) {
-	ctx, cancel := d.newContext()
-	defer cancel()
-	cursor, err := d.cases.Find(ctx, bson.M{
-		"suite": suiteId,
-		"num":   caseNum,
-	}, options.Find().SetSort(bson.D{
-		{"started_at", 1},
-		{"_id", 1},
-	}))
+func (d *WithContext) CaseRun(caseId string) (*CaseRun, error) {
+	caseOid, err := primitive.ObjectIDFromHex(caseId)
 	if err != nil {
-		return nil, fmt.Errorf("find case runs: %v", err)
+		return nil, fmt.Errorf("%w: parse object id", ErrNotFound)
 	}
 
-	caseRuns := make([]CaseRun, 0)
-	if err := cursor.All(ctx, &caseRuns); err != nil {
-		return nil, fmt.Errorf("decode case runs: %v", err)
+	ctx, cancel := d.newContext()
+	defer cancel()
+	res := d.cases.FindOne(ctx, bson.M{
+		"_id":   caseOid,
+	})
+	var caseRun CaseRun
+	if err := res.Decode(&caseRun); err == mongo.ErrNoDocuments {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("find case run: %v", err)
 	}
-	return caseRuns, nil
+	return &caseRun, nil
 }
 
-func (d *WithContext) AllCaseRuns(suiteId string) ([]CaseRun, error) {
+type AllCaseRunsFilter struct {
+	CaseNum uint
+}
+
+func (d *WithContext) AllCaseRuns(suiteId string, caseNum *uint) ([]CaseRun, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	cursor, err := d.cases.Find(ctx, bson.M{
+	filter := bson.M{
 		"suite": suiteId,
-	}, options.Find().SetSort(bson.D{
-		{"num", 1},
+	}
+	if caseNum != nil {
+		filter["num"] = *caseNum
+	}
+	cursor, err := d.cases.Find(ctx, filter, options.Find().SetSort(bson.D{
 		{"started_at", 1},
+		{"num", 1},
 		{"_id", 1},
 	}))
 	if err != nil {
@@ -148,15 +158,18 @@ func (d *WithContext) AllCaseRuns(suiteId string) ([]CaseRun, error) {
 	return caseRuns, nil
 }
 
-func (d *WithContext) DeleteCaseRuns(suiteId string, caseNum uint) error {
+func (d *WithContext) DeleteCaseRun(caseId string) error {
+	caseOid, err := primitive.ObjectIDFromHex(caseId)
+	if err != nil {
+		return fmt.Errorf("%w: parse object id", ErrNotFound)
+	}
+
 	ctx, cancel := d.newContext()
 	defer cancel()
-	_, err := d.cases.DeleteMany(ctx, bson.M{
-		"suite": suiteId,
-		"num":   caseNum,
-	})
-	if err != nil {
-		return fmt.Errorf("delete case runs: %v", err)
+	if _, err := d.cases.DeleteOne(ctx, bson.M{
+		"_id":   caseOid,
+	}); err != nil {
+		return fmt.Errorf("delete case run: %v", err)
 	}
 	return nil
 }

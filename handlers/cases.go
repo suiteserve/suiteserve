@@ -8,55 +8,45 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 func (s *srv) caseHandler(res http.ResponseWriter, req *http.Request) {
-	params := mux.Vars(req)
-	suiteId, ok := params["suite_id"]
+	caseId, ok := mux.Vars(req)["case_id"]
 	if !ok {
-		log.Panicln("req param 'suite_id' not found")
-	}
-	caseNumStr, ok := params["case_num"]
-	if !ok {
-		log.Panicln("req param 'case_num' not found")
-	}
-	caseNum, err := strconv.ParseUint(caseNumStr, 10, 64)
-	if err != nil {
-		log.Panicln("req param 'case_num' NaN")
+		log.Panicln("req param 'case_id' not found")
 	}
 
 	switch req.Method {
 	case http.MethodGet:
-		s.getCaseHandler(res, req, suiteId, uint(caseNum))
+		s.getCaseHandler(res, req, caseId)
 	case http.MethodPatch:
-		s.patchCaseHandler(res, req, suiteId, uint(caseNum))
+		s.patchCaseHandler(res, req, caseId)
 	case http.MethodDelete:
-		s.deleteCaseHandler(res, req, suiteId, uint(caseNum))
+		s.deleteCaseHandler(res, req, caseId)
 	default:
 		log.Panicf("method '%s' not implemented\n", req.Method)
 	}
 }
 
-func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, suiteId string, caseNum uint) {
-	caseRuns, err := s.db.WithContext(req.Context()).CaseRuns(suiteId, caseNum)
+func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, caseId string) {
+	caseRun, err := s.db.WithContext(req.Context()).CaseRun(caseId)
 	if errors.Is(err, database.ErrNotFound) {
 		httpError(res, errNotFound, http.StatusNotFound)
 	} else if err != nil {
-		log.Printf("get case runs: %v\n", err)
+		log.Printf("get case run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
-		httpJson(res, caseRuns, http.StatusOK)
+		httpJson(res, caseRun, http.StatusOK)
 	}
 }
 
-func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, suiteId string, caseNum uint) {
+func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, caseId string) {
 	var caseRun database.UpdateCaseRun
 	if err := json.NewDecoder(req.Body).Decode(&caseRun); err != nil {
 		httpError(res, errBadJson, http.StatusBadRequest)
 		return
 	}
-	err := s.db.WithContext(req.Context()).UpdateCaseRun(suiteId, caseNum, caseRun)
+	err := s.db.WithContext(req.Context()).UpdateCaseRun(caseId, caseRun)
 	if errors.Is(err, database.ErrInvalidModel) {
 		httpError(res, errBadJson, http.StatusBadRequest)
 	} else if err != nil {
@@ -67,12 +57,12 @@ func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, suite
 	}
 }
 
-func (s *srv) deleteCaseHandler(res http.ResponseWriter, req *http.Request, suiteId string, caseNum uint) {
-	err := s.db.WithContext(req.Context()).DeleteCaseRuns(suiteId, caseNum)
+func (s *srv) deleteCaseHandler(res http.ResponseWriter, req *http.Request, caseId string) {
+	err := s.db.WithContext(req.Context()).DeleteCaseRun(caseId)
 	if errors.Is(err, database.ErrNotFound) {
 		httpError(res, errNotFound, http.StatusNotFound)
 	} else if err != nil {
-		log.Printf("delete case runs: %v\n", err)
+		log.Printf("delete case run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
 		res.WriteHeader(http.StatusNoContent)
@@ -96,7 +86,18 @@ func (s *srv) caseCollectionHandler(res http.ResponseWriter, req *http.Request) 
 }
 
 func (s *srv) getCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) {
-	caseRuns, err := s.db.WithContext(req.Context()).AllCaseRuns(suiteId)
+	formValNum := req.FormValue("num")
+	var caseNum *uint
+	if formValNum != "" {
+		if num, err := parseUint(formValNum); err != nil {
+			httpError(res, errBadQuery, http.StatusBadRequest)
+			return
+		} else {
+			caseNum = &num
+		}
+	}
+
+	caseRuns, err := s.db.WithContext(req.Context()).AllCaseRuns(suiteId, caseNum)
 	if err != nil {
 		log.Printf("get all case runs for suite run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
@@ -123,7 +124,7 @@ func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Reque
 
 	loc, err := s.router.Get("case").URL(
 		"suite_id", suiteId,
-		"case_num", strconv.FormatUint(uint64(caseRun.Num), 10))
+		"case_id", id)
 	if err != nil {
 		log.Printf("build case url: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)

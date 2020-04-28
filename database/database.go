@@ -51,6 +51,7 @@ type Database struct {
 	mgoDb       *mongo.Database
 	attachments *mongo.Collection
 	cases       *mongo.Collection
+	logs        *mongo.Collection
 	suites      *mongo.Collection
 }
 
@@ -86,6 +87,7 @@ func Open() (*Database, error) {
 		mgoDb:       mgoDb,
 		attachments: mgoDb.Collection("attachments"),
 		cases:       mgoDb.Collection("cases"),
+		logs:        mgoDb.Collection("logs"),
 		suites:      mgoDb.Collection("suites"),
 	}, nil
 }

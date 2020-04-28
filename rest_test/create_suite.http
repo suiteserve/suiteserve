@@ -32,7 +32,7 @@ Content-Type: application/json
 
 {
   "name": "GY checkout",
-  "num": 0,
+  "num": 1,
   "links": [
     {
       "type": "other",

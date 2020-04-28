@@ -37,12 +37,12 @@ func Handler(db *database.Database) http.Handler {
 	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
 	router.Use(func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			res.Header().Set("Content-Security-Policy", "sandbox;"+
-				"default-src 'none';"+
-				"base-uri 'none';"+
-				"form-action 'none';"+
-				"frame-ancestors 'none';"+
-				"img-src 'self'")
+			res.Header().Set("Content-Security-Policy", "sandbox; "+
+				"default-src 'none'; "+
+				"base-uri 'none'; "+
+				"form-action 'none'; "+
+				"frame-ancestors 'none'; "+
+				"img-src 'self';")
 			h.ServeHTTP(res, req)
 		})
 	})
@@ -50,13 +50,13 @@ func Handler(db *database.Database) http.Handler {
 	// Static files.
 	publicSrv := http.FileServer(http.Dir(publicDir))
 	router.Path("/").HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		res.Header().Set("Content-Security-Policy", "block-all-mixed-content;"+
-			"default-src 'none';"+
-			"base-uri 'none';"+
-			"form-action 'self';"+
-			"frame-ancestors 'none';"+
-			"img-src 'self';"+
-			"script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net;"+
+		res.Header().Set("Content-Security-Policy", "block-all-mixed-content; "+
+			"default-src 'none'; "+
+			"base-uri 'none'; "+
+			"form-action 'self'; "+
+			"frame-ancestors 'none'; "+
+			"img-src 'self'; "+
+			"script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; "+
 			"style-src 'self';")
 		publicSrv.ServeHTTP(res, req)
 	})
@@ -82,7 +82,7 @@ func Handler(db *database.Database) http.Handler {
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
 	// Cases.
-	router.Path("/suites/{suite_id}/cases/{case_num:[0-9]+}").
+	router.Path("/cases/{case_id}").
 		HandlerFunc(srv.caseHandler).
 		Methods(http.MethodGet, http.MethodPatch, http.MethodDelete).
 		Name("case")
