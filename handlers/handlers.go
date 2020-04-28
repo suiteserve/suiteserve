@@ -75,6 +75,7 @@ func Handler(db *database.Database) http.Handler {
 	// Suites.
 	router.Path("/suites/{suite_id}").
 		HandlerFunc(srv.suiteHandler).
+		// TODO: implement Patch
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("suite")
 	router.Path("/suites").
@@ -84,10 +85,19 @@ func Handler(db *database.Database) http.Handler {
 	// Cases.
 	router.Path("/cases/{case_id}").
 		HandlerFunc(srv.caseHandler).
-		Methods(http.MethodGet, http.MethodPatch, http.MethodDelete).
+		Methods(http.MethodGet, http.MethodPatch).
 		Name("case")
 	router.Path("/suites/{suite_id}/cases").
 		HandlerFunc(srv.caseCollectionHandler).
+		Methods(http.MethodGet, http.MethodPost)
+
+	// Logs.
+	router.Path("/logs/{log_id}").
+		HandlerFunc(srv.logHandler).
+		Methods(http.MethodGet).
+		Name("log")
+	router.Path("/cases/{case_id}/logs").
+		HandlerFunc(srv.logCollectionHandler).
 		Methods(http.MethodGet, http.MethodPost)
 
 	return router

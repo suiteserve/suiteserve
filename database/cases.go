@@ -129,10 +129,6 @@ func (d *WithContext) CaseRun(caseId string) (*CaseRun, error) {
 	return &caseRun, nil
 }
 
-type AllCaseRunsFilter struct {
-	CaseNum uint
-}
-
 func (d *WithContext) AllCaseRuns(suiteId string, caseNum *uint) ([]CaseRun, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
@@ -156,22 +152,6 @@ func (d *WithContext) AllCaseRuns(suiteId string, caseNum *uint) ([]CaseRun, err
 		return nil, fmt.Errorf("decode all case runs for suite run: %v", err)
 	}
 	return caseRuns, nil
-}
-
-func (d *WithContext) DeleteCaseRun(caseId string) error {
-	caseOid, err := primitive.ObjectIDFromHex(caseId)
-	if err != nil {
-		return fmt.Errorf("%w: parse object id", ErrNotFound)
-	}
-
-	ctx, cancel := d.newContext()
-	defer cancel()
-	if _, err := d.cases.DeleteOne(ctx, bson.M{
-		"_id":   caseOid,
-	}); err != nil {
-		return fmt.Errorf("delete case run: %v", err)
-	}
-	return nil
 }
 
 func (d *WithContext) DeleteAllCaseRuns(suiteId string) error {

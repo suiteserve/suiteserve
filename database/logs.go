@@ -1,6 +1,11 @@
 package database
 
 import (
+	"fmt"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"time"
 )
@@ -43,4 +48,44 @@ func (d *WithContext) NewLogMessage(caseId string, l NewLogMessage) (string, err
 		Case:          caseId,
 		NewLogMessage: l,
 	})
+}
+
+func (d *WithContext) LogMessage(logId string) (*LogMessage, error) {
+	logOid, err := primitive.ObjectIDFromHex(logId)
+	if err != nil {
+		return nil, fmt.Errorf("%w: parse object id", ErrNotFound)
+	}
+
+	ctx, cancel := d.newContext()
+	defer cancel()
+	res := d.logs.FindOne(ctx, bson.M{
+		"_id":   logOid,
+	})
+	var logMsg LogMessage
+	if err := res.Decode(&logMsg); err == mongo.ErrNoDocuments {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, fmt.Errorf("find log message: %v", err)
+	}
+	return &logMsg, nil
+}
+
+func (d *WithContext) AllLogMessages(caseId string) ([]LogMessage, error) {
+	ctx, cancel := d.newContext()
+	defer cancel()
+	cursor, err := d.logs.Find(ctx, bson.M{
+		"case": caseId,
+	}, options.Find().SetSort(bson.D{
+		{"timestamp", 1},
+		{"_id", 1},
+	}))
+	if err != nil {
+		return nil, fmt.Errorf("find all log messages for case run: %v", err)
+	}
+
+	logMsgs := make([]LogMessage, 0)
+	if err := cursor.All(ctx, &logMsgs); err != nil {
+		return nil, fmt.Errorf("decode all log messages for case run: %v", err)
+	}
+	return logMsgs, nil
 }

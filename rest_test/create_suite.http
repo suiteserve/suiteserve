@@ -45,3 +45,14 @@ Content-Type: application/json
 }
 
 ###
+
+POST https://localhost:8080/cases/5ea7875d530c0d5a96437af8/logs
+Content-Type: application/json
+
+{
+  "level": "info",
+  "message": "Hello, world!",
+  "timestamp": 1587256716
+}
+
+###

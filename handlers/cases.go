@@ -21,8 +21,6 @@ func (s *srv) caseHandler(res http.ResponseWriter, req *http.Request) {
 		s.getCaseHandler(res, req, caseId)
 	case http.MethodPatch:
 		s.patchCaseHandler(res, req, caseId)
-	case http.MethodDelete:
-		s.deleteCaseHandler(res, req, caseId)
 	default:
 		log.Panicf("method '%s' not implemented\n", req.Method)
 	}
@@ -51,18 +49,6 @@ func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, caseI
 		httpError(res, errBadJson, http.StatusBadRequest)
 	} else if err != nil {
 		log.Printf("update case run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		res.WriteHeader(http.StatusNoContent)
-	}
-}
-
-func (s *srv) deleteCaseHandler(res http.ResponseWriter, req *http.Request, caseId string) {
-	err := s.db.WithContext(req.Context()).DeleteCaseRun(caseId)
-	if errors.Is(err, database.ErrNotFound) {
-		httpError(res, errNotFound, http.StatusNotFound)
-	} else if err != nil {
-		log.Printf("delete case run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
 		res.WriteHeader(http.StatusNoContent)
@@ -122,9 +108,7 @@ func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	loc, err := s.router.Get("case").URL(
-		"suite_id", suiteId,
-		"case_id", id)
+	loc, err := s.router.Get("case").URL("case_id", id)
 	if err != nil {
 		log.Printf("build case url: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
