@@ -29,7 +29,7 @@ type NewLogMessage struct {
 }
 
 func (c *NewLogMessage) TimestampTime() time.Time {
-	return time.Unix(c.Timestamp, 0)
+	return iToTime(c.Timestamp)
 }
 
 type LogMessage struct {
@@ -59,7 +59,7 @@ func (d *WithContext) LogMessage(logId string) (*LogMessage, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	res := d.logs.FindOne(ctx, bson.M{
-		"_id":   logOid,
+		"_id": logOid,
 	})
 	var logMsg LogMessage
 	if err := res.Decode(&logMsg); err == mongo.ErrNoDocuments {

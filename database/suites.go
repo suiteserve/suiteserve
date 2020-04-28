@@ -38,7 +38,7 @@ type NewSuiteRun struct {
 }
 
 func (s *NewSuiteRun) CreatedAtTime() time.Time {
-	return time.Unix(s.CreatedAt, 0)
+	return iToTime(s.CreatedAt)
 }
 
 type SuiteRun struct {
@@ -49,7 +49,7 @@ type SuiteRun struct {
 }
 
 func (s *SuiteRun) FinishedAtTime() time.Time {
-	return time.Unix(s.FinishedAt, 0)
+	return iToTime(s.FinishedAt)
 }
 
 func (d *WithContext) NewSuiteRun(s NewSuiteRun) (string, error) {
@@ -82,11 +82,11 @@ func (d *WithContext) SuiteRun(id string) (*SuiteRun, error) {
 	return &suiteRun, nil
 }
 
-func (d *WithContext) AllSuiteRuns(since time.Time) ([]SuiteRun, error) {
+func (d *WithContext) AllSuiteRuns(sinceTime int64) ([]SuiteRun, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	cursor, err := d.suites.Find(ctx, bson.M{
-		"created_at": bson.M{"$gte": since.Unix()},
+		"created_at": bson.M{"$gte": sinceTime},
 	}, options.Find().SetSort(bson.D{
 		{"created_at", 1},
 		{"_id", 1},

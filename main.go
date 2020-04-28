@@ -28,6 +28,10 @@ func main() {
 		}
 	}()
 
+	listenHttp(db)
+}
+
+func listenHttp(db *database.Database) {
 	host := config.Get(config.Host, "localhost")
 	port := config.Get(config.Port, "8080")
 	srv := http.Server{

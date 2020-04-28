@@ -55,11 +55,11 @@ type UpdateCaseRun struct {
 }
 
 func (c *UpdateCaseRun) FinishedAtTime() time.Time {
-	return time.Unix(c.FinishedAt, 0)
+	return iToTime(c.FinishedAt)
 }
 
 func (c *NewCaseRun) StartedAtTime() time.Time {
-	return time.Unix(c.StartedAt, 0)
+	return iToTime(c.StartedAt)
 }
 
 type CaseRun struct {

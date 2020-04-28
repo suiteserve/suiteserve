@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
@@ -64,13 +65,18 @@ func (s *srv) suiteCollectionHandler(res http.ResponseWriter, req *http.Request)
 }
 
 func (s *srv) getSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) {
-	since, err := parseTime(req.FormValue("since"))
-	if err != nil {
-		httpError(res, errBadQuery, http.StatusBadRequest)
-		return
+	formValSince := req.FormValue("since")
+	var sinceTime int64
+	if formValSince != "" {
+		var err error
+		sinceTime, err = strconv.ParseInt(formValSince, 10, 64)
+		if err != nil {
+			httpError(res, errBadQuery, http.StatusBadRequest)
+			return
+		}
 	}
 
-	suiteRuns, err := s.db.WithContext(req.Context()).AllSuiteRuns(since)
+	suiteRuns, err := s.db.WithContext(req.Context()).AllSuiteRuns(sinceTime)
 	if err != nil {
 		log.Printf("get all suite runs: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
