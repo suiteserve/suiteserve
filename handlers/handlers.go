@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/tmazeika/testpass/database"
 	"log"
 	"net/http"
@@ -25,13 +26,18 @@ var (
 )
 
 type srv struct {
-	db     *database.Database
-	router *mux.Router
+	db         *database.Database
+	router     *mux.Router
+	wsUpgrader websocket.Upgrader
 }
 
 func Handler(db *database.Database) http.Handler {
 	router := mux.NewRouter()
-	srv := &srv{db, router}
+	srv := &srv{
+		db,
+		router,
+		websocket.Upgrader{},
+	}
 
 	router.Use(methodOverrideHandler)
 	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
@@ -53,6 +59,7 @@ func Handler(db *database.Database) http.Handler {
 		res.Header().Set("Content-Security-Policy", "block-all-mixed-content; "+
 			"default-src 'none'; "+
 			"base-uri 'none'; "+
+			"connect-src 'self'; "+
 			"form-action 'self'; "+
 			"frame-ancestors 'none'; "+
 			"img-src 'self'; "+
@@ -98,6 +105,11 @@ func Handler(db *database.Database) http.Handler {
 	router.Path("/cases/{case_id}/logs").
 		HandlerFunc(srv.logCollectionHandler).
 		Methods(http.MethodGet, http.MethodPost)
+
+	// Events.
+	router.Path("/events").
+		HandlerFunc(srv.eventsHandler).
+		Methods(http.MethodGet)
 
 	return router
 }
