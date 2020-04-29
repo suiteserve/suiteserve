@@ -41,15 +41,19 @@ func (s *NewSuiteRun) CreatedAtTime() time.Time {
 	return iToTime(s.CreatedAt)
 }
 
-type SuiteRun struct {
-	Id          interface{} `json:"id" bson:"_id,omitempty"`
-	NewSuiteRun `bson:",inline"`
-	Status      SuiteStatus `json:"status"`
-	FinishedAt  int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+type UpdateSuiteRun struct {
+	Status     SuiteStatus `json:"status" validate:"oneof=created running finished"`
+	FinishedAt int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
 }
 
-func (s *SuiteRun) FinishedAtTime() time.Time {
+func (s *UpdateSuiteRun) FinishedAtTime() time.Time {
 	return iToTime(s.FinishedAt)
+}
+
+type SuiteRun struct {
+	Id             interface{} `json:"id" bson:"_id,omitempty"`
+	NewSuiteRun    `bson:",inline"`
+	UpdateSuiteRun `bson:",inline"`
 }
 
 func (d *WithContext) NewSuiteRun(s NewSuiteRun) (string, error) {
@@ -60,8 +64,36 @@ func (d *WithContext) NewSuiteRun(s NewSuiteRun) (string, error) {
 
 	return d.insert(d.suites, SuiteRun{
 		NewSuiteRun: s,
-		Status:      SuiteStatusCreated,
+		UpdateSuiteRun: UpdateSuiteRun{
+			Status: SuiteStatusCreated,
+		},
 	})
+}
+
+func (d *WithContext) UpdateSuiteRun(suiteId string, s UpdateSuiteRun) error {
+	suiteOid, err := primitive.ObjectIDFromHex(suiteId)
+	if err != nil {
+		return fmt.Errorf("%w: parse object id", ErrNotFound)
+	}
+
+	if err := validate.Struct(&s); err != nil {
+		log.Printf("validate suite run: %v\n", err)
+		return ErrInvalidModel
+	}
+
+	ctx, cancel := d.newContext()
+	defer cancel()
+	res, err := d.suites.UpdateOne(ctx, bson.M{
+		"_id":   suiteOid,
+	}, bson.M{
+		"$set": &s,
+	})
+	if err != nil {
+		return fmt.Errorf("update suite run: %v", err)
+	} else if res.MatchedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (d *WithContext) SuiteRun(id string) (*SuiteRun, error) {

@@ -20,6 +20,8 @@ func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 		s.getSuiteHandler(res, req, id)
+	case http.MethodPatch:
+		s.patchSuiteHandler(res, req, id)
 	case http.MethodDelete:
 		s.deleteSuiteHandler(res, req, id)
 	default:
@@ -36,6 +38,25 @@ func (s *srv) getSuiteHandler(res http.ResponseWriter, req *http.Request, id str
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
 		httpJson(res, suiteRun, http.StatusOK)
+	}
+}
+
+func (s *srv) patchSuiteHandler(res http.ResponseWriter, req *http.Request, id string) {
+	var suiteRun database.UpdateSuiteRun
+	if err := json.NewDecoder(req.Body).Decode(&suiteRun); err != nil {
+		httpError(res, errBadJson, http.StatusBadRequest)
+		return
+	}
+	err := s.db.WithContext(req.Context()).UpdateSuiteRun(id, suiteRun)
+	if errors.Is(err, database.ErrInvalidModel) {
+		httpError(res, errBadJson, http.StatusBadRequest)
+	} else if errors.Is(err, database.ErrNotFound) {
+		httpError(res, errNotFound, http.StatusNotFound)
+	} else if err != nil {
+		log.Printf("update suite run: %v\n", err)
+		httpError(res, errUnknown, http.StatusInternalServerError)
+	} else {
+		res.WriteHeader(http.StatusNoContent)
 	}
 }
 

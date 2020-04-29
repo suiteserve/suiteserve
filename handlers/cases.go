@@ -26,8 +26,8 @@ func (s *srv) caseHandler(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, caseId string) {
-	caseRun, err := s.db.WithContext(req.Context()).CaseRun(caseId)
+func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, id string) {
+	caseRun, err := s.db.WithContext(req.Context()).CaseRun(id)
 	if errors.Is(err, database.ErrNotFound) {
 		httpError(res, errNotFound, http.StatusNotFound)
 	} else if err != nil {
@@ -38,15 +38,17 @@ func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, caseId 
 	}
 }
 
-func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, caseId string) {
+func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, id string) {
 	var caseRun database.UpdateCaseRun
 	if err := json.NewDecoder(req.Body).Decode(&caseRun); err != nil {
 		httpError(res, errBadJson, http.StatusBadRequest)
 		return
 	}
-	err := s.db.WithContext(req.Context()).UpdateCaseRun(caseId, caseRun)
+	err := s.db.WithContext(req.Context()).UpdateCaseRun(id, caseRun)
 	if errors.Is(err, database.ErrInvalidModel) {
 		httpError(res, errBadJson, http.StatusBadRequest)
+	} else if errors.Is(err, database.ErrNotFound) {
+		httpError(res, errNotFound, http.StatusNotFound)
 	} else if err != nil {
 		log.Printf("update case run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)

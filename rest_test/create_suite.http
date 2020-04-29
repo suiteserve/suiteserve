@@ -56,3 +56,11 @@ Content-Type: application/json
 }
 
 ###
+
+PATCH https://localhost:8080/suites/5ea63dba1bb2e1ee2a66dc6d
+Content-Type: application/json
+
+{
+  "status": "finished",
+  "finished_at": 1587256710
+}

@@ -49,6 +49,10 @@ type NewCaseRun struct {
 	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty" validate:"gte=0"`
 }
 
+func (c *NewCaseRun) StartedAtTime() time.Time {
+	return iToTime(c.StartedAt)
+}
+
 type UpdateCaseRun struct {
 	Status     string `json:"status" validate:"oneof=disabled created running passed failed errored"`
 	FinishedAt int64  `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
@@ -56,10 +60,6 @@ type UpdateCaseRun struct {
 
 func (c *UpdateCaseRun) FinishedAtTime() time.Time {
 	return iToTime(c.FinishedAt)
-}
-
-func (c *NewCaseRun) StartedAtTime() time.Time {
-	return iToTime(c.StartedAt)
 }
 
 type CaseRun struct {
@@ -98,13 +98,15 @@ func (d *WithContext) UpdateCaseRun(caseId string, c UpdateCaseRun) error {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	_, err = d.cases.UpdateOne(ctx, bson.M{
+	res, err := d.cases.UpdateOne(ctx, bson.M{
 		"_id":   caseOid,
 	}, bson.M{
 		"$set": &c,
 	})
 	if err != nil {
 		return fmt.Errorf("update case run: %v", err)
+	} else if res.MatchedCount == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

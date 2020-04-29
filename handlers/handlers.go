@@ -75,8 +75,7 @@ func Handler(db *database.Database) http.Handler {
 	// Suites.
 	router.Path("/suites/{suite_id}").
 		HandlerFunc(srv.suiteHandler).
-		// TODO: implement Patch
-		Methods(http.MethodGet, http.MethodDelete).
+		Methods(http.MethodGet, http.MethodPatch, http.MethodDelete).
 		Name("suite")
 	router.Path("/suites").
 		HandlerFunc(srv.suiteCollectionHandler).
