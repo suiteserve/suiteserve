@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/mux"
@@ -53,6 +54,7 @@ func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, id st
 		log.Printf("update case run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
+		go s.publishCaseEvent(eventTypeUpdateCase, id)
 		res.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -109,6 +111,7 @@ func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Reque
 		httpError(res, errUnknown, http.StatusInternalServerError)
 		return
 	}
+	go s.publishCaseEvent(eventTypeCreateCase, id)
 
 	loc, err := s.router.Get("case").URL("case_id", id)
 	if err != nil {
@@ -119,4 +122,13 @@ func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Reque
 
 	res.Header().Set("Location", loc.String())
 	httpJson(res, bson.M{"id": id}, http.StatusCreated)
+}
+
+func (s *srv) publishCaseEvent(eType eventType, id string) {
+	caseRun, err := s.db.WithContext(context.Background()).CaseRun(id)
+	if err != nil {
+		log.Printf("get case run: %v\n", err)
+	} else {
+		s.eventBus.publish(newEvent(eType, caseRun))
+	}
 }

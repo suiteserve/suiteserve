@@ -84,7 +84,7 @@ func (d *WithContext) UpdateSuiteRun(suiteId string, s UpdateSuiteRun) error {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	res, err := d.suites.UpdateOne(ctx, bson.M{
-		"_id":   suiteOid,
+		"_id": suiteOid,
 	}, bson.M{
 		"$set": &s,
 	})
@@ -134,21 +134,23 @@ func (d *WithContext) AllSuiteRuns(sinceTime int64) ([]SuiteRun, error) {
 	return suiteRuns, nil
 }
 
-func (d *WithContext) DeleteSuiteRun(id string) error {
+func (d *WithContext) DeleteSuiteRun(id string) (bool, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		return fmt.Errorf("%w: parse object id", ErrNotFound)
+		return false, fmt.Errorf("%w: parse object id", ErrNotFound)
 	}
 
 	ctx, cancel := d.newContext()
 	defer cancel()
 	if err := d.DeleteAllCaseRuns(id); err != nil {
-		return err
+		return false, err
 	}
-	if _, err := d.suites.DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
-		return fmt.Errorf("delete suite run: %v", err)
+	if res, err := d.suites.DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
+		return false, fmt.Errorf("delete suite run: %v", err)
+	} else if res.DeletedCount == 0 {
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 func (d *WithContext) DeleteAllSuiteRuns() error {

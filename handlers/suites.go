@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/mux"
@@ -56,18 +57,22 @@ func (s *srv) patchSuiteHandler(res http.ResponseWriter, req *http.Request, id s
 		log.Printf("update suite run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
+		go s.publishSuiteEvent(eventTypeUpdateSuite, id)
 		res.WriteHeader(http.StatusNoContent)
 	}
 }
 
 func (s *srv) deleteSuiteHandler(res http.ResponseWriter, req *http.Request, id string) {
-	err := s.db.WithContext(req.Context()).DeleteSuiteRun(id)
+	ok, err := s.db.WithContext(req.Context()).DeleteSuiteRun(id)
 	if errors.Is(err, database.ErrNotFound) {
 		httpError(res, errNotFound, http.StatusNotFound)
 	} else if err != nil {
 		log.Printf("delete suite run: %v\n", err)
 		httpError(res, errUnknown, http.StatusInternalServerError)
 	} else {
+		if ok {
+			s.eventBus.publish(newEvent(eventTypeDeleteSuite, bson.M{"id": id}))
+		}
 		res.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -121,6 +126,7 @@ func (s *srv) postSuiteCollectionHandler(res http.ResponseWriter, req *http.Requ
 		httpError(res, errUnknown, http.StatusInternalServerError)
 		return
 	}
+	go s.publishSuiteEvent(eventTypeCreateSuite, id)
 
 	loc, err := s.router.Get("suite").URL("suite_id", id)
 	if err != nil {
@@ -140,5 +146,15 @@ func (s *srv) deleteSuiteCollectionHandler(res http.ResponseWriter, req *http.Re
 		httpError(res, errUnknown, http.StatusInternalServerError)
 		return
 	}
+	s.eventBus.publish(newEvent(eventTypeDeleteAllSuites, nil))
 	res.WriteHeader(http.StatusNoContent)
+}
+
+func (s *srv) publishSuiteEvent(eType eventType, id string) {
+	suiteRun, err := s.db.WithContext(context.Background()).SuiteRun(id)
+	if err != nil {
+		log.Printf("get suite run: %v\n", err)
+	} else {
+		s.eventBus.publish(newEvent(eType, suiteRun))
+	}
 }

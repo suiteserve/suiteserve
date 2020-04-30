@@ -113,5 +113,5 @@ func iToTime(i int64) time.Time {
 	if i < 0 {
 		log.Fatalf("time i=%d must be non-negative\n", i)
 	}
-	return time.Unix(i / 1000, (i % 1000) * time.Millisecond.Nanoseconds())
+	return time.Unix(i/1000, (i%1000)*time.Millisecond.Nanoseconds())
 }

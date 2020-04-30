@@ -9,7 +9,29 @@ import (
 	"time"
 )
 
-type event interface{}
+type eventType string
+
+const (
+	eventTypeCreateCase      eventType = "create_case"
+	eventTypeUpdateCase                = "update_case"
+	eventTypeCreateSuite               = "create_suite"
+	eventTypeUpdateSuite               = "update_suite"
+	eventTypeDeleteSuite               = "delete_suite"
+	eventTypeDeleteAllSuites           = "delete_all_suites"
+	eventTypeCreateLog                 = "create_log"
+)
+
+type event struct {
+	Type    eventType   `json:"type"`
+	Payload interface{} `json:"payload,omitempty"`
+}
+
+func newEvent(eType eventType, payload interface{}) *event {
+	return &event{
+		Type:    eType,
+		Payload: payload,
+	}
+}
 
 type eventBus struct {
 	sync.RWMutex
@@ -36,11 +58,11 @@ func (b *eventBus) unsubscribe(ch <-chan event) bool {
 	return false
 }
 
-func (b *eventBus) publish(e event) {
+func (b *eventBus) publish(e *event) {
 	b.RLock()
 	for _, s := range b.subscribers {
 		go func(ch chan<- event) {
-			ch <- e
+			ch <- *e
 		}(s)
 	}
 	b.RUnlock()
@@ -83,7 +105,7 @@ func (s *srv) eventsHandler(res http.ResponseWriter, req *http.Request) {
 	for {
 		select {
 		case e := <-eventCh:
-			if err := conn.WriteJSON(e); err != nil {
+			if err := conn.WriteJSON(&e); err != nil {
 				go func() {
 					errCh <- fmt.Errorf("write json to ws: %v", err)
 				}()

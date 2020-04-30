@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/gorilla/mux"
@@ -77,6 +78,7 @@ func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Reques
 		httpError(res, errUnknown, http.StatusInternalServerError)
 		return
 	}
+	go s.publishLogEvent(eventTypeCreateLog, id)
 
 	loc, err := s.router.Get("log").URL("log_id", id)
 	if err != nil {
@@ -87,4 +89,13 @@ func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Reques
 
 	res.Header().Set("Location", loc.String())
 	httpJson(res, bson.M{"id": id}, http.StatusCreated)
+}
+
+func (s *srv) publishLogEvent(eType eventType, id string) {
+	logMsg, err := s.db.WithContext(context.Background()).LogMessage(id)
+	if err != nil {
+		log.Printf("get log message: %v\n", err)
+	} else {
+		s.eventBus.publish(newEvent(eType, logMsg))
+	}
 }

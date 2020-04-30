@@ -99,7 +99,7 @@ func (d *WithContext) UpdateCaseRun(caseId string, c UpdateCaseRun) error {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	res, err := d.cases.UpdateOne(ctx, bson.M{
-		"_id":   caseOid,
+		"_id": caseOid,
 	}, bson.M{
 		"$set": &c,
 	})
@@ -119,9 +119,7 @@ func (d *WithContext) CaseRun(caseId string) (*CaseRun, error) {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	res := d.cases.FindOne(ctx, bson.M{
-		"_id":   caseOid,
-	})
+	res := d.cases.FindOne(ctx, bson.M{"_id": caseOid})
 	var caseRun CaseRun
 	if err := res.Decode(&caseRun); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
