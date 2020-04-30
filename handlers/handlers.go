@@ -11,10 +11,12 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
 	publicDir = "public/"
+	timeout   = 1 * time.Second
 )
 
 var (
@@ -27,16 +29,20 @@ var (
 
 type srv struct {
 	db         *database.Database
+	eventBus   *eventBus
 	router     *mux.Router
-	wsUpgrader websocket.Upgrader
+	wsUpgrader *websocket.Upgrader
 }
 
 func Handler(db *database.Database) http.Handler {
 	router := mux.NewRouter()
 	srv := &srv{
 		db,
+		&eventBus{
+			subscribers: make([]chan event, 0),
+		},
 		router,
-		websocket.Upgrader{},
+		&websocket.Upgrader{},
 	}
 
 	router.Use(methodOverrideHandler)
