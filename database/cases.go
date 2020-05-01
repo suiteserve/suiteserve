@@ -38,7 +38,7 @@ type CaseArg struct {
 	Value interface{} `json:"value,omitempty" bson:",omitempty"`
 }
 
-type NewCaseRun struct {
+type NewCase struct {
 	Name        string     `json:"name" validate:"required"`
 	Num         uint       `json:"num"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`
@@ -49,50 +49,50 @@ type NewCaseRun struct {
 	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty" validate:"gte=0"`
 }
 
-func (c *NewCaseRun) StartedAtTime() time.Time {
+func (c *NewCase) StartedAtTime() time.Time {
 	return iToTime(c.StartedAt)
 }
 
-type UpdateCaseRun struct {
+type UpdateCase struct {
 	Status     string `json:"status" validate:"oneof=disabled created running passed failed errored"`
 	FinishedAt int64  `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
 }
 
-func (c *UpdateCaseRun) FinishedAtTime() time.Time {
+func (c *UpdateCase) FinishedAtTime() time.Time {
 	return iToTime(c.FinishedAt)
 }
 
-type CaseRun struct {
-	Id            interface{} `json:"id" bson:"_id,omitempty"`
-	Suite         string      `json:"suite"`
-	NewCaseRun    `bson:",inline"`
-	UpdateCaseRun `bson:",inline"`
+type Case struct {
+	Id         interface{} `json:"id" bson:"_id,omitempty"`
+	Suite      string      `json:"suite"`
+	NewCase    `bson:",inline"`
+	UpdateCase `bson:",inline"`
 }
 
-func (d *WithContext) NewCaseRun(suiteId string, c NewCaseRun) (string, error) {
+func (d *WithContext) NewCase(suiteId string, c NewCase) (string, error) {
 	if err := validate.Struct(&c); err != nil {
-		log.Printf("validate case run: %v\n", err)
+		log.Printf("validate case: %v\n", err)
 		return "", ErrInvalidModel
 	}
 
-	return d.insert(d.cases, CaseRun{
-		Suite:      suiteId,
-		NewCaseRun: c,
-		UpdateCaseRun: UpdateCaseRun{
+	return d.insert(d.cases, Case{
+		Suite:   suiteId,
+		NewCase: c,
+		UpdateCase: UpdateCase{
 			Status:     CaseStatusCreated,
 			FinishedAt: 0,
 		},
 	})
 }
 
-func (d *WithContext) UpdateCaseRun(caseId string, c UpdateCaseRun) error {
+func (d *WithContext) UpdateCase(caseId string, c UpdateCase) error {
 	caseOid, err := primitive.ObjectIDFromHex(caseId)
 	if err != nil {
 		return fmt.Errorf("%w: parse object id", ErrNotFound)
 	}
 
 	if err := validate.Struct(&c); err != nil {
-		log.Printf("validate case run: %v\n", err)
+		log.Printf("validate case: %v\n", err)
 		return ErrInvalidModel
 	}
 
@@ -104,15 +104,15 @@ func (d *WithContext) UpdateCaseRun(caseId string, c UpdateCaseRun) error {
 		"$set": &c,
 	})
 	if err != nil {
-		return fmt.Errorf("update case run: %v", err)
+		return fmt.Errorf("update case: %v", err)
 	} else if res.MatchedCount == 0 {
 		return ErrNotFound
 	}
 	return nil
 }
 
-func (d *WithContext) CaseRun(caseId string) (*CaseRun, error) {
-	caseOid, err := primitive.ObjectIDFromHex(caseId)
+func (d *WithContext) Case(id string) (*Case, error) {
+	caseOid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse object id", ErrNotFound)
 	}
@@ -120,16 +120,16 @@ func (d *WithContext) CaseRun(caseId string) (*CaseRun, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	res := d.cases.FindOne(ctx, bson.M{"_id": caseOid})
-	var caseRun CaseRun
-	if err := res.Decode(&caseRun); err == mongo.ErrNoDocuments {
+	var _case Case
+	if err := res.Decode(&_case); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
 	} else if err != nil {
-		return nil, fmt.Errorf("find case run: %v", err)
+		return nil, fmt.Errorf("find case: %v", err)
 	}
-	return &caseRun, nil
+	return &_case, nil
 }
 
-func (d *WithContext) AllCaseRuns(suiteId string, caseNum *uint) ([]CaseRun, error) {
+func (d *WithContext) AllCases(suiteId string, caseNum *uint) ([]Case, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	filter := bson.M{
@@ -144,21 +144,21 @@ func (d *WithContext) AllCaseRuns(suiteId string, caseNum *uint) ([]CaseRun, err
 		{"_id", 1},
 	}))
 	if err != nil {
-		return nil, fmt.Errorf("find all case runs for suite run: %v", err)
+		return nil, fmt.Errorf("find all cases for suites: %v", err)
 	}
 
-	caseRuns := make([]CaseRun, 0)
-	if err := cursor.All(ctx, &caseRuns); err != nil {
-		return nil, fmt.Errorf("decode all case runs for suite run: %v", err)
+	cases := make([]Case, 0)
+	if err := cursor.All(ctx, &cases); err != nil {
+		return nil, fmt.Errorf("decode all cases for suites: %v", err)
 	}
-	return caseRuns, nil
+	return cases, nil
 }
 
-func (d *WithContext) DeleteAllCaseRuns(suiteId string) error {
+func (d *WithContext) DeleteAllCases(suiteId string) error {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	if _, err := d.cases.DeleteMany(ctx, bson.M{"suite": suiteId}); err != nil {
-		return fmt.Errorf("delete all case runs for suite run: %v", err)
+		return fmt.Errorf("delete all cases for suites: %v", err)
 	}
 	return nil
 }

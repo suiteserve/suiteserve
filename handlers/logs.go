@@ -4,97 +4,76 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gorilla/mux"
+	"fmt"
 	"github.com/tmazeika/testpass/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
 )
 
-func (s *srv) logHandler(res http.ResponseWriter, req *http.Request) {
-	logId, ok := mux.Vars(req)["log_id"]
-	if !ok {
-		log.Panicln("req param 'log_id' not found")
-	}
-
-	switch req.Method {
-	case http.MethodGet:
-		s.getLogHandler(res, req, logId)
-	default:
-		log.Panicf("method '%s' not implemented\n", req.Method)
-	}
+func (s *srv) logHandler(res http.ResponseWriter, req *http.Request) error {
+	return oneArgHandlerMap{
+		http.MethodGet: s.getLogHandler,
+	}.handle(res, req, "log_id")
 }
 
-func (s *srv) getLogHandler(res http.ResponseWriter, req *http.Request, logId string) {
-	logMsg, err := s.db.WithContext(req.Context()).LogMessage(logId)
+func (s *srv) getLogHandler(res http.ResponseWriter, req *http.Request, id string) error {
+	logMsg, err := s.db.WithContext(req.Context()).LogMessage(id)
 	if errors.Is(err, database.ErrNotFound) {
-		httpError(res, errNotFound, http.StatusNotFound)
+		return errNotFound
 	} else if err != nil {
-		log.Printf("get log message: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		httpJson(res, logMsg, http.StatusOK)
+		return fmt.Errorf("get log message: %v", err)
 	}
+
+	writeJson(res, logMsg, http.StatusOK)
+	return nil
 }
 
-func (s *srv) logCollectionHandler(res http.ResponseWriter, req *http.Request) {
-	caseId, ok := mux.Vars(req)["case_id"]
-	if !ok {
-		log.Panicln("req param 'case_id' not found")
-	}
-
-	switch req.Method {
-	case http.MethodGet:
-		s.getLogCollectionHandler(res, req, caseId)
-	case http.MethodPost:
-		s.postLogCollectionHandler(res, req, caseId)
-	default:
-		log.Panicf("method '%s' not implemented\n", req.Method)
-	}
+func (s *srv) logCollectionHandler(res http.ResponseWriter, req *http.Request) error {
+	return oneArgHandlerMap{
+		http.MethodGet:  s.getLogCollectionHandler,
+		http.MethodPost: s.postLogCollectionHandler,
+	}.handle(res, req, "case_id")
 }
 
-func (s *srv) getLogCollectionHandler(res http.ResponseWriter, req *http.Request, caseId string) {
+func (s *srv) getLogCollectionHandler(res http.ResponseWriter, req *http.Request, caseId string) error {
 	logMsgs, err := s.db.WithContext(req.Context()).AllLogMessages(caseId)
 	if err != nil {
-		log.Printf("get all log messages for case run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		httpJson(res, logMsgs, http.StatusOK)
+		return fmt.Errorf("get all log messages for case: %v", err)
 	}
+
+	writeJson(res, logMsgs, http.StatusOK)
+	return nil
 }
 
-func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Request, caseId string) {
+func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Request, caseId string) error {
 	var logMsg database.NewLogMessage
 	if err := json.NewDecoder(req.Body).Decode(&logMsg); err != nil {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+		return errBadJson
 	}
+
 	id, err := s.db.WithContext(req.Context()).NewLogMessage(caseId, logMsg)
 	if errors.Is(err, database.ErrInvalidModel) {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+		return errBadJson
 	} else if err != nil {
-		log.Printf("create log message: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("new log message: %v", err)
 	}
-	go s.publishLogEvent(eventTypeCreateLog, id)
+	//TODO go s.publishLogEvent(eventTypeCreateLog, id)
 
 	loc, err := s.router.Get("log").URL("log_id", id)
 	if err != nil {
-		log.Printf("build log url: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("build log url: %v", err)
 	}
 
 	res.Header().Set("Location", loc.String())
-	httpJson(res, bson.M{"id": id}, http.StatusCreated)
+	writeJson(res, bson.M{"id": id}, http.StatusCreated)
+	return nil
 }
 
 func (s *srv) publishLogEvent(eType eventType, id string) {
 	logMsg, err := s.db.WithContext(context.Background()).LogMessage(id)
 	if err != nil {
-		log.Printf("get log message: %v\n", err)
+		log.Printf("get log message: %v", err)
 	} else {
 		s.eventBus.publish(newEvent(eType, logMsg))
 	}

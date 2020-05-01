@@ -4,128 +4,104 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gorilla/mux"
+	"fmt"
 	"github.com/tmazeika/testpass/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
 )
 
-func (s *srv) caseHandler(res http.ResponseWriter, req *http.Request) {
-	caseId, ok := mux.Vars(req)["case_id"]
-	if !ok {
-		log.Panicln("req param 'case_id' not found")
-	}
-
-	switch req.Method {
-	case http.MethodGet:
-		s.getCaseHandler(res, req, caseId)
-	case http.MethodPatch:
-		s.patchCaseHandler(res, req, caseId)
-	default:
-		log.Panicf("method '%s' not implemented\n", req.Method)
-	}
+func (s *srv) caseHandler(res http.ResponseWriter, req *http.Request) error {
+	return oneArgHandlerMap{
+		http.MethodGet:   s.getCaseHandler,
+		http.MethodPatch: s.patchCaseHandler,
+	}.handle(res, req, "case_id")
 }
 
-func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, id string) {
-	caseRun, err := s.db.WithContext(req.Context()).CaseRun(id)
+func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, id string) error {
+	_case, err := s.db.WithContext(req.Context()).Case(id)
 	if errors.Is(err, database.ErrNotFound) {
-		httpError(res, errNotFound, http.StatusNotFound)
+		return errNotFound
 	} else if err != nil {
-		log.Printf("get case run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		httpJson(res, caseRun, http.StatusOK)
+		return fmt.Errorf("get case run: %v", err)
 	}
+
+	writeJson(res, _case, http.StatusOK)
+	return nil
 }
 
-func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, id string) {
-	var caseRun database.UpdateCaseRun
-	if err := json.NewDecoder(req.Body).Decode(&caseRun); err != nil {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, id string) error {
+	var _case database.UpdateCase
+	if err := json.NewDecoder(req.Body).Decode(&_case); err != nil {
+		return errBadJson
 	}
-	err := s.db.WithContext(req.Context()).UpdateCaseRun(id, caseRun)
+
+	err := s.db.WithContext(req.Context()).UpdateCase(id, _case)
 	if errors.Is(err, database.ErrInvalidModel) {
-		httpError(res, errBadJson, http.StatusBadRequest)
+		return errBadJson
 	} else if errors.Is(err, database.ErrNotFound) {
-		httpError(res, errNotFound, http.StatusNotFound)
+		return errNotFound
 	} else if err != nil {
-		log.Printf("update case run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		go s.publishCaseEvent(eventTypeUpdateCase, id)
-		res.WriteHeader(http.StatusNoContent)
+		return fmt.Errorf("update case run: %v", err)
 	}
+
+	//TODO go s.publishCaseEvent(eventTypeUpdateCase, id)
+	res.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
-func (s *srv) caseCollectionHandler(res http.ResponseWriter, req *http.Request) {
-	suiteId, ok := mux.Vars(req)["suite_id"]
-	if !ok {
-		log.Panicln("req param 'suite_id' not found")
-	}
-
-	switch req.Method {
-	case http.MethodGet:
-		s.getCaseCollectionHandler(res, req, suiteId)
-	case http.MethodPost:
-		s.postCaseCollectionHandler(res, req, suiteId)
-	default:
-		log.Panicf("method '%s' not implemented\n", req.Method)
-	}
+func (s *srv) caseCollectionHandler(res http.ResponseWriter, req *http.Request) error {
+	return oneArgHandlerMap{
+		http.MethodGet:  s.getCaseCollectionHandler,
+		http.MethodPost: s.postCaseCollectionHandler,
+	}.handle(res, req, "suite_id")
 }
 
-func (s *srv) getCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) {
-	formValNum := req.FormValue("num")
-	var caseNum *uint
-	if formValNum != "" {
-		if num, err := parseUint(formValNum); err != nil {
-			httpError(res, errBadQuery, http.StatusBadRequest)
-			return
-		} else {
-			caseNum = &num
-		}
-	}
-
-	caseRuns, err := s.db.WithContext(req.Context()).AllCaseRuns(suiteId, caseNum)
+func (s *srv) getCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) error {
+	num, ok, err := parseUint(req.FormValue("num"))
 	if err != nil {
-		log.Printf("get all case runs for suite run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		httpJson(res, caseRuns, http.StatusOK)
+		return errBadQuery
 	}
+	var numPtr *uint
+	if ok {
+		numPtr = &num
+	}
+
+	cases, err := s.db.WithContext(req.Context()).AllCases(suiteId, numPtr)
+	if err != nil {
+		return fmt.Errorf("get all cases for suite: %v", err)
+	}
+
+	writeJson(res, cases, http.StatusOK)
+	return nil
 }
 
-func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) {
-	var caseRun database.NewCaseRun
-	if err := json.NewDecoder(req.Body).Decode(&caseRun); err != nil {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) error {
+	var _case database.NewCase
+	if err := json.NewDecoder(req.Body).Decode(&_case); err != nil {
+		return errBadJson
 	}
-	id, err := s.db.WithContext(req.Context()).NewCaseRun(suiteId, caseRun)
+
+	id, err := s.db.WithContext(req.Context()).NewCase(suiteId, _case)
 	if errors.Is(err, database.ErrInvalidModel) {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+		return errBadJson
 	} else if err != nil {
-		log.Printf("create case run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("new case: %v", err)
 	}
-	go s.publishCaseEvent(eventTypeCreateCase, id)
+	//TODO go s.publishCaseEvent(eventTypeCreateCase, id)
 
 	loc, err := s.router.Get("case").URL("case_id", id)
 	if err != nil {
-		log.Printf("build case url: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("build case url: %v", err)
 	}
 
 	res.Header().Set("Location", loc.String())
-	httpJson(res, bson.M{"id": id}, http.StatusCreated)
+	writeJson(res, bson.M{"id": id}, http.StatusCreated)
+	return nil
 }
 
 func (s *srv) publishCaseEvent(eType eventType, id string) {
-	caseRun, err := s.db.WithContext(context.Background()).CaseRun(id)
+	caseRun, err := s.db.WithContext(context.Background()).Case(id)
 	if err != nil {
 		log.Printf("get case run: %v\n", err)
 	} else {

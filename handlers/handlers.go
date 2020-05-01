@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -17,14 +15,6 @@ import (
 const (
 	publicDir = "public/"
 	timeout   = 1 * time.Second
-)
-
-var (
-	errBadFile  = errors.New("bad_file")
-	errBadJson  = errors.New("bad_json")
-	errBadQuery = errors.New("bad_query")
-	errNotFound = errors.New("not_found")
-	errUnknown  = errors.New("unknown")
 )
 
 type srv struct {
@@ -44,72 +34,55 @@ func Handler(db *database.Database) http.Handler {
 		router,
 		&websocket.Upgrader{},
 	}
-
-	router.Use(methodOverrideHandler)
-	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
-	router.Use(func(h http.Handler) http.Handler {
-		return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-			res.Header().Set("Content-Security-Policy", "sandbox; "+
-				"default-src 'none'; "+
-				"base-uri 'none'; "+
-				"form-action 'none'; "+
-				"frame-ancestors 'none'; "+
-				"img-src 'self';")
-			h.ServeHTTP(res, req)
-		})
-	})
-
-	// Static files.
 	publicSrv := http.FileServer(http.Dir(publicDir))
-	router.Path("/").HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		res.Header().Set("Content-Security-Policy", "block-all-mixed-content; "+
-			"default-src 'none'; "+
-			"base-uri 'none'; "+
-			"connect-src 'self'; "+
-			"form-action 'self'; "+
-			"frame-ancestors 'none'; "+
-			"img-src 'self'; "+
-			"script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; "+
-			"style-src 'self';")
-		publicSrv.ServeHTTP(res, req)
-	})
-	router.Path("/favicon.ico").Handler(publicSrv)
-	router.PathPrefix("/static/").Handler(publicSrv)
+
+	router.Use(methodOverrideMiddleware)
+	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
+	router.Use(loggingMiddleware)
+	router.Use(defaultSecureHeadersMiddleware)
+
+	// Frontend.
+	frontendRouter := router.Path("/").Subrouter()
+	frontendRouter.Use(frontendSecureHeadersMiddleware)
+	frontendRouter.Path("/").Handler(publicSrv)
+
+	// Static.
+	router.Path("/favicon.ico").PathPrefix("/static/").Handler(publicSrv)
 
 	// Attachments.
 	router.Path("/attachments/{attachment_id}").
-		HandlerFunc(srv.attachmentHandler).
+		Handler(errorHandler(srv.attachmentHandler)).
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("attachment")
 	router.Path("/attachments").
-		HandlerFunc(srv.attachmentCollectionHandler).
+		Handler(errorHandler(srv.attachmentCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
 	// Suites.
 	router.Path("/suites/{suite_id}").
-		HandlerFunc(srv.suiteHandler).
+		Handler(errorHandler(srv.suiteHandler)).
 		Methods(http.MethodGet, http.MethodPatch, http.MethodDelete).
 		Name("suite")
 	router.Path("/suites").
-		HandlerFunc(srv.suiteCollectionHandler).
+		Handler(errorHandler(srv.suiteCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
 
 	// Cases.
 	router.Path("/cases/{case_id}").
-		HandlerFunc(srv.caseHandler).
+		Handler(errorHandler(srv.caseHandler)).
 		Methods(http.MethodGet, http.MethodPatch).
 		Name("case")
 	router.Path("/suites/{suite_id}/cases").
-		HandlerFunc(srv.caseCollectionHandler).
+		Handler(errorHandler(srv.caseCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost)
 
 	// Logs.
 	router.Path("/logs/{log_id}").
-		HandlerFunc(srv.logHandler).
+		Handler(errorHandler(srv.logHandler)).
 		Methods(http.MethodGet).
 		Name("log")
 	router.Path("/cases/{case_id}/logs").
-		HandlerFunc(srv.logCollectionHandler).
+		Handler(errorHandler(srv.logCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost)
 
 	// Events.
@@ -120,7 +93,7 @@ func Handler(db *database.Database) http.Handler {
 	return router
 }
 
-func methodOverrideHandler(h http.Handler) http.Handler {
+func methodOverrideMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		if req.Method == http.MethodPost {
 			m := strings.ToUpper(req.FormValue("_method"))
@@ -132,20 +105,73 @@ func methodOverrideHandler(h http.Handler) http.Handler {
 	})
 }
 
-func httpError(res http.ResponseWriter, error error, code int) {
-	httpJson(res, map[string]interface{}{"error": error.Error()}, code)
+func loggingMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		log.Printf("%s %s %s", req.RemoteAddr, req.Method, req.URL.String())
+		h.ServeHTTP(res, req)
+	})
 }
 
-func httpJson(res http.ResponseWriter, v interface{}, code int) {
-	res.Header().Set("Content-Type", "application/json")
-	res.Header().Set("X-Content-Type-Options", "nosniff")
+func defaultSecureHeadersMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Set("content-security-policy", "sandbox; "+
+			"default-src 'none'; "+
+			"base-uri 'none'; "+
+			"form-action 'none'; "+
+			"frame-ancestors 'none'; "+
+			"img-src 'self';")
+		res.Header().Set("strict-transport-security", "max-age=31536000")
+		res.Header().Set("x-content-type-options", "nosniff")
+		res.Header().Set("x-frame-options", "deny")
+		h.ServeHTTP(res, req)
+	})
+}
+
+func frontendSecureHeadersMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		res.Header().Set("content-security-policy", "block-all-mixed-content; "+
+			"default-src 'none'; "+
+			"base-uri 'none'; "+
+			"connect-src 'self'; "+
+			"form-action 'self'; "+
+			"frame-ancestors 'none'; "+
+			"img-src 'self'; "+
+			"script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; "+
+			"style-src 'self';")
+		res.Header().Set("x-xss-protection", "1; mode=block")
+		h.ServeHTTP(res, req)
+	})
+}
+
+type oneArgHandlerMap map[string]func(http.ResponseWriter, *http.Request, string) error
+
+func (m oneArgHandlerMap) handle(res http.ResponseWriter, req *http.Request, param string) error {
+	arg, ok := mux.Vars(req)[param]
+	if !ok {
+		log.Panicf("req param '%s' not found\n", param)
+	}
+	fn, ok := m[req.Method]
+	if !ok {
+		log.Panicf("method %s not implemented\n", req.Method)
+	}
+	return fn(res, req, arg)
+}
+
+type noArgHandlerMap map[string]func(http.ResponseWriter, *http.Request) error
+
+func (m noArgHandlerMap) handle(res http.ResponseWriter, req *http.Request) error {
+	fn, ok := m[req.Method]
+	if !ok {
+		log.Panicf("method %s not implemented\n", req.Method)
+	}
+	return fn(res, req)
+}
+
+func writeJson(res http.ResponseWriter, msg interface{}, code int) {
+	res.Header().Set("content-type", "application/json")
 	res.WriteHeader(code)
 
-	if err := json.NewEncoder(res).Encode(v); err != nil {
-		log.Printf("encode json: %v\n", err)
-		res.WriteHeader(http.StatusInternalServerError)
-		if _, err := fmt.Fprintf(res, `{"error":"`+errUnknown.Error()+`"}"`); err != nil {
-			log.Printf("http response: %v\n", err)
-		}
+	if err := json.NewEncoder(res).Encode(msg); err != nil {
+		log.Printf("write json: %v\n", err)
 	}
 }

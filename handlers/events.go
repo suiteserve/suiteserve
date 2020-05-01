@@ -12,13 +12,11 @@ import (
 type eventType string
 
 const (
-	eventTypeCreateCase      eventType = "create_case"
-	eventTypeUpdateCase                = "update_case"
-	eventTypeCreateSuite               = "create_suite"
-	eventTypeUpdateSuite               = "update_suite"
-	eventTypeDeleteSuite               = "delete_suite"
-	eventTypeDeleteAllSuites           = "delete_all_suites"
-	eventTypeCreateLog                 = "create_log"
+	eventTypeSetCase         eventType = "set_case"
+	eventTypeSetSuite                  = "set_suite"
+	eventTypeDeleteSuite               = "del_suite"
+	eventTypeDeleteAllSuites           = "del_all_suites"
+	eventTypeLog                       = "set_log"
 )
 
 type event struct {

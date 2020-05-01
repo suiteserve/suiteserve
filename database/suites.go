@@ -28,7 +28,7 @@ type SuiteEnvVar struct {
 	Value interface{} `json:"value,omitempty" bson:",omitempty"`
 }
 
-type NewSuiteRun struct {
+type NewSuite struct {
 	FailureTypes []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty" validate:"dive"`
 	Tags         []string           `json:"tags,omitempty" bson:",omitempty" validate:"unique,dive,required"`
 	EnvVars      []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty" validate:"dive"`
@@ -37,47 +37,47 @@ type NewSuiteRun struct {
 	CreatedAt    int64              `json:"created_at" bson:"created_at" validate:"gte=0"`
 }
 
-func (s *NewSuiteRun) CreatedAtTime() time.Time {
+func (s *NewSuite) CreatedAtTime() time.Time {
 	return iToTime(s.CreatedAt)
 }
 
-type UpdateSuiteRun struct {
+type UpdateSuite struct {
 	Status     SuiteStatus `json:"status" validate:"oneof=created running finished"`
 	FinishedAt int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
 }
 
-func (s *UpdateSuiteRun) FinishedAtTime() time.Time {
+func (s *UpdateSuite) FinishedAtTime() time.Time {
 	return iToTime(s.FinishedAt)
 }
 
-type SuiteRun struct {
-	Id             interface{} `json:"id" bson:"_id,omitempty"`
-	NewSuiteRun    `bson:",inline"`
-	UpdateSuiteRun `bson:",inline"`
+type Suite struct {
+	Id          interface{} `json:"id" bson:"_id,omitempty"`
+	NewSuite    `bson:",inline"`
+	UpdateSuite `bson:",inline"`
 }
 
-func (d *WithContext) NewSuiteRun(s NewSuiteRun) (string, error) {
+func (d *WithContext) NewSuite(s NewSuite) (string, error) {
 	if err := validate.Struct(&s); err != nil {
-		log.Printf("validate suite run: %v\n", err)
+		log.Printf("validate suite: %v\n", err)
 		return "", ErrInvalidModel
 	}
 
-	return d.insert(d.suites, SuiteRun{
-		NewSuiteRun: s,
-		UpdateSuiteRun: UpdateSuiteRun{
+	return d.insert(d.suites, Suite{
+		NewSuite: s,
+		UpdateSuite: UpdateSuite{
 			Status: SuiteStatusCreated,
 		},
 	})
 }
 
-func (d *WithContext) UpdateSuiteRun(suiteId string, s UpdateSuiteRun) error {
+func (d *WithContext) UpdateSuite(suiteId string, s UpdateSuite) error {
 	suiteOid, err := primitive.ObjectIDFromHex(suiteId)
 	if err != nil {
 		return fmt.Errorf("%w: parse object id", ErrNotFound)
 	}
 
 	if err := validate.Struct(&s); err != nil {
-		log.Printf("validate suite run: %v\n", err)
+		log.Printf("validate suite: %v\n", err)
 		return ErrInvalidModel
 	}
 
@@ -89,14 +89,14 @@ func (d *WithContext) UpdateSuiteRun(suiteId string, s UpdateSuiteRun) error {
 		"$set": &s,
 	})
 	if err != nil {
-		return fmt.Errorf("update suite run: %v", err)
+		return fmt.Errorf("update suite: %v", err)
 	} else if res.MatchedCount == 0 {
 		return ErrNotFound
 	}
 	return nil
 }
 
-func (d *WithContext) SuiteRun(id string) (*SuiteRun, error) {
+func (d *WithContext) Suite(id string) (*Suite, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse object id", ErrNotFound)
@@ -105,16 +105,16 @@ func (d *WithContext) SuiteRun(id string) (*SuiteRun, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	res := d.suites.FindOne(ctx, bson.M{"_id": oid})
-	var suiteRun SuiteRun
-	if err := res.Decode(&suiteRun); err == mongo.ErrNoDocuments {
+	var suite Suite
+	if err := res.Decode(&suite); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
 	} else if err != nil {
-		return nil, fmt.Errorf("find suite run: %v", err)
+		return nil, fmt.Errorf("find suite: %v", err)
 	}
-	return &suiteRun, nil
+	return &suite, nil
 }
 
-func (d *WithContext) AllSuiteRuns(sinceTime int64) ([]SuiteRun, error) {
+func (d *WithContext) AllSuites(sinceTime int64) ([]Suite, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	cursor, err := d.suites.Find(ctx, bson.M{
@@ -124,17 +124,17 @@ func (d *WithContext) AllSuiteRuns(sinceTime int64) ([]SuiteRun, error) {
 		{"_id", 1},
 	}))
 	if err != nil {
-		return nil, fmt.Errorf("find all suite runs: %v", err)
+		return nil, fmt.Errorf("find all suites: %v", err)
 	}
 
-	suiteRuns := make([]SuiteRun, 0)
-	if err := cursor.All(ctx, &suiteRuns); err != nil {
-		return nil, fmt.Errorf("decode all suite runs: %v", err)
+	suites := make([]Suite, 0)
+	if err := cursor.All(ctx, &suites); err != nil {
+		return nil, fmt.Errorf("decode all suites: %v", err)
 	}
-	return suiteRuns, nil
+	return suites, nil
 }
 
-func (d *WithContext) DeleteSuiteRun(id string) (bool, error) {
+func (d *WithContext) DeleteSuite(id string) (bool, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return false, fmt.Errorf("%w: parse object id", ErrNotFound)
@@ -142,25 +142,25 @@ func (d *WithContext) DeleteSuiteRun(id string) (bool, error) {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	if err := d.DeleteAllCaseRuns(id); err != nil {
+	if err := d.DeleteAllCases(id); err != nil {
 		return false, err
 	}
 	if res, err := d.suites.DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
-		return false, fmt.Errorf("delete suite run: %v", err)
+		return false, fmt.Errorf("delete suite: %v", err)
 	} else if res.DeletedCount == 0 {
 		return false, nil
 	}
 	return true, nil
 }
 
-func (d *WithContext) DeleteAllSuiteRuns() error {
+func (d *WithContext) DeleteAllSuites() error {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	if _, err := d.cases.DeleteMany(ctx, bson.M{}); err != nil {
-		return fmt.Errorf("delete all case runs before all suite runs: %v", err)
+		return fmt.Errorf("delete all cases before all suites: %v", err)
 	}
 	if _, err := d.suites.DeleteMany(ctx, bson.M{}); err != nil {
-		return fmt.Errorf("delete all suite runs: %v", err)
+		return fmt.Errorf("delete all suites: %v", err)
 	}
 	return nil
 }

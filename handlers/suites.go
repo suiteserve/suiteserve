@@ -4,154 +4,124 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/gorilla/mux"
+	"fmt"
 	"github.com/tmazeika/testpass/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
-	"strconv"
 )
 
-func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) {
-	id, ok := mux.Vars(req)["suite_id"]
-	if !ok {
-		log.Panicln("req param 'suite_id' not found")
-	}
-
-	switch req.Method {
-	case http.MethodGet:
-		s.getSuiteHandler(res, req, id)
-	case http.MethodPatch:
-		s.patchSuiteHandler(res, req, id)
-	case http.MethodDelete:
-		s.deleteSuiteHandler(res, req, id)
-	default:
-		log.Panicf("method '%s' not implemented\n", req.Method)
-	}
+func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) error {
+	return oneArgHandlerMap{
+		http.MethodGet:    s.getSuiteHandler,
+		http.MethodPatch:  s.patchSuiteHandler,
+		http.MethodDelete: s.deleteSuiteHandler,
+	}.handle(res, req, "suite_id")
 }
 
-func (s *srv) getSuiteHandler(res http.ResponseWriter, req *http.Request, id string) {
-	suiteRun, err := s.db.WithContext(req.Context()).SuiteRun(id)
+func (s *srv) getSuiteHandler(res http.ResponseWriter, req *http.Request, id string) error {
+	suite, err := s.db.WithContext(req.Context()).Suite(id)
 	if errors.Is(err, database.ErrNotFound) {
-		httpError(res, errNotFound, http.StatusNotFound)
+		return errNotFound
 	} else if err != nil {
-		log.Printf("get suite run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		httpJson(res, suiteRun, http.StatusOK)
+		return fmt.Errorf("get suite: %v", err)
 	}
+
+	writeJson(res, suite, http.StatusOK)
+	return nil
 }
 
-func (s *srv) patchSuiteHandler(res http.ResponseWriter, req *http.Request, id string) {
-	var suiteRun database.UpdateSuiteRun
-	if err := json.NewDecoder(req.Body).Decode(&suiteRun); err != nil {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+func (s *srv) patchSuiteHandler(res http.ResponseWriter, req *http.Request, id string) error {
+	var suite database.UpdateSuite
+	if err := json.NewDecoder(req.Body).Decode(&suite); err != nil {
+		return errBadJson
 	}
-	err := s.db.WithContext(req.Context()).UpdateSuiteRun(id, suiteRun)
+
+	err := s.db.WithContext(req.Context()).UpdateSuite(id, suite)
 	if errors.Is(err, database.ErrInvalidModel) {
-		httpError(res, errBadJson, http.StatusBadRequest)
+		return errBadJson
 	} else if errors.Is(err, database.ErrNotFound) {
-		httpError(res, errNotFound, http.StatusNotFound)
+		return errNotFound
 	} else if err != nil {
-		log.Printf("update suite run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		go s.publishSuiteEvent(eventTypeUpdateSuite, id)
-		res.WriteHeader(http.StatusNoContent)
+		return fmt.Errorf("update suite: %v", err)
 	}
+
+	//TODO go s.publishSuiteEvent(eventTypeUpdateSuite, id)
+	res.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
-func (s *srv) deleteSuiteHandler(res http.ResponseWriter, req *http.Request, id string) {
-	ok, err := s.db.WithContext(req.Context()).DeleteSuiteRun(id)
-	if errors.Is(err, database.ErrNotFound) {
-		httpError(res, errNotFound, http.StatusNotFound)
-	} else if err != nil {
-		log.Printf("delete suite run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-	} else {
-		if ok {
-			s.eventBus.publish(newEvent(eventTypeDeleteSuite, bson.M{"id": id}))
-		}
-		res.WriteHeader(http.StatusNoContent)
-	}
-}
-
-func (s *srv) suiteCollectionHandler(res http.ResponseWriter, req *http.Request) {
-	switch req.Method {
-	case http.MethodGet:
-		s.getSuiteCollectionHandler(res, req)
-	case http.MethodPost:
-		s.postSuiteCollectionHandler(res, req)
-	case http.MethodDelete:
-		s.deleteSuiteCollectionHandler(res, req)
-	default:
-		log.Panicf("method '%s' not implemented\n", req.Method)
-	}
-}
-
-func (s *srv) getSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) {
-	formValSince := req.FormValue("since")
-	var sinceTime int64
-	if formValSince != "" {
-		var err error
-		sinceTime, err = strconv.ParseInt(formValSince, 10, 64)
-		if err != nil {
-			httpError(res, errBadQuery, http.StatusBadRequest)
-			return
-		}
-	}
-
-	suiteRuns, err := s.db.WithContext(req.Context()).AllSuiteRuns(sinceTime)
+func (s *srv) deleteSuiteHandler(res http.ResponseWriter, req *http.Request, id string) error {
+	_, err := s.db.WithContext(req.Context()).DeleteSuite(id)
 	if err != nil {
-		log.Printf("get all suite runs: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("delete suite: %v", err)
 	}
-	httpJson(res, suiteRuns, http.StatusOK)
+
+	//TODO if ok { s.eventBus.publish(newEvent(eventTypeDeleteSuite, bson.M{"id": id}))}
+	res.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
-func (s *srv) postSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) {
-	var suiteRun database.NewSuiteRun
-	if err := json.NewDecoder(req.Body).Decode(&suiteRun); err != nil {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+func (s *srv) suiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
+	return noArgHandlerMap{
+		http.MethodGet:    s.getSuiteCollectionHandler,
+		http.MethodPost:   s.postSuiteCollectionHandler,
+		http.MethodDelete: s.deleteSuiteCollectionHandler,
+	}.handle(res, req)
+}
+
+func (s *srv) getSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
+	since, _, err := parseInt64(req.FormValue("since"))
+	if err != nil {
+		return errBadQuery
 	}
-	id, err := s.db.WithContext(req.Context()).NewSuiteRun(suiteRun)
+
+	suites, err := s.db.WithContext(req.Context()).AllSuites(since)
+	if err != nil {
+		return fmt.Errorf("get all suites: %v", err)
+	}
+
+	writeJson(res, suites, http.StatusOK)
+	return nil
+}
+
+func (s *srv) postSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
+	var suite database.NewSuite
+	if err := json.NewDecoder(req.Body).Decode(&suite); err != nil {
+		return errBadJson
+	}
+
+	id, err := s.db.WithContext(req.Context()).NewSuite(suite)
 	if errors.Is(err, database.ErrInvalidModel) {
-		httpError(res, errBadJson, http.StatusBadRequest)
-		return
+		return errBadJson
 	} else if err != nil {
-		log.Printf("create suite run: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("new suite run: %v", err)
 	}
-	go s.publishSuiteEvent(eventTypeCreateSuite, id)
+	//TODO go s.publishSuiteEvent(eventTypeCreateSuite, id)
 
 	loc, err := s.router.Get("suite").URL("suite_id", id)
 	if err != nil {
-		log.Printf("build suite url: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("build suite url: %v", err)
 	}
 
 	res.Header().Set("Location", loc.String())
-	httpJson(res, bson.M{"id": id}, http.StatusCreated)
+	writeJson(res, bson.M{"id": id}, http.StatusCreated)
+	return nil
 }
 
-func (s *srv) deleteSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) {
-	err := s.db.WithContext(req.Context()).DeleteAllSuiteRuns()
+func (s *srv) deleteSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
+	err := s.db.WithContext(req.Context()).DeleteAllSuites()
 	if err != nil {
-		log.Printf("delete all suite runs: %v\n", err)
-		httpError(res, errUnknown, http.StatusInternalServerError)
-		return
+		return fmt.Errorf("delete all suites: %v", err)
 	}
-	s.eventBus.publish(newEvent(eventTypeDeleteAllSuites, nil))
+
+	// TODO s.eventBus.publish(newEvent(eventTypeDeleteAllSuites, nil))
 	res.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
 func (s *srv) publishSuiteEvent(eType eventType, id string) {
-	suiteRun, err := s.db.WithContext(context.Background()).SuiteRun(id)
+	suiteRun, err := s.db.WithContext(context.Background()).Suite(id)
 	if err != nil {
 		log.Printf("get suite run: %v\n", err)
 	} else {

@@ -4,10 +4,18 @@ import (
 	"strconv"
 )
 
-func parseUint(s string) (uint, error) {
-	i64, err := strconv.ParseUint(s, 10, 32)
-	if err != nil {
-		return 0, err
+func parseUint(s string) (uint, bool, error) {
+	if s == "" {
+		return 0, false, nil
 	}
-	return uint(i64), nil
+	i, err := strconv.ParseUint(s, 10, 32)
+	return uint(i), err == nil, err
+}
+
+func parseInt64(s string) (int64, bool, error) {
+	if s == "" {
+		return 0, false, nil
+	}
+	i, err := strconv.ParseInt(s, 10, 64)
+	return i, err == nil, err
 }

@@ -80,12 +80,12 @@ func (d *WithContext) AllLogMessages(caseId string) ([]LogMessage, error) {
 		{"_id", 1},
 	}))
 	if err != nil {
-		return nil, fmt.Errorf("find all log messages for case run: %v", err)
+		return nil, fmt.Errorf("find all log messages for case: %v", err)
 	}
 
 	logMsgs := make([]LogMessage, 0)
 	if err := cursor.All(ctx, &logMsgs); err != nil {
-		return nil, fmt.Errorf("decode all log messages for case run: %v", err)
+		return nil, fmt.Errorf("decode all log messages for case: %v", err)
 	}
 	return logMsgs, nil
 }
