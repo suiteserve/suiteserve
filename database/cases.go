@@ -153,13 +153,3 @@ func (d *WithContext) AllCases(suiteId string, caseNum *uint) ([]Case, error) {
 	}
 	return cases, nil
 }
-
-func (d *WithContext) DeleteAllCases(suiteId string) error {
-	ctx, cancel := d.newContext()
-	defer cancel()
-	// TODO delete logs
-	if _, err := d.cases.DeleteMany(ctx, bson.M{"suite": suiteId}); err != nil {
-		return fmt.Errorf("delete all cases for suite: %v", err)
-	}
-	return nil
-}

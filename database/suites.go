@@ -142,9 +142,9 @@ func (d *WithContext) DeleteSuite(id string) (bool, error) {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	if err := d.DeleteAllCases(id); err != nil {
-		return false, err
-	}
+	//if err := d.DeleteAllCases(id); err != nil {
+	//	return false, err
+	//}
 	if res, err := d.suites.DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
 		return false, fmt.Errorf("delete suite: %v", err)
 	} else if res.DeletedCount == 0 {
@@ -156,11 +156,15 @@ func (d *WithContext) DeleteSuite(id string) (bool, error) {
 func (d *WithContext) DeleteAllSuites() error {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	if _, err := d.cases.DeleteMany(ctx, bson.M{}); err != nil {
-		return fmt.Errorf("delete all cases before all suites: %v", err)
-	}
-	if _, err := d.suites.DeleteMany(ctx, bson.M{}); err != nil {
+	// TODO: is it okay that transactions aren't being used?
+	if err := d.suites.Drop(ctx); err != nil {
 		return fmt.Errorf("delete all suites: %v", err)
+	}
+	if err := d.cases.Drop(ctx); err != nil {
+		return fmt.Errorf("delete all cases: %v", err)
+	}
+	if err := d.logs.Drop(ctx); err != nil {
+		return fmt.Errorf("delete all logs: %v", err)
 	}
 	return nil
 }
