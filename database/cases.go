@@ -144,12 +144,12 @@ func (d *WithContext) AllCases(suiteId string, caseNum *uint) ([]Case, error) {
 		{"_id", 1},
 	}))
 	if err != nil {
-		return nil, fmt.Errorf("find all cases for suites: %v", err)
+		return nil, fmt.Errorf("find many cases for suite: %v", err)
 	}
 
 	cases := make([]Case, 0)
 	if err := cursor.All(ctx, &cases); err != nil {
-		return nil, fmt.Errorf("decode all cases for suites: %v", err)
+		return nil, fmt.Errorf("decode many cases for suite: %v", err)
 	}
 	return cases, nil
 }
@@ -158,7 +158,7 @@ func (d *WithContext) DeleteAllCases(suiteId string) error {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	if _, err := d.cases.DeleteMany(ctx, bson.M{"suite": suiteId}); err != nil {
-		return fmt.Errorf("delete all cases for suites: %v", err)
+		return fmt.Errorf("delete all cases for suite: %v", err)
 	}
 	return nil
 }

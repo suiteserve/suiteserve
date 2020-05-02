@@ -109,7 +109,7 @@ func (d *WithContext) Suite(id string) (*Suite, error) {
 	if err := res.Decode(&suite); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
 	} else if err != nil {
-		return nil, fmt.Errorf("find suite: %v", err)
+		return nil, fmt.Errorf("find and decode suite: %v", err)
 	}
 	return &suite, nil
 }

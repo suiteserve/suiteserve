@@ -27,12 +27,6 @@ func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, i
 		return fmt.Errorf("get attachment: %v", err)
 	}
 
-	res.Header().Set("cache-control", "private, max-age=31536000")
-	res.Header().Set("content-size", strconv.FormatInt(attachment.Size, 10))
-	res.Header().Set("content-disposition", "inline; filename="+
-		strconv.Quote(attachment.Filename))
-	res.Header().Set("content-type", attachment.ContentType)
-
 	file, err := attachment.OpenFile()
 	if err != nil {
 		return fmt.Errorf("open attachment: %v", err)
@@ -42,6 +36,12 @@ func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, i
 			log.Printf("close attachment: %v\n", err)
 		}
 	}()
+
+	res.Header().Set("cache-control", "private, max-age=31536000")
+	res.Header().Set("content-size", strconv.FormatInt(attachment.Size, 10))
+	res.Header().Set("content-disposition", "inline; filename="+
+		strconv.Quote(attachment.Filename))
+	res.Header().Set("content-type", attachment.ContentType)
 
 	if _, err := io.Copy(res, file); err != nil {
 		return fmt.Errorf("write attachment: %v", err)

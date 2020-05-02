@@ -40,6 +40,7 @@ func (d *WithContext) newContext() (context.Context, context.CancelFunc) {
 func (d *WithContext) insert(collection *mongo.Collection, v interface{}) (string, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
+
 	res, err := collection.InsertOne(ctx, v)
 	if err != nil {
 		return "", fmt.Errorf("insert: %v", err)
@@ -111,7 +112,8 @@ func (d *Database) WithContext(ctx context.Context) *WithContext {
 
 func iToTime(i int64) time.Time {
 	if i < 0 {
-		log.Fatalf("time i=%d must be non-negative\n", i)
+		log.Printf("time i=%d must be non-negative\n", i)
+		return time.Time{}
 	}
 	return time.Unix(i/1000, (i%1000)*time.Millisecond.Nanoseconds())
 }

@@ -70,7 +70,7 @@ func (d *WithContext) NewAttachment(filename, contentType string, src io.Reader)
 		if deleteErr := attachment.deleteFile(); deleteErr != nil {
 			log.Printf("%v\n", deleteErr)
 		}
-		return "", fmt.Errorf("insert attachment: %v", err)
+		return "", err
 	}
 	return oid.Hex(), nil
 }
@@ -88,7 +88,7 @@ func (d *WithContext) Attachment(id string) (*Attachment, error) {
 	if err := res.Decode(&attachment); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
 	} else if err != nil {
-		return nil, fmt.Errorf("find attachment: %v", err)
+		return nil, fmt.Errorf("find and decode attachment: %v", err)
 	}
 	return &attachment, nil
 }
@@ -124,8 +124,7 @@ func (d *WithContext) DeleteAttachment(id string) error {
 func (d *WithContext) DeleteAllAttachments() error {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	_, err := d.attachments.DeleteMany(ctx, bson.M{})
-	if err != nil {
+	if _, err := d.attachments.DeleteMany(ctx, bson.M{}); err != nil {
 		return fmt.Errorf("delete all attachments: %v", err)
 	}
 	filenames, err := filepath.Glob(filepath.Join(dataDir, "*.attachment"))
