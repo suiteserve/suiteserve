@@ -22,12 +22,12 @@ Content-Type: application/json
     "1234567890"
   ],
   "planned_cases": 3,
-  "created_at": 0
+  "created_at": 1587256716
 }
 
 ###
 
-POST https://localhost:8080/suites/5ea645714f34fbb33044c83b/cases
+POST https://localhost:8080/suites/5eacc2e4081ecf92c43df8a1/cases
 Content-Type: application/json
 
 {

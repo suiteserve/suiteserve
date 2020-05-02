@@ -124,7 +124,7 @@ func (d *WithContext) Case(id string) (*Case, error) {
 	if err := res.Decode(&_case); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
 	} else if err != nil {
-		return nil, fmt.Errorf("find case: %v", err)
+		return nil, fmt.Errorf("find and decode case: %v", err)
 	}
 	return &_case, nil
 }
@@ -157,6 +157,7 @@ func (d *WithContext) AllCases(suiteId string, caseNum *uint) ([]Case, error) {
 func (d *WithContext) DeleteAllCases(suiteId string) error {
 	ctx, cancel := d.newContext()
 	defer cancel()
+	// TODO delete logs
 	if _, err := d.cases.DeleteMany(ctx, bson.M{"suite": suiteId}); err != nil {
 		return fmt.Errorf("delete all cases for suite: %v", err)
 	}
