@@ -117,3 +117,10 @@ func iToTime(i int64) time.Time {
 	}
 	return time.Unix(i/1000, (i%1000)*time.Millisecond.Nanoseconds())
 }
+
+func nowTimeMillis() int64 {
+	now := time.Now()
+	// Doesn't use now.UnixNano() to avoid Y2K262.
+	return now.Unix()*time.Second.Milliseconds() +
+		time.Duration(now.Nanosecond()).Milliseconds()
+}

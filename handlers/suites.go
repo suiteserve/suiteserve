@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/tmazeika/testpass/database"
-	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
 )
@@ -26,9 +25,7 @@ func (s *srv) getSuiteHandler(res http.ResponseWriter, req *http.Request, id str
 	} else if err != nil {
 		return fmt.Errorf("get suite: %v", err)
 	}
-
-	writeJson(res, suite, http.StatusOK)
-	return nil
+	return writeJson(res, http.StatusOK, suite)
 }
 
 func (s *srv) patchSuiteHandler(res http.ResponseWriter, req *http.Request, id string) error {
@@ -80,9 +77,7 @@ func (s *srv) getSuiteCollectionHandler(res http.ResponseWriter, req *http.Reque
 	if err != nil {
 		return fmt.Errorf("get all suites: %v", err)
 	}
-
-	writeJson(res, suites, http.StatusOK)
-	return nil
+	return writeJson(res, http.StatusOK, suites)
 }
 
 func (s *srv) postSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
@@ -105,8 +100,7 @@ func (s *srv) postSuiteCollectionHandler(res http.ResponseWriter, req *http.Requ
 	}
 
 	res.Header().Set("Location", loc.String())
-	writeJson(res, bson.M{"id": id}, http.StatusCreated)
-	return nil
+	return writeJson(res, http.StatusCreated, map[string]string{"id": id})
 }
 
 func (s *srv) deleteSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {

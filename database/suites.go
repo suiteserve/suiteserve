@@ -54,6 +54,12 @@ type Suite struct {
 	Id          interface{} `json:"id" bson:"_id,omitempty"`
 	NewSuite    `bson:",inline"`
 	UpdateSuite `bson:",inline"`
+	Deleted     bool  `json:"delete"`
+	DeletedAt   int64 `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
+}
+
+func (s *Suite) DeletedAtTime() time.Time {
+	return iToTime(s.DeletedAt)
 }
 
 func (d *WithContext) NewSuite(s NewSuite) (string, error) {
@@ -84,7 +90,8 @@ func (d *WithContext) UpdateSuite(suiteId string, s UpdateSuite) error {
 	ctx, cancel := d.newContext()
 	defer cancel()
 	res, err := d.suites.UpdateOne(ctx, bson.M{
-		"_id": suiteOid,
+		"_id":     suiteOid,
+		"deleted": false,
 	}, bson.M{
 		"$set": &s,
 	})
@@ -104,7 +111,10 @@ func (d *WithContext) Suite(id string) (*Suite, error) {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	res := d.suites.FindOne(ctx, bson.M{"_id": oid})
+	res := d.suites.FindOne(ctx, bson.M{
+		"_id":     oid,
+		"deleted": false,
+	})
 	var suite Suite
 	if err := res.Decode(&suite); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
@@ -119,6 +129,7 @@ func (d *WithContext) AllSuites(sinceTime int64) ([]Suite, error) {
 	defer cancel()
 	cursor, err := d.suites.Find(ctx, bson.M{
 		"created_at": bson.M{"$gte": sinceTime},
+		"deleted":    false,
 	}, options.Find().SetSort(bson.D{
 		{"created_at", 1},
 		{"_id", 1},
@@ -142,12 +153,17 @@ func (d *WithContext) DeleteSuite(id string) (bool, error) {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	//if err := d.DeleteAllCases(id); err != nil {
-	//	return false, err
-	//}
-	if res, err := d.suites.DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
+	if res, err := d.suites.UpdateOne(ctx, bson.M{
+		"_id":     oid,
+		"deleted": false,
+	}, bson.M{
+		"$set": bson.D{
+			{"deleted", true},
+			{"deleted_at", nowTimeMillis()},
+		},
+	}); err != nil {
 		return false, fmt.Errorf("delete suite: %v", err)
-	} else if res.DeletedCount == 0 {
+	} else if res.MatchedCount == 0 {
 		return false, nil
 	}
 	return true, nil
@@ -156,15 +172,18 @@ func (d *WithContext) DeleteSuite(id string) (bool, error) {
 func (d *WithContext) DeleteAllSuites() error {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	// TODO: is it okay that transactions aren't being used?
-	if err := d.suites.Drop(ctx); err != nil {
+	deletedAt := nowTimeMillis()
+	if _, err := d.suites.UpdateMany(ctx,
+		bson.M{
+			"deleted": false,
+		},
+		bson.M{
+			"$set": bson.D{
+				{"deleted", true},
+				{"deleted_at", deletedAt},
+			},
+		}); err != nil {
 		return fmt.Errorf("delete all suites: %v", err)
-	}
-	if err := d.cases.Drop(ctx); err != nil {
-		return fmt.Errorf("delete all cases: %v", err)
-	}
-	if err := d.logs.Drop(ctx); err != nil {
-		return fmt.Errorf("delete all logs: %v", err)
 	}
 	return nil
 }

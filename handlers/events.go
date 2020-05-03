@@ -24,8 +24,8 @@ type event struct {
 	Payload interface{} `json:"payload,omitempty"`
 }
 
-func newEvent(eType eventType, payload interface{}) *event {
-	return &event{
+func newEvent(eType eventType, payload interface{}) event {
+	return event{
 		Type:    eType,
 		Payload: payload,
 	}
@@ -56,11 +56,11 @@ func (b *eventBus) unsubscribe(ch <-chan event) bool {
 	return false
 }
 
-func (b *eventBus) publish(e *event) {
+func (b *eventBus) publish(e event) {
 	b.RLock()
 	for _, s := range b.subscribers {
 		go func(ch chan<- event) {
-			ch <- *e
+			ch <- e
 		}(s)
 	}
 	b.RUnlock()

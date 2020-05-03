@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/tmazeika/testpass/database"
-	"go.mongodb.org/mongo-driver/bson"
 	"io"
 	"log"
 	"mime"
@@ -20,11 +19,19 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) erro
 }
 
 func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, id string) error {
-	attachment, err := s.db.WithContext(req.Context()).Attachment(id)
+	download, _, err := parseBool(req.FormValue("download"))
+	if err != nil {
+		return errBadQuery
+	}
+	attachment, err := s.db.WithContext(req.Context()).Attachment(id, !download)
 	if errors.Is(err, database.ErrNotFound) {
 		return errNotFound
 	} else if err != nil {
 		return fmt.Errorf("get attachment: %v", err)
+	}
+
+	if !download {
+		return writeJson(res, http.StatusOK, attachment)
 	}
 
 	file, err := attachment.OpenFile()
@@ -56,7 +63,6 @@ func (s *srv) deleteAttachmentHandler(res http.ResponseWriter, req *http.Request
 	} else if err != nil {
 		return fmt.Errorf("delete attachment: %v", err)
 	}
-
 	res.WriteHeader(http.StatusNoContent)
 	return nil
 }
@@ -74,9 +80,7 @@ func (s *srv) getAttachmentCollectionHandler(res http.ResponseWriter, req *http.
 	if err != nil {
 		return fmt.Errorf("get all attachments: %v", err)
 	}
-
-	writeJson(res, attachments, http.StatusOK)
-	return nil
+	return writeJson(res, http.StatusOK, attachments)
 }
 
 func (s *srv) postAttachmentCollectionHandler(res http.ResponseWriter, req *http.Request) error {
@@ -111,8 +115,7 @@ func (s *srv) postAttachmentCollectionHandler(res http.ResponseWriter, req *http
 	}
 
 	res.Header().Set("Location", loc.String())
-	writeJson(res, bson.M{"id": id}, http.StatusCreated)
-	return nil
+	return writeJson(res, http.StatusCreated, map[string]string{"id": id})
 }
 
 func (s *srv) deleteAttachmentCollectionHandler(res http.ResponseWriter, req *http.Request) error {

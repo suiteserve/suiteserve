@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/tmazeika/testpass/database"
-	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
 )
@@ -25,9 +24,7 @@ func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, id stri
 	} else if err != nil {
 		return fmt.Errorf("get case run: %v", err)
 	}
-
-	writeJson(res, _case, http.StatusOK)
-	return nil
+	return writeJson(res, http.StatusOK, _case)
 }
 
 func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, id string) error {
@@ -71,9 +68,7 @@ func (s *srv) getCaseCollectionHandler(res http.ResponseWriter, req *http.Reques
 	if err != nil {
 		return fmt.Errorf("get all cases for suite: %v", err)
 	}
-
-	writeJson(res, cases, http.StatusOK)
-	return nil
+	return writeJson(res, http.StatusOK, cases)
 }
 
 func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) error {
@@ -96,8 +91,7 @@ func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Reque
 	}
 
 	res.Header().Set("Location", loc.String())
-	writeJson(res, bson.M{"id": id}, http.StatusCreated)
-	return nil
+	return writeJson(res, http.StatusCreated, map[string]string{"id": id})
 }
 
 func (s *srv) publishCaseEvent(eType eventType, id string) {

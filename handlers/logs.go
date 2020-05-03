@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/tmazeika/testpass/database"
-	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"net/http"
 )
@@ -24,9 +23,7 @@ func (s *srv) getLogHandler(res http.ResponseWriter, req *http.Request, id strin
 	} else if err != nil {
 		return fmt.Errorf("get log message: %v", err)
 	}
-
-	writeJson(res, logMsg, http.StatusOK)
-	return nil
+	return writeJson(res, http.StatusOK, logMsg)
 }
 
 func (s *srv) logCollectionHandler(res http.ResponseWriter, req *http.Request) error {
@@ -41,9 +38,7 @@ func (s *srv) getLogCollectionHandler(res http.ResponseWriter, req *http.Request
 	if err != nil {
 		return fmt.Errorf("get all log messages for case: %v", err)
 	}
-
-	writeJson(res, logMsgs, http.StatusOK)
-	return nil
+	return writeJson(res, http.StatusOK, logMsgs)
 }
 
 func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Request, caseId string) error {
@@ -66,8 +61,7 @@ func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Reques
 	}
 
 	res.Header().Set("Location", loc.String())
-	writeJson(res, bson.M{"id": id}, http.StatusCreated)
-	return nil
+	return writeJson(res, http.StatusCreated, map[string]string{"id": id})
 }
 
 func (s *srv) publishLogEvent(eType eventType, id string) {

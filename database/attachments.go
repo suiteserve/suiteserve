@@ -19,6 +19,8 @@ type Attachment struct {
 	Filename    string      `json:"filename"`
 	Size        int64       `json:"size"`
 	ContentType string      `json:"content_type" bson:"content_type"`
+	Deleted     bool        `json:"deleted"`
+	DeletedAt   int64       `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
 }
 
 func (a *Attachment) OpenFile() (io.ReadCloser, error) {
@@ -75,7 +77,7 @@ func (d *WithContext) NewAttachment(filename, contentType string, src io.Reader)
 	return oid.Hex(), nil
 }
 
-func (d *WithContext) Attachment(id string) (*Attachment, error) {
+func (d *WithContext) Attachment(id string, allowDeleted bool) (*Attachment, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse object id", ErrNotFound)
@@ -83,7 +85,13 @@ func (d *WithContext) Attachment(id string) (*Attachment, error) {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	res := d.attachments.FindOne(ctx, bson.M{"_id": oid})
+	filter := bson.M{
+		"_id": oid,
+	}
+	if !allowDeleted {
+		filter["deleted"] = false
+	}
+	res := d.attachments.FindOne(ctx, filter)
 	var attachment Attachment
 	if err := res.Decode(&attachment); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
@@ -96,7 +104,9 @@ func (d *WithContext) Attachment(id string) (*Attachment, error) {
 func (d *WithContext) AllAttachments() ([]Attachment, error) {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	cursor, err := d.attachments.Find(ctx, bson.M{})
+	cursor, err := d.attachments.Find(ctx, bson.M{
+		"deleted": false,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("find all attachments: %v", err)
 	}
@@ -115,16 +125,36 @@ func (d *WithContext) DeleteAttachment(id string) error {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	if _, err := d.attachments.DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
+	res, err := d.attachments.UpdateOne(ctx, bson.M{
+		"_id":     oid,
+		"deleted": false,
+	}, bson.M{
+		"$set": bson.D{
+			{"deleted", true},
+			{"deleted_at", nowTimeMillis()},
+		},
+	})
+	if err != nil {
 		return fmt.Errorf("delete attachment: %v", err)
 	}
-	return (&Attachment{Id: oid}).deleteFile()
+	if res.ModifiedCount == 0 {
+		return nil
+	} else {
+		return (&Attachment{Id: oid}).deleteFile()
+	}
 }
 
 func (d *WithContext) DeleteAllAttachments() error {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	if _, err := d.attachments.DeleteMany(ctx, bson.M{}); err != nil {
+	if _, err := d.attachments.UpdateMany(ctx, bson.M{
+		"deleted": false,
+	}, bson.M{
+		"$set": bson.D{
+			{"deleted", true},
+			{"deleted_at", nowTimeMillis()},
+		},
+	}); err != nil {
 		return fmt.Errorf("delete all attachments: %v", err)
 	}
 	filenames, err := filepath.Glob(filepath.Join(dataDir, "*.attachment"))

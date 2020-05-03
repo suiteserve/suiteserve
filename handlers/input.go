@@ -19,3 +19,11 @@ func parseInt64(s string) (int64, bool, error) {
 	i, err := strconv.ParseInt(s, 10, 64)
 	return i, err == nil, err
 }
+
+func parseBool(s string) (bool, bool, error) {
+	if s == "" {
+		return false, false, nil
+	}
+	b, err := strconv.ParseBool(s)
+	return b, err == nil, err
+}

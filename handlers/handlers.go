@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -167,11 +168,12 @@ func (m noArgHandlerMap) handle(res http.ResponseWriter, req *http.Request) erro
 	return fn(res, req)
 }
 
-func writeJson(res http.ResponseWriter, msg interface{}, code int) {
+func writeJson(res http.ResponseWriter, code int, msg interface{}) error {
 	res.Header().Set("content-type", "application/json")
 	res.WriteHeader(code)
 
 	if err := json.NewEncoder(res).Encode(msg); err != nil {
-		log.Printf("write json: %v\n", err)
+		return fmt.Errorf("write json: %v", err)
 	}
+	return nil
 }

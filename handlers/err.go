@@ -23,17 +23,19 @@ var (
 )
 
 func errorHandler(h func(res http.ResponseWriter, req *http.Request) error) http.Handler {
-	type errorRes struct {
-		Error string `json:"error"`
-	}
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		write := func(code int, name string) {
+			if err := writeJson(res, code, map[string]string{"error": name}); err != nil {
+				log.Printf("%s %v\n", req.RemoteAddr, err)
+			}
+		}
 		if err := h(res, req); err != nil {
 			if restErr, ok := err.(restError); ok {
 				log.Printf("%s status %v\n", req.RemoteAddr, err)
-				writeJson(res, errorRes{restErr.name}, restErr.code)
+				write(restErr.code, restErr.name)
 			} else {
 				log.Printf("%s status 500: %v\n", req.RemoteAddr, err)
-				writeJson(res, errorRes{"unknown"}, http.StatusInternalServerError)
+				write(http.StatusInternalServerError, "unknown")
 			}
 		}
 	})
