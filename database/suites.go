@@ -111,10 +111,7 @@ func (d *WithContext) Suite(id string) (*Suite, error) {
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	res := d.suites.FindOne(ctx, bson.M{
-		"_id":     oid,
-		"deleted": false,
-	})
+	res := d.suites.FindOne(ctx, bson.M{"_id": oid})
 	var suite Suite
 	if err := res.Decode(&suite); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound

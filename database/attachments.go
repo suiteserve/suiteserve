@@ -77,7 +77,7 @@ func (d *WithContext) NewAttachment(filename, contentType string, src io.Reader)
 	return oid.Hex(), nil
 }
 
-func (d *WithContext) Attachment(id string, allowDeleted bool) (*Attachment, error) {
+func (d *WithContext) Attachment(id string) (*Attachment, error) {
 	oid, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, fmt.Errorf("%w: parse object id", ErrNotFound)
@@ -85,13 +85,7 @@ func (d *WithContext) Attachment(id string, allowDeleted bool) (*Attachment, err
 
 	ctx, cancel := d.newContext()
 	defer cancel()
-	filter := bson.M{
-		"_id": oid,
-	}
-	if !allowDeleted {
-		filter["deleted"] = false
-	}
-	res := d.attachments.FindOne(ctx, filter)
+	res := d.attachments.FindOne(ctx, bson.M{"_id": oid})
 	var attachment Attachment
 	if err := res.Decode(&attachment); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound

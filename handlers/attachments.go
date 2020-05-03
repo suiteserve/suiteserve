@@ -23,7 +23,7 @@ func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, i
 	if err != nil {
 		return errBadQuery
 	}
-	attachment, err := s.db.WithContext(req.Context()).Attachment(id, !download)
+	attachment, err := s.db.WithContext(req.Context()).Attachment(id)
 	if errors.Is(err, database.ErrNotFound) {
 		return errNotFound
 	} else if err != nil {
@@ -32,6 +32,8 @@ func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, i
 
 	if !download {
 		return writeJson(res, http.StatusOK, attachment)
+	} else if attachment.Deleted {
+		return errNotFound
 	}
 
 	file, err := attachment.OpenFile()
