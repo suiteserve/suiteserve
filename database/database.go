@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"github.com/go-playground/validator/v10"
 	"github.com/tmazeika/testpass/config"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"log"
 	"net"
-	"net/url"
 	"time"
 )
 
@@ -59,29 +59,28 @@ type Database struct {
 func Open() (*Database, error) {
 	host := config.Get(config.MongoHost, "localhost")
 	port := config.Get(config.MongoPort, "27017")
-	user := config.Get(config.MongoUser, "root")
-	pass := config.Get(config.MongoPass, "pass")
-	mongoUri := (&url.URL{
-		Scheme: "mongodb",
-		Host:   net.JoinHostPort(host, port),
-	}).String()
+	rs := config.Get(config.MongoReplicaSet, "rs0")
+	user := config.Get(config.MongoUser, "testpass")
+	pass := config.Get(config.MongoPass, "testpass")
+
 	opts := options.Client()
+	opts.SetHosts([]string{net.JoinHostPort(host, port)})
+	opts.SetReplicaSet(rs)
 	opts.SetAuth(options.Credential{
 		Username: user,
 		Password: pass,
 	})
-	opts.ApplyURI(mongoUri)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		return nil, fmt.Errorf("connect DB: %v", err)
+		return nil, fmt.Errorf("connect db: %v", err)
 	}
 	if err := client.Ping(ctx, readpref.Primary()); err != nil {
-		return nil, fmt.Errorf("ping DB: %v", err)
+		return nil, fmt.Errorf("ping db: %v", err)
 	}
-	log.Printf("Connected to DB at %s\n", opts.GetURI())
+	log.Printf("Connected to DB at %v\n", opts.Hosts)
 
 	mgoDb := client.Database("testpass")
 	return &Database{
@@ -98,7 +97,7 @@ func (d *Database) Close() error {
 	defer cancel()
 
 	if err := d.mgoDb.Client().Disconnect(ctx); err != nil {
-		return fmt.Errorf("disconnect DB: %v", err)
+		return fmt.Errorf("disconnect db: %v", err)
 	}
 	return nil
 }
@@ -108,6 +107,31 @@ func (d *Database) WithContext(ctx context.Context) *WithContext {
 		Database: d,
 		ctx:      ctx,
 	}
+}
+
+type Change interface{}
+
+func (d *WithContext) Watch(fn func(Change)) error {
+	ctx, cancel := d.newContext()
+	defer cancel()
+	res, err := d.mgoDb.Watch(ctx, bson.D{})
+	if err != nil {
+		return fmt.Errorf("watch db: %v", err)
+	}
+	go func() {
+		for res.Next(d.ctx) {
+			var change Change
+			if err := res.Decode(&change); err != nil {
+				log.Printf("decode db change: %v\n", err)
+			} else {
+				go fn(change)
+			}
+		}
+		if res.Err() != nil {
+			log.Printf("watch db: %v\n", res.Err())
+		}
+	}()
+	return nil
 }
 
 func iToTime(i int64) time.Time {

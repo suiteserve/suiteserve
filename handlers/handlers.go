@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/handlers"
@@ -90,6 +91,13 @@ func Handler(db *database.Database) http.Handler {
 	router.Path("/events").
 		HandlerFunc(srv.eventsHandler).
 		Methods(http.MethodGet)
+
+	err := db.WithContext(context.Background()).Watch(func(change database.Change) {
+		srv.eventBus.publish(event{eventTypeSetCase, change})
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	return router
 }

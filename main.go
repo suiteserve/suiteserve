@@ -20,14 +20,13 @@ func main() {
 	log.Println("Starting up...")
 	db, err := database.Open()
 	if err != nil {
-		log.Fatalf("open DB: %v\n", err)
+		log.Fatalf("open db: %v\n", err)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Printf("close DB: %v\n", err)
+			log.Printf("close db: %v\n", err)
 		}
 	}()
-
 	listenHttp(db)
 }
 
