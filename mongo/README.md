@@ -1,0 +1,18 @@
+Run `./provision.sh` from within this directory to bring up and provision a single-instanced MongoDB replica set with Mongo Express. Access Mongo Express at [localhost:8081](http://localhost:8081).
+
+Created replica sets:
+- *ID:* `rs0`  
+  *Members:*
+  - `localhost:27017`
+
+Created users:
+- *User:* `admin`  
+  *Password:* `admin`  
+  *Roles:* `root`  
+  *Auth DB:* `admin`
+- *User:* `testpass`  
+  *Password:* `testpass`  
+  *Roles:* `readWrite` on DB `testpass`  
+  *Auth DB:* `admin`
+
+⚠️ *Warning:* This configuration of MongoDB must only be used for development purposes. Nothing here is secure or production-ready.
