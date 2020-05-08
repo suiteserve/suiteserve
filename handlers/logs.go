@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/tmazeika/testpass/database"
-	"log"
 	"net/http"
 )
 
@@ -53,7 +51,6 @@ func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Reques
 	} else if err != nil {
 		return fmt.Errorf("new log message: %v", err)
 	}
-	//TODO go s.publishLogEvent(eventTypeCreateLog, id)
 
 	loc, err := s.router.Get("log").URL("log_id", id)
 	if err != nil {
@@ -62,13 +59,4 @@ func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Reques
 
 	res.Header().Set("Location", loc.String())
 	return writeJson(res, http.StatusCreated, map[string]string{"id": id})
-}
-
-func (s *srv) publishLogEvent(eType eventType, id string) {
-	logMsg, err := s.db.WithContext(context.Background()).LogMessage(id)
-	if err != nil {
-		log.Printf("get log message: %v", err)
-	} else {
-		s.eventBus.publish(newEvent(eType, logMsg))
-	}
 }

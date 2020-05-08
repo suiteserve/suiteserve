@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/tmazeika/testpass/database"
-	"log"
 	"net/http"
 )
 
@@ -43,7 +41,6 @@ func (s *srv) patchSuiteHandler(res http.ResponseWriter, req *http.Request, id s
 		return fmt.Errorf("update suite: %v", err)
 	}
 
-	//TODO go s.publishSuiteEvent(eventTypeUpdateSuite, id)
 	res.WriteHeader(http.StatusNoContent)
 	return nil
 }
@@ -54,7 +51,6 @@ func (s *srv) deleteSuiteHandler(res http.ResponseWriter, req *http.Request, id 
 		return fmt.Errorf("delete suite: %v", err)
 	}
 
-	//TODO if ok { s.eventBus.publish(newEvent(eventTypeDeleteSuite, bson.M{"id": id}))}
 	res.WriteHeader(http.StatusNoContent)
 	return nil
 }
@@ -92,7 +88,6 @@ func (s *srv) postSuiteCollectionHandler(res http.ResponseWriter, req *http.Requ
 	} else if err != nil {
 		return fmt.Errorf("new suite run: %v", err)
 	}
-	//TODO go s.publishSuiteEvent(eventTypeCreateSuite, id)
 
 	loc, err := s.router.Get("suite").URL("suite_id", id)
 	if err != nil {
@@ -109,16 +104,6 @@ func (s *srv) deleteSuiteCollectionHandler(res http.ResponseWriter, req *http.Re
 		return fmt.Errorf("delete all suites: %v", err)
 	}
 
-	// TODO s.eventBus.publish(newEvent(eventTypeDeleteAllSuites, nil))
 	res.WriteHeader(http.StatusNoContent)
 	return nil
-}
-
-func (s *srv) publishSuiteEvent(eType eventType, id string) {
-	suiteRun, err := s.db.WithContext(context.Background()).Suite(id)
-	if err != nil {
-		log.Printf("get suite run: %v\n", err)
-	} else {
-		s.eventBus.publish(newEvent(eType, suiteRun))
-	}
 }

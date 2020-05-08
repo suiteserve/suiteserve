@@ -19,17 +19,7 @@ const (
 	eventTypeLog                       = "set_log"
 )
 
-type event struct {
-	Type    eventType   `json:"type"`
-	Payload interface{} `json:"payload,omitempty"`
-}
-
-func newEvent(eType eventType, payload interface{}) event {
-	return event{
-		Type:    eType,
-		Payload: payload,
-	}
-}
+type event interface {}
 
 type eventBus struct {
 	sync.RWMutex

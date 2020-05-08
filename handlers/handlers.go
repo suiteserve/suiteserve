@@ -49,7 +49,8 @@ func Handler(db *database.Database) http.Handler {
 	frontendRouter.Path("/").Handler(publicSrv)
 
 	// Static.
-	router.Path("/favicon.ico").PathPrefix("/static/").Handler(publicSrv)
+	router.PathPrefix("/static/").Handler(publicSrv)
+	router.Path("/favicon.ico").Handler(publicSrv)
 
 	// Attachments.
 	router.Path("/attachments/{attachment_id}").
@@ -93,7 +94,7 @@ func Handler(db *database.Database) http.Handler {
 		Methods(http.MethodGet)
 
 	err := db.WithContext(context.Background()).Watch(func(change database.Change) {
-		srv.eventBus.publish(event{eventTypeSetCase, change})
+		srv.eventBus.publish(event(change))
 	})
 	if err != nil {
 		log.Fatalln(err)
