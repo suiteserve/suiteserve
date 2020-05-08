@@ -1,4 +1,4 @@
-Run `./provision.sh` from within this directory to bring up and provision a single-instanced MongoDB replica set with Mongo Express. Access Mongo Express at [localhost:8081](http://localhost:8081).
+Run `./provision.sh` from within this directory to bring up and provision a single-instanced MongoDB replica set with Mongo Express. Access Mongo Express at [localhost:8081](http://localhost:8081). To bring up the services without provisioning them, use the standard `docker-compose up` command and friends.
 
 Created replica sets:
 - *ID:* `rs0`  
