@@ -22,12 +22,12 @@ Content-Type: application/json
     "1234567890"
   ],
   "planned_cases": 3,
-  "created_at": 1587256716
+  "created_at": 1387256716000
 }
 
 ###
 
-POST https://localhost:8080/suites/5eacc2e4081ecf92c43df8a1/cases
+POST https://localhost:8080/suites/5eb6f6d20abd189598c36230/cases
 Content-Type: application/json
 
 {
@@ -41,12 +41,12 @@ Content-Type: application/json
     }
   ],
   "description": "A new feature test",
-  "started_at": 1587256716
+  "started_at": 1517256716000
 }
 
 ###
 
-POST https://localhost:8080/cases/5ea7875d530c0d5a96437af8/logs
+POST https://localhost:8080/cases/5eb613213aa90dbe1633cc2a/logs
 Content-Type: application/json
 
 {

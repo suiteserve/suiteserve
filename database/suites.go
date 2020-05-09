@@ -29,6 +29,7 @@ type SuiteEnvVar struct {
 }
 
 type NewSuite struct {
+	Name         string             `json:"name,omitempty" bson:",omitempty"`
 	FailureTypes []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty" validate:"dive"`
 	Tags         []string           `json:"tags,omitempty" bson:",omitempty" validate:"unique,dive,required"`
 	EnvVars      []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty" validate:"dive"`

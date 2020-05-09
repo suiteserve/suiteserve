@@ -3,35 +3,28 @@
 <head>
   <meta charset="utf-8">
 
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Mono&display=swap"/>
   <link rel="stylesheet" href="/static/styles.css"/>
 
   <title>TestPass</title>
 </head>
 <body>
 <main id="app">
-  <h2>Upload Attachment</h2>
-
-  <form method="post" action="/attachments" enctype="multipart/form-data">
-    <input type="file" name="file"/>
-    <input type="submit" value="Upload"/>
-  </form>
-
-  <a href="/attachments">All Attachments</a>
-
-  <h2>Delete Attachment</h2>
-
-  <form id="delete-attachment-form" method="post" :action="`/attachments/${deleteAttachmentId}`">
-    <input type="hidden" name="_method" value="delete">
-    <div>
-      <label for="delete-attachment-form-id">ID</label>
-      <input id="delete-attachment-form-id" type="text" name="id" v-model="deleteAttachmentId"/>
-    </div>
-    <input type="submit" value="Delete"/>
-  </form>
-
-  <h2>Suites</h2>
-
-  <a href="/suites">All Suites</a>
+  <nav class="suites">
+    <ul>
+      <li class="suite-tab" v-for="suite in suites.slice().reverse()" :key="suite.id">
+        <a href="#" @click="openSuite($event, suite)">
+          <div class="status">
+            <div class="status-icon" :class="[suite.status]"></div>
+          </div>
+          <div>
+            <p v-text="formatTime(suite.created_at)"></p>
+            <p class="muted" v-text="suite.id"></p>
+          </div>
+        </a>
+      </li>
+    </ul>
+  </nav>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"
