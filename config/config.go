@@ -7,6 +7,8 @@ type Key string
 const (
 	Host            Key = "HOST"
 	Port                = "PORT"
+	TlsCert             = "TLS_CERT"
+	TlsKey              = "TLS_KEY"
 	MongoHost           = "MONGO_HOST"
 	MongoPort           = "MONGO_PORT"
 	MongoReplicaSet     = "MONGO_REPLICA_SET"

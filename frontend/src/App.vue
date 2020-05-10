@@ -1,6 +1,6 @@
 <template>
   <main id="app">
-    <TabNav :items="suites" :onTabClick="openSuite" title="Suites">
+    <TabNav :items="suites" @open-tab="openSuite" title="Suites">
       <template #header>
         <div class="suites-stats">
           <p>
@@ -39,8 +39,6 @@
   import TabNav from './components/TabNav';
   import {fetchCases} from './cases';
 
-  let activeSuiteElem;
-
   export default {
     name: 'App',
     created() {
@@ -56,16 +54,7 @@
     },
     methods: {
       formatTime,
-      openSuite: function (event, suite) {
-        event.preventDefault();
-        const e = event.currentTarget;
-
-        if (activeSuiteElem) {
-          activeSuiteElem.classList.remove('active');
-        }
-        activeSuiteElem = e;
-        activeSuiteElem.classList.add('active');
-
+      openSuite(suite) {
         retry.bind(this)(() => true, fetchCases, suite.id)
           .then(cases => this.cases = cases)
           .catch(() => {

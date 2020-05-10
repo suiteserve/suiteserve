@@ -33,6 +33,8 @@ func main() {
 func listenHttp(db *database.Database) {
 	host := config.Get(config.Host, "localhost")
 	port := config.Get(config.Port, "8080")
+	tlsCert := config.Get(config.TlsCert, "tls/cert.pem")
+	tlsKey := config.Get(config.TlsKey, "tls/key.pem")
 	srv := http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: handlers.Handler(db),
@@ -53,7 +55,7 @@ func listenHttp(db *database.Database) {
 	}()
 
 	log.Println("Binding to", srv.Addr)
-	if err := srv.ListenAndServeTLS("tls/cert.pem", "tls/key.pem"); err != http.ErrServerClosed {
+	if err := srv.ListenAndServeTLS(tlsCert, tlsKey); err != http.ErrServerClosed {
 		log.Fatalf("listen http: %v\n", err)
 	}
 	<-srvDone

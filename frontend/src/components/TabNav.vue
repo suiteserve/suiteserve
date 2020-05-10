@@ -5,7 +5,7 @@
       <slot name="header"></slot>
     </div>
     <a class="tab" href="#" v-for="item in items.slice().reverse()" :key="item.id"
-       @click="onTabClick($event, item)">
+       @click="openTab($event, item)">
       <div class="status">
         <div class="status-icon" :class="[item.status]"></div>
       </div>
@@ -15,12 +15,27 @@
 </template>
 
 <script>
+  let activeSuiteElem;
+
   export default {
     name: 'TabNav',
     props: {
       title: String,
       items: Array,
-      onTabClick: Object,
+    },
+    methods: {
+      openTab: function (event, item) {
+        event.preventDefault();
+        const e = event.currentTarget;
+
+        if (activeSuiteElem) {
+          activeSuiteElem.classList.remove('active');
+        }
+        activeSuiteElem = e;
+        activeSuiteElem.classList.add('active');
+
+        this.$emit('open-tab', item)
+      }
     },
   };
 </script>

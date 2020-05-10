@@ -143,7 +143,7 @@ func frontendSecureHeadersMiddleware(h http.Handler) http.Handler {
 			"default-src 'none'; "+
 			"base-uri 'none'; "+
 			"connect-src 'self'; "+
-			"font-src https://fonts.googleapis.com https://fonts.gstatic.com; "+
+			"font-src https://fonts.gstatic.com; "+
 			"form-action 'self'; "+
 			"frame-ancestors 'none'; "+
 			"img-src 'self'; "+

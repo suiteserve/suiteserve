@@ -1,3 +1,14 @@
+/**
+ * Retries the given async function with some arguments until it succeeds.
+ * Before awaiting a result and after getting a result, the continue function
+ * is called to see if we still care about the result. If not, an exception is
+ * thrown.
+ * @param {function(): boolean} continueFn
+ * @param {function(...): T} asyncFn
+ * @param {...} args
+ * @returns {Promise<T>}
+ * @template T
+ */
 export async function retry(continueFn, asyncFn, ...args) {
   if (!continueFn()) throw 'Cancelled';
   try {
@@ -14,7 +25,13 @@ export async function retry(continueFn, asyncFn, ...args) {
   throw 'Cancelled';
 }
 
-export function formatTime (millis) {
+/**
+ * Formats the given number of milliseconds since the Unix Epoch as a date in
+ * the user's locale.
+ * @param {int} millis
+ * @returns {string}
+ */
+export function formatTime(millis) {
   const date = new Date(millis);
   const opts = {
     weekday: 'short',

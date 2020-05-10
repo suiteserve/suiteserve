@@ -1,6 +1,7 @@
 module.exports = {
   assetsDir: 'static/',
   devServer: {
+    host: 'localhost',
     https: true,
     key: '../tls/key.pem',
     cert: '../tls/cert.pem',
