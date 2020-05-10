@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	publicDir = "public/"
+	publicDir = "frontend/dist/"
 	timeout   = 1 * time.Second
 )
 
@@ -43,14 +43,14 @@ func Handler(db *database.Database) http.Handler {
 	router.Use(loggingMiddleware)
 	router.Use(defaultSecureHeadersMiddleware)
 
+	// Static.
+	router.PathPrefix("/static/").Handler(publicSrv)
+	router.Path("/favicon.ico").Handler(publicSrv)
+
 	// Frontend.
 	frontendRouter := router.Path("/").Subrouter()
 	frontendRouter.Use(frontendSecureHeadersMiddleware)
 	frontendRouter.Path("/").Handler(publicSrv)
-
-	// Static.
-	router.PathPrefix("/static/").Handler(publicSrv)
-	router.Path("/favicon.ico").Handler(publicSrv)
 
 	// Attachments.
 	router.Path("/attachments/{attachment_id}").

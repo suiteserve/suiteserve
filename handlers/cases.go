@@ -18,7 +18,7 @@ func (s *srv) caseHandler(res http.ResponseWriter, req *http.Request) error {
 func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, id string) error {
 	_case, err := s.db.WithContext(req.Context()).Case(id)
 	if errors.Is(err, database.ErrNotFound) {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	} else if err != nil {
 		return fmt.Errorf("get case run: %v", err)
 	}
@@ -28,14 +28,14 @@ func (s *srv) getCaseHandler(res http.ResponseWriter, req *http.Request, id stri
 func (s *srv) patchCaseHandler(res http.ResponseWriter, req *http.Request, id string) error {
 	var _case database.UpdateCase
 	if err := json.NewDecoder(req.Body).Decode(&_case); err != nil {
-		return errBadJson
+		return errBadJson(err)
 	}
 
 	err := s.db.WithContext(req.Context()).UpdateCase(id, _case)
 	if errors.Is(err, database.ErrInvalidModel) {
-		return errBadJson
+		return errBadJson(err)
 	} else if errors.Is(err, database.ErrNotFound) {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	} else if err != nil {
 		return fmt.Errorf("update case run: %v", err)
 	}
@@ -54,7 +54,7 @@ func (s *srv) caseCollectionHandler(res http.ResponseWriter, req *http.Request) 
 func (s *srv) getCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) error {
 	num, ok, err := parseUint(req.FormValue("num"))
 	if err != nil {
-		return errBadQuery
+		return errBadQuery(err)
 	}
 	var numPtr *uint
 	if ok {
@@ -71,12 +71,12 @@ func (s *srv) getCaseCollectionHandler(res http.ResponseWriter, req *http.Reques
 func (s *srv) postCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) error {
 	var _case database.NewCase
 	if err := json.NewDecoder(req.Body).Decode(&_case); err != nil {
-		return errBadJson
+		return errBadJson(err)
 	}
 
 	id, err := s.db.WithContext(req.Context()).NewCase(suiteId, _case)
 	if errors.Is(err, database.ErrInvalidModel) {
-		return errBadJson
+		return errBadJson(err)
 	} else if err != nil {
 		return fmt.Errorf("new case: %v", err)
 	}

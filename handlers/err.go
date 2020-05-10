@@ -9,18 +9,28 @@ import (
 type restError struct {
 	code int
 	name string
+	cause error
 }
 
 func (e restError) Error() string {
-	return fmt.Sprintf("%d: %s", e.code, e.name)
+	return fmt.Sprintf("%d %s: %v", e.code, e.name, e.cause)
 }
 
-var (
-	errBadFile  = restError{http.StatusBadRequest, "bad_file"}
-	errBadJson  = restError{http.StatusBadRequest, "bad_json"}
-	errBadQuery = restError{http.StatusBadRequest, "bad_query"}
-	errNotFound = restError{http.StatusNotFound, "not_found"}
-)
+func errBadFile(cause error) error {
+	return restError{http.StatusBadRequest, "bad_file", cause}
+}
+
+func errBadJson(cause error) error {
+	return restError{http.StatusBadRequest, "bad_json", cause}
+}
+
+func errBadQuery(cause error) error {
+	return restError{http.StatusBadRequest, "bad_query", cause}
+}
+
+func errNotFound(cause error) error {
+	return restError{http.StatusNotFound, "not_found", cause}
+}
 
 func errorHandler(h func(res http.ResponseWriter, req *http.Request) error) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {

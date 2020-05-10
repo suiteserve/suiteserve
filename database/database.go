@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	dataDir = "data/"
-	timeout = 10 * time.Second
+	storageDir = "storage/"
+	timeout    = 10 * time.Second
 )
 
 var (

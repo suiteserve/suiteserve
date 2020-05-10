@@ -19,7 +19,7 @@ func (s *srv) suiteHandler(res http.ResponseWriter, req *http.Request) error {
 func (s *srv) getSuiteHandler(res http.ResponseWriter, req *http.Request, id string) error {
 	suite, err := s.db.WithContext(req.Context()).Suite(id)
 	if errors.Is(err, database.ErrNotFound) {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	} else if err != nil {
 		return fmt.Errorf("get suite: %v", err)
 	}
@@ -29,14 +29,14 @@ func (s *srv) getSuiteHandler(res http.ResponseWriter, req *http.Request, id str
 func (s *srv) patchSuiteHandler(res http.ResponseWriter, req *http.Request, id string) error {
 	var suite database.UpdateSuite
 	if err := json.NewDecoder(req.Body).Decode(&suite); err != nil {
-		return errBadJson
+		return errBadJson(err)
 	}
 
 	err := s.db.WithContext(req.Context()).UpdateSuite(id, suite)
 	if errors.Is(err, database.ErrInvalidModel) {
-		return errBadJson
+		return errBadJson(err)
 	} else if errors.Is(err, database.ErrNotFound) {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	} else if err != nil {
 		return fmt.Errorf("update suite: %v", err)
 	}
@@ -66,7 +66,7 @@ func (s *srv) suiteCollectionHandler(res http.ResponseWriter, req *http.Request)
 func (s *srv) getSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
 	since, _, err := parseInt64(req.FormValue("since"))
 	if err != nil {
-		return errBadQuery
+		return errBadQuery(err)
 	}
 
 	suites, err := s.db.WithContext(req.Context()).AllSuites(since)
@@ -79,12 +79,12 @@ func (s *srv) getSuiteCollectionHandler(res http.ResponseWriter, req *http.Reque
 func (s *srv) postSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
 	var suite database.NewSuite
 	if err := json.NewDecoder(req.Body).Decode(&suite); err != nil {
-		return errBadJson
+		return errBadJson(err)
 	}
 
 	id, err := s.db.WithContext(req.Context()).NewSuite(suite)
 	if errors.Is(err, database.ErrInvalidModel) {
-		return errBadJson
+		return errBadJson(err)
 	} else if err != nil {
 		return fmt.Errorf("new suite run: %v", err)
 	}

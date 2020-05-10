@@ -21,11 +21,11 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) erro
 func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, id string) error {
 	download, _, err := parseBool(req.FormValue("download"))
 	if err != nil {
-		return errBadQuery
+		return errBadQuery(err)
 	}
 	attachment, err := s.db.WithContext(req.Context()).Attachment(id)
 	if errors.Is(err, database.ErrNotFound) {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	} else if err != nil {
 		return fmt.Errorf("get attachment: %v", err)
 	}
@@ -33,7 +33,7 @@ func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, i
 	if !download {
 		return writeJson(res, http.StatusOK, attachment)
 	} else if attachment.Deleted {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	}
 
 	file, err := attachment.OpenFile()
@@ -61,7 +61,7 @@ func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, i
 func (s *srv) deleteAttachmentHandler(res http.ResponseWriter, req *http.Request, id string) error {
 	err := s.db.WithContext(req.Context()).DeleteAttachment(id)
 	if errors.Is(err, database.ErrNotFound) {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	} else if err != nil {
 		return fmt.Errorf("delete attachment: %v", err)
 	}
@@ -88,7 +88,7 @@ func (s *srv) getAttachmentCollectionHandler(res http.ResponseWriter, req *http.
 func (s *srv) postAttachmentCollectionHandler(res http.ResponseWriter, req *http.Request) error {
 	file, header, err := req.FormFile("file")
 	if err == http.ErrMissingFile {
-		return errBadFile
+		return errBadFile(err)
 	} else if err != nil {
 		return fmt.Errorf("get form file: %v", err)
 	}

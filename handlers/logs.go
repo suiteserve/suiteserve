@@ -17,7 +17,7 @@ func (s *srv) logHandler(res http.ResponseWriter, req *http.Request) error {
 func (s *srv) getLogHandler(res http.ResponseWriter, req *http.Request, id string) error {
 	logMsg, err := s.db.WithContext(req.Context()).LogMessage(id)
 	if errors.Is(err, database.ErrNotFound) {
-		return errNotFound
+		return errNotFound(errors.New(id))
 	} else if err != nil {
 		return fmt.Errorf("get log message: %v", err)
 	}
@@ -42,12 +42,12 @@ func (s *srv) getLogCollectionHandler(res http.ResponseWriter, req *http.Request
 func (s *srv) postLogCollectionHandler(res http.ResponseWriter, req *http.Request, caseId string) error {
 	var logMsg database.NewLogMessage
 	if err := json.NewDecoder(req.Body).Decode(&logMsg); err != nil {
-		return errBadJson
+		return errBadJson(err)
 	}
 
 	id, err := s.db.WithContext(req.Context()).NewLogMessage(caseId, logMsg)
 	if errors.Is(err, database.ErrInvalidModel) {
-		return errBadJson
+		return errBadJson(err)
 	} else if err != nil {
 		return fmt.Errorf("new log message: %v", err)
 	}

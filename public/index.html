@@ -34,18 +34,23 @@
     </a>
   </nav>
   <nav class="tab-nav">
+    <div class="tab-nav-header">
+      <h3 class="title">Cases</h3>
+      <div class="stats">
+        <p>
+          <span class="muted">Running:</span> <span v-text="runningSuites"></span>
+        </p>
+        <p>
+          <span class="muted">Total:</span> <span v-text="suites.length"></span>
+        </p>
+      </div>
+    </div>
     <a class="tab" href="#" v-for="c in cases.slice().reverse()" :key="c.id"
        @click="">
       <div class="status">
         <div class="status-icon" :class="[c.status]"></div>
       </div>
-      <div class="case-name">
-        <p v-text="c.name"></p>
-      </div>
-      <div class="flex-spacer"></div>
-      <div class="case-num">
-        <p class="muted">#<span v-text="c.num"></span></p>
-      </div>
+
     </a>
   </nav>
 </main>

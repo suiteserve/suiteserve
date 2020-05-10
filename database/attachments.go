@@ -38,7 +38,7 @@ func (a *Attachment) deleteFile() error {
 }
 
 func (a *Attachment) savedFilename() string {
-	return path.Join(dataDir, a.Id.(primitive.ObjectID).Hex()+".attachment")
+	return path.Join(storageDir, a.Id.(primitive.ObjectID).Hex()+".attachment")
 }
 
 func (d *WithContext) NewAttachment(filename, contentType string, src io.Reader) (string, error) {
@@ -151,7 +151,7 @@ func (d *WithContext) DeleteAllAttachments() error {
 	}); err != nil {
 		return fmt.Errorf("delete all attachments: %v", err)
 	}
-	filenames, err := filepath.Glob(filepath.Join(dataDir, "*.attachment"))
+	filenames, err := filepath.Glob(filepath.Join(storageDir, "*.attachment"))
 	if err != nil {
 		log.Panicln(err)
 	}

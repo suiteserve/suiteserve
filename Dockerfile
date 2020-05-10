@@ -1,4 +1,13 @@
-FROM golang:1.14-alpine AS builder
+FROM node:14-alpine AS frontend-builder
+USER testpass
+WORKDIR /app/
+COPY frontend/package*.json ./
+RUN npm i
+COPY frontend/ ./
+RUN npm run build
+
+FROM golang:1.14-alpine AS api-builder
+USER testpass
 WORKDIR /go/src/testpass/
 COPY go.mod go.sum ./
 RUN go mod download
@@ -6,11 +15,13 @@ COPY . .
 RUN CGO_ENABLED=0 go install
 
 FROM scratch
+USER testpass
 WORKDIR /app/
-COPY --from=builder /go/bin/testpass .
+COPY --from=api-builder /go/bin/testpass ./
+COPY --from=frontend-builder /app/dist/ frontend/dist/
 ENV HOST 0.0.0.0
 ENV PORT 8080
 ENV MONGO_HOST mongo
 EXPOSE $PORT
-VOLUME /app/data/ /app/tls/
+VOLUME /app/storage/ /app/tls/
 ENTRYPOINT ["./testpass"]
