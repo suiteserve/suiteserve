@@ -1,13 +1,18 @@
 <template>
-  <nav class="tab-nav">
-    <div class="tab-nav-header">
+  <nav>
+    <header>
       <h3 class="title">{{ title }}</h3>
       <slot name="header"></slot>
-    </div>
+      <div class="stats">
+        <p v-for="(value, name) in stats">
+          <span class="muted">{{ name }}</span> {{ value }}
+        </p>
+      </div>
+    </header>
     <a class="tab" href="#" v-for="item in items.slice().reverse()" :key="item.id"
-       @click="openTab($event, item)">
-      <div class="status">
-        <div class="status-icon" :class="[item.status]"></div>
+       @click="openTab($event, item)" :class="{ active: item.id === activeTabId }">
+      <div>
+        <div class="status-icon" :class="item.status"></div>
       </div>
       <slot name="tab" :item="item"></slot>
     </a>
@@ -15,25 +20,22 @@
 </template>
 
 <script>
-  let activeSuiteElem;
-
   export default {
     name: 'TabNav',
     props: {
       title: String,
+      stats: Object,
       items: Array,
     },
+    data() {
+      return {
+        activeTabId: undefined,
+      };
+    },
     methods: {
-      openTab: function (event, item) {
+      openTab(event, item) {
         event.preventDefault();
-        const e = event.currentTarget;
-
-        if (activeSuiteElem) {
-          activeSuiteElem.classList.remove('active');
-        }
-        activeSuiteElem = e;
-        activeSuiteElem.classList.add('active');
-
+        this.activeTabId = item.id;
         this.$emit('open-tab', item)
       }
     },
@@ -41,7 +43,7 @@
 </script>
 
 <style scoped>
-  .tab-nav {
+  nav {
     --padding: 0.6em;
 
     width: 18em;
@@ -49,25 +51,33 @@
     overflow-y: scroll;
   }
 
-  .tab-nav p {
+  p {
     font-size: 0.75em;
 
     margin: 0;
   }
 
-  .tab-nav-header {
+  header {
     padding: var(--padding);
   }
 
-  .tab-nav-header .title {
+  .title {
     font-size: 1em;
     font-weight: 400;
 
     margin: 0;
   }
 
-  .tab-nav-header > *:not(:last-child) {
+  header > *:not(:last-child) {
     margin-bottom: var(--padding);
+  }
+
+  .stats {
+    display: flex;
+  }
+
+  .stats > *:not(:last-child) {
+    margin-right: 1em;
   }
 
   .tab {
@@ -94,29 +104,26 @@
     margin-right: var(--padding)
   }
 
-  .tab .status-icon {
+  .status-icon {
     --border-width: 4px;
 
     border: var(--border-width) solid var(--line-color);
     border-radius: 50%;
 
     transition: border var(--transition-speed);
-    animation: spin var(--spin-speed) linear infinite;
+    animation: spin var(--spin-speed) linear;
 
     width: 1.5em;
     height: 1.5em;
   }
 
-  .tab .status-icon.created {
-    /* TODO */
-    animation-play-state: paused;
-  }
-
-  .tab .status-icon.running {
+  .status-icon.running {
     border-top-color: var(--highlight-color);
+
+    animation-iteration-count: infinite;
   }
 
-  .tab .status-icon.finished {
+  .status-icon.finished {
     border-color: var(--highlight-color);
   }
 

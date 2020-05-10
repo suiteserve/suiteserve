@@ -1,32 +1,25 @@
 <template>
   <main id="app">
-    <TabNav :items="suites" @open-tab="openSuite" title="Suites">
-      <template #header>
-        <div class="suites-stats">
-          <p>
-            <span class="muted">Running:</span> <span v-text="runningSuites"></span>
-          </p>
-          <p>
-            <span class="muted">Total:</span> <span v-text="suites.length"></span>
-          </p>
-        </div>
-      </template>
+    <TabNav title="Suites" :items="suites" :stats="{
+      'Running': runningSuites,
+      'Total': suites.length,
+    }" @open-tab="openSuite">
       <template #tab="{ item }">
         <div>
-          <p v-text="formatTime(item.created_at)"></p>
-          <p class="muted" v-text="item.id"></p>
+          <p>{{ formatTime(item.created_at) }}</p>
+          <p class="muted">{{ item.id }}</p>
         </div>
       </template>
     </TabNav>
 
-    <TabNav :items="cases" title="Cases">
+    <TabNav title="Cases" :items="cases" @open-tab="openCase">
       <template #tab="{ item }">
         <div class="case-name">
-          <p v-text="item.name"></p>
+          <p>{{ item.name }}</p>
         </div>
         <div class="flex-spacer"></div>
         <div class="case-num">
-          <p class="muted">#<span v-text="item.num"></span></p>
+          <p class="muted">#{{ item.num }}</p>
         </div>
       </template>
     </TabNav>
@@ -48,14 +41,21 @@
     data() {
       return {
         cases: [],
-        runningSuites: 0,
         suites: [],
       };
     },
+    computed: {
+      runningSuites() {
+        return this.suites.filter(s => s.status === 'running').length;
+      },
+    },
     methods: {
       formatTime,
-      openSuite(suite) {
-        retry.bind(this)(() => true, fetchCases, suite.id)
+      openCase(c) {
+        console.log('TODO');
+      },
+      openSuite(s) {
+        retry.bind(this)(() => true, fetchCases, s.id)
           .then(cases => this.cases = cases)
           .catch(() => {
           });
@@ -124,14 +124,6 @@
 
   #app {
     display: flex;
-  }
-
-  .tab-nav-header .suites-stats {
-    display: flex;
-  }
-
-  .tab-nav-header .suites-stats > *:not(:last-child):not(.flex-spacer) {
-    margin-right: 1em;
   }
 
   .case-name {
