@@ -4,13 +4,13 @@ import (
 	"context"
 	"github.com/tmazeika/testpass/database"
 	"log"
+	"sync"
 )
 
-func newSuite(name string, cases int) {
+func newSuite(wg *sync.WaitGroup, name string, cases int) {
+	defer wg.Done()
 	_ = connGrp.Acquire(context.Background(), 1)
-	defer connGrp.Release(1)
-	defer waitGrp.Done()
-	header := postJson(*baseUri+"/suites", database.NewSuite{
+	header := postJson(*baseUri+"/v1/suites", database.NewSuite{
 		Name: name,
 		FailureTypes: []database.SuiteFailureType{
 			{Name: "IO", Description: "Input/Output exception"},
@@ -22,11 +22,14 @@ func newSuite(name string, cases int) {
 		PlannedCases: uint(cases),
 		CreatedAt:    nowTimeMillis(),
 	}, nil)
+	connGrp.Release(1)
 	loc := header.Get("location")
 	log.Printf("Created suite: %s\n", loc)
 
-	waitGrp.Add(cases)
+	var childWg sync.WaitGroup
+	childWg.Add(cases)
 	for i := 0; i < cases; i++ {
-		go newCase(loc, i+1, randUint(30))
+		go newCase(&childWg, loc, i+1, randUint(30))
 	}
+	childWg.Wait()
 }

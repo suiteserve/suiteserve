@@ -36,69 +36,62 @@ func Handler(db *database.Database) http.Handler {
 		router,
 		&websocket.Upgrader{},
 	}
-	publicSrv := http.FileServer(http.Dir(publicDir))
 
 	router.Use(methodOverrideMiddleware)
 	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
 	router.Use(loggingMiddleware)
 	router.Use(defaultSecureHeadersMiddleware)
 
-	// Static.
-	router.PathPrefix("/static/").Handler(publicSrv)
-	router.Path("/favicon.ico").Handler(publicSrv)
-
-	// Frontend.
-	frontendRouter := router.Path("/").Subrouter()
-	frontendRouter.Use(frontendSecureHeadersMiddleware)
-	frontendRouter.Path("/").Handler(publicSrv)
-
+	// API v1.
+	v1ApiRouter := router.PathPrefix("/v1/").Subrouter()
 	// Attachments.
-	router.Path("/attachments/{attachment_id}").
+	v1ApiRouter.Path("/attachments/{attachment_id}").
 		Handler(errorHandler(srv.attachmentHandler)).
 		Methods(http.MethodGet, http.MethodDelete).
 		Name("attachment")
-	router.Path("/attachments").
+	v1ApiRouter.Path("/attachments").
 		Handler(errorHandler(srv.attachmentCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
-
 	// Suites.
-	router.Path("/suites/{suite_id}").
+	v1ApiRouter.Path("/suites/{suite_id}").
 		Handler(errorHandler(srv.suiteHandler)).
 		Methods(http.MethodGet, http.MethodPatch, http.MethodDelete).
 		Name("suite")
-	router.Path("/suites").
+	v1ApiRouter.Path("/suites").
 		Handler(errorHandler(srv.suiteCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost, http.MethodDelete)
-
 	// Cases.
-	router.Path("/cases/{case_id}").
+	v1ApiRouter.Path("/cases/{case_id}").
 		Handler(errorHandler(srv.caseHandler)).
 		Methods(http.MethodGet, http.MethodPatch).
 		Name("case")
-	router.Path("/suites/{suite_id}/cases").
+	v1ApiRouter.Path("/suites/{suite_id}/cases").
 		Handler(errorHandler(srv.caseCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost)
-
 	// Logs.
-	router.Path("/logs/{log_id}").
+	v1ApiRouter.Path("/logs/{log_id}").
 		Handler(errorHandler(srv.logHandler)).
 		Methods(http.MethodGet).
 		Name("log")
-	router.Path("/cases/{case_id}/logs").
+	v1ApiRouter.Path("/cases/{case_id}/logs").
 		Handler(errorHandler(srv.logCollectionHandler)).
 		Methods(http.MethodGet, http.MethodPost)
-
 	// Events.
-	router.Path("/events").
+	v1ApiRouter.Path("/events").
 		HandlerFunc(srv.eventsHandler).
 		Methods(http.MethodGet)
-
 	err := db.WithContext(context.Background()).Watch(func(change database.Change) {
 		srv.eventBus.publish(event(change))
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	// Frontend.
+	publicSrv := http.FileServer(http.Dir(publicDir))
+	frontendRouter := router.PathPrefix("/").Subrouter()
+	frontendRouter.Use(frontendSecureHeadersMiddleware)
+	frontendRouter.PathPrefix("/").Handler(publicSrv)
 
 	return router
 }

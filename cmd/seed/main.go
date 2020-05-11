@@ -26,7 +26,6 @@ var (
 		},
 	}
 	connGrp = semaphore.NewWeighted(int64(maxConns))
-	waitGrp sync.WaitGroup
 )
 
 func main() {
@@ -34,11 +33,12 @@ func main() {
 	log.Printf("-baseuri=%s\n", *baseUri)
 
 	start := nowTimeMillis()
-	waitGrp.Add(20)
+	var wg sync.WaitGroup
+	wg.Add(30)
 	for i := 0; i < 30; i++ {
-		go newSuite("Suite "+strconv.Itoa(i), randUint(30))
+		go newSuite(&wg, "Suite "+strconv.Itoa(i), randUint(30))
 	}
-	waitGrp.Wait()
+	wg.Wait()
 	end := nowTimeMillis()
 	log.Printf("Total run time: %.1fs", float64(end-start)*time.Millisecond.Seconds())
 }

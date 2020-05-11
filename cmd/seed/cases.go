@@ -5,12 +5,12 @@ import (
 	"github.com/tmazeika/testpass/database"
 	"log"
 	"strconv"
+	"sync"
 )
 
-func newCase(suiteLoc string, num int, logMsgs int) {
+func newCase(wg *sync.WaitGroup, suiteLoc string, num int, logMsgs int) {
+	defer wg.Done()
 	_ = connGrp.Acquire(context.Background(), 1)
-	defer connGrp.Release(1)
-	defer waitGrp.Done()
 	header := postJson(*baseUri+suiteLoc+"/cases", database.NewCase{
 		Name:        "Case " + strconv.Itoa(num),
 		Num:         uint(num),
@@ -31,11 +31,14 @@ func newCase(suiteLoc string, num int, logMsgs int) {
 		},
 		StartedAt: nowTimeMillis(),
 	}, nil)
+	connGrp.Release(1)
 	loc := header.Get("location")
 	log.Printf("Created case: %s\n", loc)
 
-	waitGrp.Add(logMsgs)
+	var childWg sync.WaitGroup
+	childWg.Add(logMsgs)
 	for i := 0; i < logMsgs; i++ {
-		go newLogMessage(loc)
+		go newLogMessage(&childWg, loc)
 	}
+	childWg.Wait()
 }

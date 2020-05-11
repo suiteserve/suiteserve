@@ -1,5 +1,4 @@
 module.exports = {
-  assetsDir: 'static/',
   devServer: {
     host: 'localhost',
     https: true,

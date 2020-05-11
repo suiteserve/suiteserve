@@ -1,5 +1,5 @@
 export async function fetchCases(suiteId) {
-  const res = await fetch(`/suites/${suiteId}/cases`);
+  const res = await fetch(`/v1/suites/${suiteId}/cases`);
   const json = await res.json();
 
   if (res.ok) {
