@@ -19,10 +19,11 @@ const (
 	CaseLinkTypeIssue CaseLinkType = "issue"
 	CaseLinkTypeOther              = "other"
 
-	CaseStatusDisabled CaseStatus = "disabled"
-	CaseStatusCreated             = "created"
+	CaseStatusCreated  CaseStatus = "created"
+	CaseStatusDisabled            = "disabled"
 	CaseStatusRunning             = "running"
 	CaseStatusPassed              = "passed"
+	CaseStatusFlaky               = "flaky"
 	CaseStatusFailed              = "failed"
 	CaseStatusErrored             = "errored"
 )
@@ -54,8 +55,8 @@ func (c *NewCase) StartedAtTime() time.Time {
 }
 
 type UpdateCase struct {
-	Status     string `json:"status" validate:"oneof=disabled created running passed failed errored"`
-	FinishedAt int64  `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
+	Status     CaseStatus `json:"status" validate:"oneof=created disabled running passed flaky failed errored"`
+	FinishedAt int64      `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
 }
 
 func (c *UpdateCase) FinishedAtTime() time.Time {
@@ -139,8 +140,8 @@ func (d *WithContext) AllCases(suiteId string, caseNum *uint) ([]Case, error) {
 		filter["num"] = *caseNum
 	}
 	cursor, err := d.cases.Find(ctx, filter, options.Find().SetSort(bson.D{
-		{"started_at", 1},
 		{"num", 1},
+		{"started_at", 1},
 		{"_id", 1},
 	}))
 	if err != nil {

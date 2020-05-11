@@ -2,7 +2,7 @@
   <main id="app">
     <TabNav title="Suites" :items="suites" :stats="{
       'Running': runningSuites,
-      'Total': suites.length,
+      'Finished': finishedSuites,
     }" @open-tab="openSuite">
       <template #tab="{ item }">
         <div>
@@ -12,7 +12,11 @@
       </template>
     </TabNav>
 
-    <TabNav title="Cases" :items="cases" @open-tab="openCase">
+    <TabNav title="Cases" :items="cases" :stats="{
+      'Waiting': waitingCases,
+      'Running': runningCases,
+      'Finished': finishedCases,
+    }" @open-tab="openCase">
       <template #tab="{ item }">
         <div class="case-name">
           <p>{{ item.name }}</p>
@@ -45,8 +49,24 @@
       };
     },
     computed: {
+      waitingCases() {
+        return this.cases.filter(c => c.status === 'created').length;
+      },
+      runningCases() {
+        return this.cases.filter(c => c.status === 'running').length;
+      },
+      finishedCases() {
+        return this.cases
+          .filter(c => c.status !== 'created' && c.status !== 'running')
+          .length;
+      },
       runningSuites() {
         return this.suites.filter(s => s.status === 'running').length;
+      },
+      finishedSuites() {
+        return this.suites
+          .filter(s => s.status !== 'created' && s.status !== 'running')
+          .length;
       },
     },
     methods: {
@@ -76,6 +96,7 @@
     --bg-color: #23232d;
     --hover-color: #282833;
     --line-color: #3c3c4d;
+    --muted-color: #6c6c80;
     --highlight-color: #9f9fcc;
 
     --spin-speed: 1.5s;
@@ -100,7 +121,7 @@
   }
 
   .muted {
-    color: #6c6c80;
+    color: var(--muted-color);
   }
 
   .flex-spacer {

@@ -37,16 +37,20 @@
         event.preventDefault();
         this.activeTabId = item.id;
         this.$emit('open-tab', item)
-      }
+      },
     },
   };
 </script>
 
 <style scoped>
   nav {
+    --status-passed-color: #52af5c;
+    --status-flaky-color: #afa352;
+    --status-failed-color: #af525a;
     --padding: 0.6em;
 
-    width: 18em;
+    width: max-content;
+    max-width: 18em;
     height: 100vh;
     overflow-y: scroll;
   }
@@ -106,25 +110,46 @@
 
   .status-icon {
     --border-width: 4px;
+    --size: 1em;
 
     border: var(--border-width) solid var(--line-color);
     border-radius: 50%;
 
     transition: border var(--transition-speed);
-    animation: spin var(--spin-speed) linear;
 
-    width: 1.5em;
-    height: 1.5em;
+    width: var(--size);
+    height: var(--size);
+    box-sizing: content-box;
+  }
+
+  .status-icon.disabled {
+    border: none;
+    margin: var(--border-width);
+    background-color: var(--line-color);
   }
 
   .status-icon.running {
     border-top-color: var(--highlight-color);
 
-    animation-iteration-count: infinite;
+    animation: spin var(--spin-speed) linear infinite;
   }
 
-  .status-icon.finished {
-    border-color: var(--highlight-color);
+  .status-icon.passed {
+    border: none;
+    margin: var(--border-width);
+    background-color: var(--status-passed-color);
+  }
+
+  .status-icon.flaky {
+    border: none;
+    margin: var(--border-width);
+    background-color: var(--status-flaky-color);
+  }
+
+  .status-icon.failed, .status-icon.errored {
+    border: none;
+    margin: var(--border-width);
+    background-color: var(--status-failed-color);
   }
 
   @keyframes spin {

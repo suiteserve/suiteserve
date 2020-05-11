@@ -13,9 +13,9 @@ import (
 type SuiteStatus string
 
 const (
-	SuiteStatusCreated  SuiteStatus = "created"
-	SuiteStatusRunning              = "running"
-	SuiteStatusFinished             = "finished"
+	SuiteStatusRunning SuiteStatus = "running"
+	SuiteStatusPassed              = "passed"
+	SuiteStatusFailed              = "failed"
 )
 
 type SuiteFailureType struct {
@@ -43,7 +43,7 @@ func (s *NewSuite) CreatedAtTime() time.Time {
 }
 
 type UpdateSuite struct {
-	Status     SuiteStatus `json:"status" validate:"oneof=created running finished"`
+	Status     SuiteStatus `json:"status" validate:"oneof=running passed failed"`
 	FinishedAt int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty" validate:"gte=0"`
 }
 
@@ -72,7 +72,7 @@ func (d *WithContext) NewSuite(s NewSuite) (string, error) {
 	return d.insert(d.suites, Suite{
 		NewSuite: s,
 		UpdateSuite: UpdateSuite{
-			Status: SuiteStatusCreated,
+			Status: SuiteStatusRunning,
 		},
 	})
 }
