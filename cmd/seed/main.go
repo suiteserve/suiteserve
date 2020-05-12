@@ -40,7 +40,7 @@ func main() {
 	}
 	wg.Wait()
 	end := nowTimeMillis()
-	log.Printf("Total run time: %.1fs", float64(end-start)*time.Millisecond.Seconds())
+	log.Printf("Total run time: %.3fs", float64(end-start)*time.Millisecond.Seconds())
 }
 
 func nowTimeMillis() int64 {
@@ -50,8 +50,8 @@ func nowTimeMillis() int64 {
 		time.Duration(now.Nanosecond()).Milliseconds()
 }
 
-func randUint(max int32) int {
-	return int(rand.Int31n(max))
+func randUint(max int) int {
+	return int(rand.Int31n(int32(max)))
 }
 
 func postJson(url string, body interface{}, resBody interface{}) http.Header {
@@ -81,4 +81,32 @@ func postJson(url string, body interface{}, resBody interface{}) http.Header {
 		}
 	}
 	return res.Header
+}
+
+func patchJson(url string, body interface{}) {
+	b, err := json.Marshal(body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req, err := http.NewRequest(http.MethodPatch, url, bytes.NewReader(b))
+	if err != nil {
+		log.Fatalln(err)
+	}
+	req.Header.Set("content-type", "application/json")
+	res, err := httpClient.Do(req)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Println(err)
+		}
+	}()
+	resBodyB, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		log.Fatalf("non 2xx status: %v <<EOF\n%vEOF\n", res.StatusCode, string(resBodyB))
+	}
 }
