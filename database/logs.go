@@ -21,6 +21,7 @@ const (
 )
 
 type NewLogMessage struct {
+	Seq         uint64       `json:"seq" validate:"gte=0"`
 	Level       LogLevelType `json:"level" validate:"oneof=trace debug info warn error"`
 	Trace       string       `json:"trace,omitempty" bson:",omitempty"`
 	Message     string       `json:"message,omitempty" bson:",omitempty"`
@@ -60,7 +61,11 @@ func (d *WithContext) LogMessage(logId string) (*LogMessage, error) {
 	defer cancel()
 	res := d.logs.FindOne(ctx, bson.M{
 		"_id": logOid,
-	})
+	}, options.FindOne().SetSort(bson.D{
+		{"timestamp", -1},
+		{"seq", -1},
+		{"_id", -1},
+	}))
 	var logMsg LogMessage
 	if err := res.Decode(&logMsg); err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound

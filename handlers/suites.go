@@ -64,12 +64,15 @@ func (s *srv) suiteCollectionHandler(res http.ResponseWriter, req *http.Request)
 }
 
 func (s *srv) getSuiteCollectionHandler(res http.ResponseWriter, req *http.Request) error {
-	since, _, err := parseInt64(req.FormValue("since"))
+	afterId := parseString(req.FormValue("after_id"))
+	limit, err := parseInt64(req.FormValue("limit"))
 	if err != nil {
 		return errBadQuery(err)
+	} else if limit != nil && *limit < 1 {
+		return errBadQuery(errors.New("limit must be positive"))
 	}
 
-	suites, err := s.db.WithContext(req.Context()).AllSuites(since)
+	suites, err := s.db.WithContext(req.Context()).AllSuites(afterId, limit)
 	if err != nil {
 		return fmt.Errorf("get all suites: %v", err)
 	}

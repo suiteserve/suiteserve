@@ -1,13 +1,13 @@
 <template>
   <main id="app">
-    <TabNav title="Suites" :items="suites" :stats="{
+    <TabNav title="Suites" :items="suites" :more="moreSuites" :stats="{
       'Running': runningSuites,
       'Finished': finishedSuites,
-    }" @open-tab="openSuite">
+    }" @open-tab="openSuite" @load-more="loadMoreSuites">
       <template #tab="{ item }">
         <div>
-          <p>{{ formatTime(item.created_at) }}</p>
-          <p class="muted">{{ item.id }}</p>
+          <p>{{ item.name }}</p>
+          <p class="muted">{{ formatTime(item.created_at) }}</p>
         </div>
       </template>
     </TabNav>
@@ -38,14 +38,20 @@
 
   export default {
     name: 'App',
-    created() {
-      retry.bind(this)(() => true, fetchSuites)
-        .then(suites => this.suites = suites);
+    async created() {
+      const suitesRes = await fetchSuites(null, 10)
+      this.suites = suitesRes.suites
+      this.runningSuites = suitesRes.running
+      this.finishedSuites = suitesRes.finished
+      this.moreSuites = suitesRes.more
     },
     data() {
       return {
         cases: [],
         suites: [],
+        runningSuites: 0,
+        finishedSuites: 0,
+        moreSuites: true,
       };
     },
     computed: {
@@ -60,25 +66,27 @@
           .filter(c => c.status !== 'created' && c.status !== 'running')
           .length;
       },
-      runningSuites() {
-        return this.suites.filter(s => s.status === 'running').length;
-      },
-      finishedSuites() {
-        return this.suites
-          .filter(s => s.status !== 'created' && s.status !== 'running')
-          .length;
-      },
     },
     methods: {
       formatTime,
       openCase(c) {
         console.log('TODO');
       },
-      openSuite(s) {
-        retry.bind(this)(() => true, fetchCases, s.id)
-          .then(cases => this.cases = cases)
-          .catch(() => {
-          });
+      async openSuite(s) {
+        this.cases = await fetchCases(s.id)
+      },
+      async loadMoreSuites() {
+        let suitesRes;
+        if (this.suites.length) {
+          suitesRes = await fetchSuites(this.suites[this.suites.length - 1].id, 10);
+        } else {
+          suitesRes = await fetchSuites(null, 10);
+        }
+
+        this.suites.push(...suitesRes.suites)
+        this.runningSuites = suitesRes.running
+        this.finishedSuites = suitesRes.finished
+        this.moreSuites = suitesRes.more
       },
     },
     components: {

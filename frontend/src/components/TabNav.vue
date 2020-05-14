@@ -9,12 +9,15 @@
         </p>
       </div>
     </header>
-    <a class="tab" href="#" v-for="item in items.slice().reverse()" :key="item.id"
+    <a class="tab" href="#" v-for="item in items" :key="item.id"
        @click="openTab($event, item)" :class="{ active: item.id === activeTabId }">
       <div>
         <div class="status-icon" :class="item.status"></div>
       </div>
       <slot name="tab" :item="item"></slot>
+    </a>
+    <a class="tab" href="#" v-if="more" @click="loadMore">
+      <p>Load 10 More</p>
     </a>
   </nav>
 </template>
@@ -26,6 +29,7 @@
       title: String,
       stats: Object,
       items: Array,
+      more: Boolean,
     },
     data() {
       return {
@@ -36,7 +40,11 @@
       openTab(event, item) {
         event.preventDefault();
         this.activeTabId = item.id;
-        this.$emit('open-tab', item)
+        this.$emit('open-tab', item);
+      },
+      loadMore(event) {
+        event.preventDefault();
+        this.$emit('load-more');
       },
     },
   };

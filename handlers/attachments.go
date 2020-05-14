@@ -19,7 +19,7 @@ func (s *srv) attachmentHandler(res http.ResponseWriter, req *http.Request) erro
 }
 
 func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, id string) error {
-	download, _, err := parseBool(req.FormValue("download"))
+	download, err := parseBool(req.FormValue("download"))
 	if err != nil {
 		return errBadQuery(err)
 	}
@@ -30,7 +30,7 @@ func (s *srv) getAttachmentHandler(res http.ResponseWriter, req *http.Request, i
 		return fmt.Errorf("get attachment: %v", err)
 	}
 
-	if !download {
+	if !*download {
 		return writeJson(res, http.StatusOK, attachment)
 	} else if attachment.Deleted {
 		return errNotFound(errors.New(id))

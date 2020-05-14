@@ -5,7 +5,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"time"
 )
@@ -57,6 +56,13 @@ type Suite struct {
 	UpdateSuite `bson:",inline"`
 	Deleted     bool  `json:"delete"`
 	DeletedAt   int64 `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
+}
+
+type AllSuites struct {
+	Running  uint64  `json:"running"`
+	Finished uint64  `json:"finished"`
+	More     bool    `json:"more"`
+	Suites   []Suite `json:"suites,omitempty"`
 }
 
 func (s *Suite) DeletedAtTime() time.Time {
@@ -122,25 +128,85 @@ func (d *WithContext) Suite(id string) (*Suite, error) {
 	return &suite, nil
 }
 
-func (d *WithContext) AllSuites(sinceTime int64) ([]Suite, error) {
+func (d *WithContext) AllSuites(afterId *string, limit *int64) (*AllSuites, error) {
+	filter := bson.M{
+		"deleted": false,
+	}
+	if afterId != nil {
+		afterOid, err := primitive.ObjectIDFromHex(*afterId)
+		if err != nil {
+			return nil, fmt.Errorf("%w: parse object id", ErrNotFound)
+		}
+		filter["_id"] = bson.M{"$lt": afterOid}
+	}
+	suitesAgg := bson.A{
+		bson.M{"$match": filter},
+		bson.M{"$sort": bson.M{"_id": -1}},
+	}
+	if limit != nil {
+		suitesAgg = append(suitesAgg, bson.M{"$limit": *limit})
+	}
 	ctx, cancel := d.newContext()
 	defer cancel()
-	cursor, err := d.suites.Find(ctx, bson.M{
-		"created_at": bson.M{"$gte": sinceTime},
-		"deleted":    false,
-	}, options.Find().SetSort(bson.D{
-		{"created_at", 1},
-		{"_id", 1},
-	}))
+	cursor, err := d.suites.Aggregate(ctx, bson.A{
+		bson.M{"$facet": bson.D{
+			{"running", bson.A{
+				bson.M{"$match": bson.M{
+					"status":  SuiteStatusRunning,
+					"deleted": false,
+				}},
+				bson.M{"$count": "count"},
+			}},
+			{"finished", bson.A{
+				bson.M{"$match": bson.M{
+					"status":  bson.M{"$ne": SuiteStatusRunning},
+					"deleted": false,
+				}},
+				bson.M{"$count": "count"},
+			}},
+			{"more", bson.A{
+				bson.M{"$sort": bson.M{
+					"_id": 1,
+				}},
+				bson.M{"$limit": 1},
+				bson.M{"$project": bson.M{
+					"_id": 1,
+				}},
+			}},
+			{"suites", suitesAgg},
+		}},
+		bson.M{"$set": bson.D{
+			{"running", bson.M{
+				"$arrayElemAt": bson.A{
+					"$running.count", 0,
+				},
+			}},
+			{"finished", bson.M{
+				"$arrayElemAt": bson.A{
+					"$finished.count", 0,
+				},
+			}},
+			{"more", bson.M{
+				"$ne": bson.A{
+					bson.M{"$arrayElemAt": bson.A{
+						"$suites._id", -1,
+					}},
+					bson.M{"$arrayElemAt": bson.A{
+						"$more._id", 0,
+					}},
+				},
+			}},
+		}},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("find all suites: %v", err)
 	}
 
-	suites := make([]Suite, 0)
+	suites := make([]AllSuites, 0)
 	if err := cursor.All(ctx, &suites); err != nil {
 		return nil, fmt.Errorf("decode all suites: %v", err)
 	}
-	return suites, nil
+	return &suites[0], nil
 }
 
 func (d *WithContext) DeleteSuite(id string) (bool, error) {
@@ -170,7 +236,6 @@ func (d *WithContext) DeleteSuite(id string) (bool, error) {
 func (d *WithContext) DeleteAllSuites() error {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	deletedAt := nowTimeMillis()
 	if _, err := d.suites.UpdateMany(ctx,
 		bson.M{
 			"deleted": false,
@@ -178,7 +243,7 @@ func (d *WithContext) DeleteAllSuites() error {
 		bson.M{
 			"$set": bson.D{
 				{"deleted", true},
-				{"deleted_at", deletedAt},
+				{"deleted_at", nowTimeMillis()},
 			},
 		}); err != nil {
 		return fmt.Errorf("delete all suites: %v", err)

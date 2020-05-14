@@ -52,16 +52,12 @@ func (s *srv) caseCollectionHandler(res http.ResponseWriter, req *http.Request) 
 }
 
 func (s *srv) getCaseCollectionHandler(res http.ResponseWriter, req *http.Request, suiteId string) error {
-	num, ok, err := parseUint(req.FormValue("num"))
+	num, err := parseUint(req.FormValue("num"))
 	if err != nil {
 		return errBadQuery(err)
 	}
-	var numPtr *uint
-	if ok {
-		numPtr = &num
-	}
 
-	cases, err := s.db.WithContext(req.Context()).AllCases(suiteId, numPtr)
+	cases, err := s.db.WithContext(req.Context()).AllCases(suiteId, num)
 	if err != nil {
 		return fmt.Errorf("get all cases for suite: %v", err)
 	}

@@ -4,26 +4,34 @@ import (
 	"strconv"
 )
 
-func parseUint(s string) (uint, bool, error) {
+func parseString(s string) *string {
 	if s == "" {
-		return 0, false, nil
+		return nil
+	}
+	return &s
+}
+
+func parseUint(s string) (*uint, error) {
+	if s == "" {
+		return nil, nil
 	}
 	i, err := strconv.ParseUint(s, 10, 32)
-	return uint(i), err == nil, err
+	ui := uint(i)
+	return &ui, err
 }
 
-func parseInt64(s string) (int64, bool, error) {
+func parseInt64(s string) (*int64, error) {
 	if s == "" {
-		return 0, false, nil
+		return nil, nil
 	}
 	i, err := strconv.ParseInt(s, 10, 64)
-	return i, err == nil, err
+	return &i, err
 }
 
-func parseBool(s string) (bool, bool, error) {
+func parseBool(s string) (*bool, error) {
 	if s == "" {
-		return false, false, nil
+		return nil, nil
 	}
 	b, err := strconv.ParseBool(s)
-	return b, err == nil, err
+	return &b, err
 }

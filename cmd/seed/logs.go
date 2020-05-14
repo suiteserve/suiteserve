@@ -11,6 +11,7 @@ func newLogMessage(wg *sync.WaitGroup, caseLoc string) {
 	defer wg.Done()
 	_ = connGrp.Acquire(context.Background(), 1)
 	header := postJson(*baseUri+caseLoc+"/logs", NewLogMessage{
+		Seq: 1,
 		Level: []LogLevelType{
 			LogLevelTypeError,
 			LogLevelTypeWarn,

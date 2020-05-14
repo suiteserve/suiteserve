@@ -140,9 +140,9 @@ func (d *WithContext) AllCases(suiteId string, caseNum *uint) ([]Case, error) {
 		filter["num"] = *caseNum
 	}
 	cursor, err := d.cases.Find(ctx, filter, options.Find().SetSort(bson.D{
-		{"num", 1},
-		{"started_at", 1},
-		{"_id", 1},
+		{"num", -1},
+		{"started_at", -1},
+		{"_id", -1},
 	}))
 	if err != nil {
 		return nil, fmt.Errorf("find many cases for suite: %v", err)
