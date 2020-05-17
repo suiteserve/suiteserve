@@ -31,10 +31,10 @@ func main() {
 }
 
 func listenHttp(db *database.Database) {
-	host := config.Get(config.Host, "localhost")
-	port := config.Get(config.Port, "8080")
-	tlsCert := config.Get(config.TlsCert, "tls/cert.pem")
-	tlsKey := config.Get(config.TlsKey, "tls/key.pem")
+	host := config.Env(config.Host, "localhost")
+	port := config.Env(config.Port, "8080")
+	tlsCert := config.Env(config.TlsCertFile, "tls/cert.pem")
+	tlsKey := config.Env(config.TlsKeyFile, "tls/key.pem")
 	srv := http.Server{
 		Addr:    net.JoinHostPort(host, port),
 		Handler: handlers.Handler(db),

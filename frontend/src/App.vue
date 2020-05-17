@@ -32,7 +32,7 @@
 
 <script>
   import {fetchSuites} from './suites';
-  import {formatTime, retry} from './util';
+  import {formatTime} from './util';
   import TabNav from './components/TabNav';
   import {fetchCases} from './cases';
 

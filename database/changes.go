@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 )
 
@@ -37,8 +36,29 @@ type Change struct {
 func (d *WithContext) Watch(fn func(Change)) error {
 	ctx, cancel := d.newContext()
 	defer cancel()
-	res, err := d.mgoDb.Watch(ctx, bson.D{},
-		options.ChangeStream().SetFullDocument(options.UpdateLookup))
+	res, err := d.mgoDb.Watch(ctx, bson.A{
+		bson.M{"$match": bson.M{
+			"operationType": bson.M{"$in": bson.A{
+				"insert",
+				"replace",
+				"update",
+				"delete",
+			}},
+			"ns.coll": bson.M{"$in": bson.A{
+				d.attachments.Name(),
+				d.cases.Name(),
+				d.logs.Name(),
+				d.suites.Name(),
+			}},
+		}},
+		bson.M{"$project": bson.D{
+			{"_id", false},
+			{"operationType", true},
+			{"ns.coll", true},
+			{"fullDocument", true},
+			{"updateDescription", true},
+		}},
+	})
 	if err != nil {
 		return fmt.Errorf("watch db: %v", err)
 	}

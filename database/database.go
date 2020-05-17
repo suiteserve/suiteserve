@@ -56,11 +56,11 @@ type Database struct {
 }
 
 func Open() (*Database, error) {
-	host := config.Get(config.MongoHost, "localhost")
-	port := config.Get(config.MongoPort, "27017")
-	rs := config.Get(config.MongoReplicaSet, "rs0")
-	user := config.Get(config.MongoUser, "testpass")
-	pass := config.Get(config.MongoPass, "testpass")
+	host := config.Env(config.MongoHost, "localhost")
+	port := config.Env(config.MongoPort, "27017")
+	rs := config.Env(config.MongoReplicaSet, "rs0")
+	user := config.Env(config.MongoUser, "testpass")
+	pass := config.EnvFile(config.MongoPassFile, "testpass")
 
 	opts := options.Client()
 	opts.SetHosts([]string{net.JoinHostPort(host, port)})

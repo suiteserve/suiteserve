@@ -9,16 +9,6 @@ import (
 	"time"
 )
 
-type eventType string
-
-const (
-	eventTypeSetCase         eventType = "set_case"
-	eventTypeSetSuite                  = "set_suite"
-	eventTypeDeleteSuite               = "del_suite"
-	eventTypeDeleteAllSuites           = "del_all_suites"
-	eventTypeLog                       = "set_log"
-)
-
 type event interface {}
 
 type eventBus struct {
