@@ -1,9 +1,9 @@
 FROM golang:1.14-alpine AS api-builder
-WORKDIR /go/src/testpass/
+WORKDIR /app/
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go install
+RUN cd cmd/testpass && CGO_ENABLED=0 go install
 
 FROM node:14-alpine AS frontend-builder
 WORKDIR /app/
