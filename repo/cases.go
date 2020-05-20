@@ -13,14 +13,14 @@ type (
 
 const (
 	CaseLinkTypeIssue CaseLinkType = "issue"
-	CaseLinkTypeOther              = "other"
+	CaseLinkTypeOther CaseLinkType = "other"
 
 	CaseStatusCreated  CaseStatus = "created"
-	CaseStatusDisabled            = "disabled"
-	CaseStatusRunning             = "running"
-	CaseStatusPassed              = "passed"
-	CaseStatusFailed              = "failed"
-	CaseStatusErrored             = "errored"
+	CaseStatusDisabled CaseStatus = "disabled"
+	CaseStatusRunning  CaseStatus = "running"
+	CaseStatusPassed   CaseStatus = "passed"
+	CaseStatusFailed   CaseStatus = "failed"
+	CaseStatusErrored  CaseStatus = "errored"
 )
 
 type CaseLink struct {
@@ -35,20 +35,20 @@ type CaseArg struct {
 }
 
 type Case struct {
-	Id          string `json:"id" bson:"_id,omitempty"`
-	Suite       string      `json:"suite"`
-	Name        string      `json:"name"`
-	Description string      `json:"description,omitempty" bson:",omitempty"`
-	Tags        []string    `json:"tags,omitempty" bson:",omitempty"`
-	Num         int64       `json:"num"`
-	Links       []CaseLink  `json:"links,omitempty" bson:",omitempty"`
-	Args        []CaseArg   `json:"args,omitempty" bson:",omitempty"`
-	Attachments []string    `json:"attachments,omitempty" bson:",omitempty"`
-	Status      CaseStatus  `json:"status"`
-	Flaky       bool        `json:"flaky"`
-	CreatedAt   int64       `json:"created_at" bson:"created_at"`
-	StartedAt   int64       `json:"started_at,omitempty" bson:"started_at,omitempty"`
-	FinishedAt  int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+	Id          string     `json:"id" bson:"_id,omitempty"`
+	Suite       string     `json:"suite"`
+	Name        string     `json:"name"`
+	Description string     `json:"description,omitempty" bson:",omitempty"`
+	Tags        []string   `json:"tags,omitempty" bson:",omitempty"`
+	Num         int64      `json:"num"`
+	Links       []CaseLink `json:"links,omitempty" bson:",omitempty"`
+	Args        []CaseArg  `json:"args,omitempty" bson:",omitempty"`
+	Attachments []string   `json:"attachments,omitempty" bson:",omitempty"`
+	Status      CaseStatus `json:"status"`
+	Flaky       bool       `json:"flaky"`
+	CreatedAt   int64      `json:"created_at" bson:"created_at"`
+	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty"`
+	FinishedAt  int64      `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
 }
 
 type CaseRepoSaveStatusOptions struct {
@@ -82,8 +82,8 @@ type buntCaseRepo struct {
 }
 
 func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
-	err := r.db.ReplaceIndex("cases_suite_id", "cases:*",
-		buntdb.IndexJSON("suite"), buntdb.IndexJSON("id"))
+	err := r.db.ReplaceIndex("cases_suite", "cases:*",
+		buntdb.IndexJSON("suite"))
 	if err != nil {
 		return nil, err
 	}
@@ -91,14 +91,14 @@ func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
 }
 
 func (r *buntCaseRepo) Save(c Case) (string, error) {
-	b, err := json.Marshal(&c)
-	if err != nil {
-		return "", err
-	}
 	var id string
-	err = r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		id = primitive.NewObjectID().Hex()
 		c.Id = id
+		b, err := json.Marshal(&c)
+		if err != nil {
+			return err
+		}
 		_, _, err = tx.Set("cases:"+id, string(b), nil)
 		if err != nil {
 			return err
@@ -198,7 +198,7 @@ func (r *buntCaseRepo) Find(id string) (*Case, error) {
 func (r *buntCaseRepo) FindAllBySuite(suiteId string, num *int64) ([]Case, error) {
 	values := make([]string, 0)
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		return tx.AscendEqual("cases_suite_id", suiteId, func(k, v string) bool {
+		return tx.AscendEqual("cases_suite", `{"suite":"`+suiteId+`"}`, func(k, v string) bool {
 			values = append(values, v)
 			return true
 		})

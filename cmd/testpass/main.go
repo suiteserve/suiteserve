@@ -6,6 +6,7 @@ import (
 	"github.com/tmazeika/testpass/config"
 	"github.com/tmazeika/testpass/repo"
 	"github.com/tmazeika/testpass/rest"
+	"github.com/tmazeika/testpass/seed"
 	"log"
 	"net"
 	"net/http"
@@ -15,26 +16,24 @@ import (
 )
 
 var (
-	configFile = flag.String("config", "config/config.json",
+	configFileFlag = flag.String("config", "config/config.json",
 		"The path to the JSON configuration file")
-	db = flag.String("db", "bunt",
+	dbFlag = flag.String("db", "bunt",
 		"The database implementation to use: bunt, mongo")
-	help = flag.Bool("help", false,
+	helpFlag = flag.Bool("help", false,
 		"Shows this help")
-	seed = flag.Bool("seed", false,
+	seedFlag = flag.Bool("seed", false,
 		"Whether to seed the database with test data")
 )
 
 func main() {
 	flag.Parse()
-	if *help {
+	if *helpFlag {
 		flag.PrintDefaults()
 		return
 	}
 
-	log.Println("Starting up...")
-
-	cfg, err := config.New(*configFile)
+	cfg, err := config.New(*configFileFlag)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -48,7 +47,16 @@ func main() {
 			log.Printf("close BuntDB repos: %v\n", err)
 		}
 	}()
-	listenHttp(cfg, repos)
+
+	if *seedFlag {
+		log.Println("Seeding...")
+		if err := seed.Seed(repos); err != nil {
+			log.Fatalln(err)
+		}
+	} else {
+		log.Println("Starting up...")
+		listenHttp(cfg, repos)
+	}
 }
 
 func listenHttp(cfg *config.Config, repos repo.Repos) {

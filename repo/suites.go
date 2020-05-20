@@ -11,9 +11,9 @@ type SuiteStatus string
 
 const (
 	SuiteStatusRunning      SuiteStatus = "running"
-	SuiteStatusPassed                   = "passed"
-	SuiteStatusFailed                   = "failed"
-	SuiteStatusDisconnected             = "disconnected"
+	SuiteStatusPassed       SuiteStatus = "passed"
+	SuiteStatusFailed       SuiteStatus = "failed"
+	SuiteStatusDisconnected SuiteStatus = "disconnected"
 )
 
 type SuiteFailureType struct {
@@ -89,14 +89,14 @@ func (r *buntRepo) newSuiteRepo() (*buntSuiteRepo, error) {
 }
 
 func (r *buntSuiteRepo) Save(s Suite) (string, error) {
-	b, err := json.Marshal(&s)
-	if err != nil {
-		return "", err
-	}
 	var id string
-	err = r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		id = primitive.NewObjectID().Hex()
 		s.Id = id
+		b, err := json.Marshal(&s)
+		if err != nil {
+			return err
+		}
 		_, _, err = tx.Set("suites:"+id, string(b), nil)
 		if err != nil {
 			return err
@@ -178,7 +178,7 @@ func (r *buntSuiteRepo) Page(afterId *string, n int64, includeArchived bool) (*S
 		suites := make([]Suite, 0)
 		var err error
 		if afterId != nil {
-			if err := tx.DescendLessOrEqual("suites_id", *afterId, func(k, v string) bool {
+			if err := tx.DescendLessOrEqual("suites_id", `{"id":"`+*afterId+`"}`, func(k, v string) bool {
 				var s Suite
 				if err = json.Unmarshal([]byte(v), &s); err != nil {
 					return false
@@ -212,19 +212,19 @@ func (r *buntSuiteRepo) Page(afterId *string, n int64, includeArchived bool) (*S
 			return err
 		}
 
-		if err := tx.AscendEqual("suites_status", string(SuiteStatusRunning), func(k, v string) bool {
+		if err := tx.AscendEqual("suites_status", `{"status":"running"}`, func(k, v string) bool {
 			running++
 			return true
 		}); err != nil {
 			return err
 		}
-		if err := tx.AscendEqual("suites_status", SuiteStatusPassed, func(k, v string) bool {
+		if err := tx.AscendEqual("suites_status", `{"status":"passed"}`, func(k, v string) bool {
 			finished++
 			return true
 		}); err != nil {
 			return err
 		}
-		if err := tx.AscendEqual("suites_status", SuiteStatusFailed, func(k, v string) bool {
+		if err := tx.AscendEqual("suites_status", `{"status":"failed"}`, func(k, v string) bool {
 			finished++
 			return true
 		}); err != nil {
@@ -234,7 +234,7 @@ func (r *buntSuiteRepo) Page(afterId *string, n int64, includeArchived bool) (*S
 		if n > 0 && int64(len(suites)) == n {
 			afterId := suites[n-1].Id
 			// TODO: can weave in with the previous DescendLessOrEqual() call
-			if err := tx.DescendLessOrEqual("suites_id", afterId, func(k, v string) bool {
+			if err := tx.DescendLessOrEqual("suites_id", `{"id":"`+afterId+`"}`, func(k, v string) bool {
 				var s Suite
 				if err = json.Unmarshal([]byte(v), &s); err != nil {
 					return false
@@ -313,7 +313,7 @@ func (r *buntSuiteRepo) FindAll(includeArchived bool) ([]Suite, error) {
 		if includeArchived {
 			return tx.Ascend("", iterator)
 		}
-		return tx.AscendEqual("suites_archived", "false", iterator)
+		return tx.AscendEqual("suites_archived", `{"archived": false}`, iterator)
 	})
 	if err != nil {
 		return nil, err
@@ -361,7 +361,7 @@ func (r *buntSuiteRepo) Archive(id string) error {
 func (r *buntSuiteRepo) ArchiveAll() error {
 	return r.db.Update(func(tx *buntdb.Tx) error {
 		values := make([]string, 0)
-		err := tx.AscendEqual("suites_archived", "false", func(k, v string) bool {
+		err := tx.AscendEqual("suites_archived", `{"archived": false}`, func(k, v string) bool {
 			values = append(values, v)
 			return true
 		})

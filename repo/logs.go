@@ -10,10 +10,10 @@ type LogLevelType string
 
 const (
 	LogLevelTypeTrace LogLevelType = "trace"
-	LogLevelTypeDebug              = "debug"
-	LogLevelTypeInfo               = "info"
-	LogLevelTypeWarn               = "warn"
-	LogLevelTypeError              = "error"
+	LogLevelTypeDebug LogLevelType = "debug"
+	LogLevelTypeInfo  LogLevelType = "info"
+	LogLevelTypeWarn  LogLevelType = "warn"
+	LogLevelTypeError LogLevelType = "error"
 )
 
 type LogEntry struct {
@@ -37,8 +37,8 @@ type buntLogRepo struct {
 }
 
 func (r *buntRepo) newLogRepo() (*buntLogRepo, error) {
-	err := r.db.ReplaceIndex("logs_case_id", "logs:*",
-		buntdb.IndexJSON("case"), buntdb.IndexJSON("id"))
+	err := r.db.ReplaceIndex("logs_case", "logs:*",
+		buntdb.IndexJSON("case"))
 	if err != nil {
 		return nil, err
 	}
@@ -46,14 +46,14 @@ func (r *buntRepo) newLogRepo() (*buntLogRepo, error) {
 }
 
 func (r *buntLogRepo) Save(e LogEntry) (string, error) {
-	b, err := json.Marshal(&e)
-	if err != nil {
-		return "", err
-	}
 	var id string
-	err = r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		id = primitive.NewObjectID().Hex()
 		e.Id = id
+		b, err := json.Marshal(&e)
+		if err != nil {
+			return err
+		}
 		_, _, err = tx.Set("logs:"+id, string(b), nil)
 		if err != nil {
 			return err
@@ -89,7 +89,7 @@ func (r *buntLogRepo) Find(id string) (*LogEntry, error) {
 func (r *buntLogRepo) FindAllByCase(caseId string) ([]LogEntry, error) {
 	values := make([]string, 0)
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		return tx.AscendEqual("logs_case_id", caseId, func(k, v string) bool {
+		return tx.AscendEqual("logs_case", `{"case":"`+caseId+`"}`, func(k, v string) bool {
 			values = append(values, v)
 			return true
 		})

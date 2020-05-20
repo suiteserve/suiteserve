@@ -17,7 +17,7 @@ const (
 )
 
 type srv struct {
-	repos     repo.Repos
+	repos      repo.Repos
 	eventBus   *eventBus
 	router     *mux.Router
 	wsUpgrader *websocket.Upgrader
@@ -89,7 +89,12 @@ func Handler(repos repo.Repos) http.Handler {
 	v1ApiRouter.Path("/events").
 		HandlerFunc(srv.eventsHandler).
 		Methods(http.MethodGet)
-	// TODO: events!
+	go func() {
+		for {
+			// TODO: handle!
+			<-repos.Changes()
+		}
+	}()
 
 	// Frontend.
 	publicSrv := http.FileServer(http.Dir(publicDir))

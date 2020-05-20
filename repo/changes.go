@@ -5,12 +5,12 @@ type ChangeColl string
 
 const (
 	ChangeOpInsert ChangeOp = "insert"
-	ChangeOpUpdate          = "update"
+	ChangeOpUpdate ChangeOp = "update"
 
 	ChangeCollAttachments ChangeColl = "attachments"
-	ChangeCollCases                  = "cases"
-	ChangeCollLogs                   = "logs"
-	ChangeCollSuites                 = "suites"
+	ChangeCollCases       ChangeColl = "cases"
+	ChangeCollLogs        ChangeColl = "logs"
+	ChangeCollSuites      ChangeColl = "suites"
 )
 
 type Change struct {

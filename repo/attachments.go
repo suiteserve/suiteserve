@@ -37,15 +37,14 @@ func (r *buntRepo) newAttachmentRepo() (*buntAttachmentRepo, error) {
 }
 
 func (r *buntAttachmentRepo) Save(a Attachment) (string, error) {
-	b, err := json.Marshal(&a)
-	if err != nil {
-		return "", err
-	}
-
 	var id string
-	err = r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		id = primitive.NewObjectID().Hex()
 		a.Id = id
+		b, err := json.Marshal(&a)
+		if err != nil {
+			return err
+		}
 		_, _, err = tx.Set("attachments:"+id, string(b), nil)
 		if err != nil {
 			return err
@@ -136,7 +135,7 @@ func (r *buntAttachmentRepo) Delete(id string) error {
 func (r *buntAttachmentRepo) DeleteAll() error {
 	return r.db.Update(func(tx *buntdb.Tx) error {
 		values := make([]string, 0)
-		err := tx.AscendEqual("attachments_deleted", "false", func(k, v string) bool {
+		err := tx.AscendEqual("attachments_deleted", `{"deleted": false}`, func(k, v string) bool {
 			values = append(values, v)
 			return true
 		})
