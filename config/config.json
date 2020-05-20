@@ -1,0 +1,27 @@
+{
+  "http": {
+    "host": "localhost",
+    "port": 8080,
+    "tls_cert_file": "config/cert.pem",
+    "tls_key_file": "config/key.pem",
+    "public_dir": "frontend/dist/"
+  },
+  "storage": {
+    "timeout": 10,
+    "attachments": {
+      "file_pattern": "data/*.attachment",
+      "max_size_mb": 64
+    },
+    "bunt": {
+      "file": "data/bunt.db"
+    },
+    "mongo": {
+      "host": "localhost",
+      "port": 27017,
+      "rs": "rs0",
+      "db": "testpass",
+      "user": "testpass",
+      "pass_file": "config/passfile"
+    }
+  }
+}

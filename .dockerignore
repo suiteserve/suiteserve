@@ -1,5 +1,4 @@
+/data/
 /frontend/dist/
 /frontend/node_modules/
-/storage/
-/tls/
 /vendor/

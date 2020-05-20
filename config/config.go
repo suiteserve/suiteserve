@@ -1,42 +1,74 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/go-playground/validator/v10"
 	"io/ioutil"
 	"log"
-	"os"
+	"strings"
+	"time"
 )
 
-type Key string
+type Config struct {
+	Http struct {
+		Host            string        `json:"host" validate:"required"`
+		Port            uint16        `json:"port"`
+		TlsCertFile     string        `json:"tls_cert_file" validate:"required,file"`
+		TlsKeyFile      string        `json:"tls_key_file" validate:"required,file"`
+		PublicDir       string        `json:"public_dir" validate:"required,dir"`
+		ShutdownTimeout time.Duration `json:"-"`
+	} `json:"http"`
 
-const (
-	Host            Key = "HOST"
-	Port                = "PORT"
-	TlsCertFile         = "TLS_CERT_FILE"
-	TlsKeyFile          = "TLS_KEY_FILE"
-	MongoHost           = "MONGO_HOST"
-	MongoPort           = "MONGO_PORT"
-	MongoReplicaSet     = "MONGO_REPLICA_SET"
-	MongoUser           = "MONGO_USER"
-	MongoPassFile       = "MONGO_PASS_FILE"
-)
+	Storage struct {
+		Timeout int `json:"timeout" validate:"min=-1"`
 
-func Env(key Key, defVal string) string {
-	val, ok := os.LookupEnv(string(key))
-	if !ok {
-		return defVal
-	}
-	return val
+		Attachments struct {
+			FilePattern string `json:"file_pattern" validate:"contains=*"`
+			MaxSizeMb   int    `json:"max_size_mb" validate:"min=-1"`
+		} `json:"attachments"`
+
+		Bunt *struct {
+			File string `json:"file" validate:"required"`
+		} `json:"bunt" validate:"required_without_all=Mongo"`
+
+		Mongo *struct {
+			Host     string `json:"host" validate:"required"`
+			Port     uint16 `json:"port"`
+			Rs       string `json:"rs" validate:"required"`
+			Db       string `json:"db" validate:"required"`
+			User     string `json:"user" validate:"required"`
+			PassFile string `json:"pass_file" validate:"required,file"`
+		} `json:"mongo" validate:"required_without_all=Bunt"`
+	} `json:"storage" validate:"dive"`
 }
 
-func EnvFile(key Key, defVal string) string {
-	val, ok := os.LookupEnv(string(key))
-	if !ok {
-		return defVal
-	}
-	b, err := ioutil.ReadFile(val)
+var validate = validator.New()
+
+func New(filename string) (*Config, error) {
+	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Printf("read env file: %v\n", err)
+		return nil, fmt.Errorf("read config: %v", err)
+	}
+	var c Config
+	if err := json.Unmarshal(b, &c); err != nil {
+		return nil, fmt.Errorf("decode config: %v", err)
+	}
+	if err := validate.Struct(&c); err != nil {
+		return nil, err
+	}
+
+	// hidden constants
+	c.Http.ShutdownTimeout = 10 * time.Second
+
+	return &c, err
+}
+
+func ReadFile(filename, defVal string) string {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Printf("read file from config: %v\n", err)
 		return defVal
 	}
-	return string(b)
+	return strings.TrimRight(string(b), "\r\n")
 }

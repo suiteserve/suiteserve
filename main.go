@@ -5,6 +5,7 @@ import (
 	"github.com/tmazeika/testpass/config"
 	"github.com/tmazeika/testpass/database"
 	"github.com/tmazeika/testpass/handlers"
+	"github.com/tmazeika/testpass/rest"
 	"log"
 	"net"
 	"net/http"
@@ -37,7 +38,7 @@ func listenHttp(db *database.Database) {
 	tlsKey := config.Env(config.TlsKeyFile, "tls/key.pem")
 	srv := http.Server{
 		Addr:    net.JoinHostPort(host, port),
-		Handler: handlers.Handler(db),
+		Handler: rest.Handler(db),
 	}
 	srvDone := make(chan interface{})
 

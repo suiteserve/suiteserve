@@ -7,5 +7,7 @@ require (
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.2
+	github.com/tidwall/buntdb v1.1.2
 	go.mongodb.org/mongo-driver v1.3.1
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 )
