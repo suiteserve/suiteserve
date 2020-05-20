@@ -101,8 +101,8 @@ func Handler(repos repo.Repos) http.Handler {
 }
 
 func writeJson(w http.ResponseWriter, code int, msg interface{}) error {
-	w.WriteHeader(code)
 	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(&msg); err != nil {
 		return fmt.Errorf("write json: %v", err)
 	}
