@@ -1,9 +1,9 @@
 package repo
 
 import (
-	"encoding/json"
 	"github.com/tidwall/buntdb"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/tidwall/gjson"
+	"strconv"
 	"strings"
 )
 
@@ -27,37 +27,35 @@ type SuiteEnvVar struct {
 }
 
 type Suite struct {
-	Id           string             `json:"id" bson:"_id,omitempty"`
-	Name         string             `json:"name,omitempty" bson:",omitempty"`
-	FailureTypes []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty"`
-	Tags         []string           `json:"tags,omitempty" bson:",omitempty"`
-	EnvVars      []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty"`
-	Attachments  []string           `json:"attachments,omitempty" bson:",omitempty"`
-	PlannedCases int64              `json:"planned_cases" bson:"planned_cases"`
-	Status       SuiteStatus        `json:"status"`
-	StartedAt    int64              `json:"started_at" bson:"started_at"`
-	FinishedAt   int64              `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
-	Archived     bool               `json:"archived"`
-	ArchivedAt   int64              `json:"archived_at,omitempty" bson:"archived_at,omitempty"`
+	*SoftDeleteEntity `bson:",inline"`
+	Name              string             `json:"name,omitempty" bson:",omitempty"`
+	FailureTypes      []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty"`
+	Tags              []string           `json:"tags,omitempty" bson:",omitempty"`
+	EnvVars           []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty"`
+	Attachments       []string           `json:"attachments,omitempty" bson:",omitempty"`
+	PlannedCases      int64              `json:"planned_cases" bson:"planned_cases"`
+	Status            SuiteStatus        `json:"status"`
+	StartedAt         int64              `json:"started_at" bson:"started_at"`
+	FinishedAt        int64              `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
 }
 
 type SuitePage struct {
 	RunningCount  int64   `json:"running_count" bson:"running_count"`
 	FinishedCount int64   `json:"finished_count" bson:"finished_count"`
-	More          bool    `json:"more"`
-	Suites        []Suite `json:"suites,omitempty" bson:",omitempty"`
+	NextId        *string `json:"next_id" bson:"next_id,omitempty"`
+	Suites        []Suite `json:"suites" bson:",omitempty"`
 }
 
 type SuiteRepo interface {
 	Save(Suite) (string, error)
 	SaveAttachments(id string, attachments ...string) error
 	SaveStatus(id string, status SuiteStatus, finishedAt *int64) error
-	Page(afterId *string, n int64, includeArchived bool) (*SuitePage, error)
+	Page(fromId *string, n int64, includeDeleted bool) (*SuitePage, error)
 	Find(id string) (*Suite, error)
-	FuzzyFind(fuzzyIdOrName string, includeArchived bool) ([]Suite, error)
-	FindAll(includeArchived bool) ([]Suite, error)
-	Archive(id string) error
-	ArchiveAll() error
+	FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]Suite, error)
+	FindAll(includeDeleted bool) ([]Suite, error)
+	Delete(id string) error
+	DeleteAll() error
 }
 
 type buntSuiteRepo struct {
@@ -70,18 +68,13 @@ func (r *buntRepo) newSuiteRepo() (*buntSuiteRepo, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = r.db.ReplaceIndex("suites_name", "suites:*",
-		buntdb.IndexJSON("name"))
-	if err != nil {
-		return nil, err
-	}
 	err = r.db.ReplaceIndex("suites_status", "suites:*",
 		buntdb.IndexJSON("status"))
 	if err != nil {
 		return nil, err
 	}
-	err = r.db.ReplaceIndex("suites_archived", "suites:*",
-		buntdb.IndexJSON("archived"))
+	err = r.db.ReplaceIndex("suites_deleted", "suites:*",
+		buntdb.IndexJSON("deleted"))
 	if err != nil {
 		return nil, err
 	}
@@ -89,306 +82,139 @@ func (r *buntRepo) newSuiteRepo() (*buntSuiteRepo, error) {
 }
 
 func (r *buntSuiteRepo) Save(s Suite) (string, error) {
-	var id string
-	err := r.db.Update(func(tx *buntdb.Tx) error {
-		id = primitive.NewObjectID().Hex()
-		s.Id = id
-		b, err := json.Marshal(&s)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set("suites:"+id, string(b), nil)
-		if err != nil {
-			return err
-		}
-		r.changes <- Change{
-			Op:      ChangeOpInsert,
-			Coll:    ChangeCollSuites,
-			Payload: s,
-		}
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	return id, nil
+	return r.save(&s, SuiteCollection)
 }
 
 func (r *buntSuiteRepo) SaveAttachments(id string, attachments ...string) error {
-	return r.db.Update(func(tx *buntdb.Tx) error {
-		v, err := tx.Get("suites:" + id)
-		if err != nil {
-			return err
-		}
-		var s Suite
-		if err := json.Unmarshal([]byte(v), &s); err != nil {
-			return err
-		}
-		s.Attachments = append(s.Attachments, attachments...)
-		b, err := json.Marshal(&s)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set("suites:"+id, string(b), nil)
-		if err != nil {
-			return err
-		}
-		r.changes <- Change{
-			Op:      ChangeOpUpdate,
-			Coll:    ChangeCollSuites,
-			Payload: s,
-		}
-		return nil
-	})
+	m := make(map[string]interface{})
+	for _, a := range attachments {
+		m["attachments.-1"] = a
+	}
+	return r.set(CaseCollection, id, m)
 }
 
 func (r *buntSuiteRepo) SaveStatus(id string, status SuiteStatus, finishedAt *int64) error {
-	return r.db.Update(func(tx *buntdb.Tx) error {
-		v, err := tx.Get("suites:" + id)
-		if err != nil {
-			return err
-		}
-		var s Suite
-		if err := json.Unmarshal([]byte(v), &s); err != nil {
-			return err
-		}
-		s.Status = status
-		if finishedAt != nil {
-			s.FinishedAt = *finishedAt
-		}
-		b, err := json.Marshal(&s)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set("suites:"+id, string(b), nil)
-		r.changes <- Change{
-			Op:      ChangeOpUpdate,
-			Coll:    ChangeCollSuites,
-			Payload: s,
-		}
-		return err
+	return r.set(SuiteCollection, id, map[string]interface{}{
+		"status":      status,
+		"finished_at": finishedAt,
 	})
 }
 
-func (r *buntSuiteRepo) Page(afterId *string, n int64, includeArchived bool) (*SuitePage, error) {
-	var page SuitePage
+func (r *buntSuiteRepo) Page(fromId *string, n int64, includeDeleted bool) (*SuitePage, error) {
+	var running int64
+	var finished int64
+	var nextId *string
+	values := make([]string, 0)
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		var running int64
-		var finished int64
-		suites := make([]Suite, 0)
+		iterator := func(k, v string) bool {
+			id := gjson.Get(v, "id").String()
+			if int64(len(values)) == n {
+				nextId = &id
+				return false
+			}
+			if includeDeleted || !gjson.Get(v, "deleted").Bool() {
+				values = append(values, v)
+			}
+			return true
+		}
 		var err error
-		if afterId != nil {
-			if err := tx.DescendLessOrEqual("suites_id", `{"id":"`+*afterId+`"}`, func(k, v string) bool {
-				var s Suite
-				if err = json.Unmarshal([]byte(v), &s); err != nil {
-					return false
-				}
-				if s.Id != *afterId && (includeArchived || !s.Archived) {
-					suites = append(suites, s)
-				}
-				// TODO: we may not want to limit ourselves to the max array length;
-				//  this concerns memory efficiency as well as the max number of
-				//  results allowed
-				return int64(len(suites)) < n
-			}); err != nil {
-				return err
-			}
+		if fromId == nil {
+			err = tx.Descend("suites_id", iterator)
 		} else {
-			if err := tx.Descend("suites_id", func(k, v string) bool {
-				var s Suite
-				if err = json.Unmarshal([]byte(v), &s); err != nil {
-					return false
-				}
-				if includeArchived || !s.Archived {
-					suites = append(suites, s)
-				}
-				// TODO: reduce duplication
-				return int64(len(suites)) < n
-			}); err != nil {
-				return err
-			}
+			escapedFromId := strconv.Quote(*fromId)
+			err = tx.DescendLessOrEqual("suites_id", `{"id":`+escapedFromId+`}`, iterator)
 		}
 		if err != nil {
 			return err
 		}
 
-		if err := tx.AscendEqual("suites_status", `{"status":"running"}`, func(k, v string) bool {
-			running++
-			return true
-		}); err != nil {
+		running, err = r.count(tx, "suites_status", "status", string(SuiteStatusRunning))
+		if err != nil {
 			return err
 		}
-		if err := tx.AscendEqual("suites_status", `{"status":"passed"}`, func(k, v string) bool {
-			finished++
-			return true
-		}); err != nil {
+		passed, err := r.count(tx, "suites_status", "status", string(SuiteStatusPassed))
+		if err != nil {
 			return err
 		}
-		if err := tx.AscendEqual("suites_status", `{"status":"failed"}`, func(k, v string) bool {
-			finished++
-			return true
-		}); err != nil {
+		failed, err := r.count(tx, "suites_status", "status", string(SuiteStatusFailed))
+		if err != nil {
 			return err
 		}
-		var more bool
-		if n > 0 && int64(len(suites)) == n {
-			afterId := suites[n-1].Id
-			// TODO: can weave in with the previous DescendLessOrEqual() call
-			if err := tx.DescendLessOrEqual("suites_id", `{"id":"`+afterId+`"}`, func(k, v string) bool {
-				var s Suite
-				if err = json.Unmarshal([]byte(v), &s); err != nil {
-					return false
-				}
-				if s.Id != afterId {
-					more = true
-					return false
-				}
-				return true
-			}); err != nil {
-				return err
-			}
-		}
-		page = SuitePage{
-			RunningCount:  running,
-			FinishedCount: finished,
-			More:          more,
-			Suites:        suites,
-		}
+		finished = passed + failed
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &page, nil
+	var suites []Suite
+	if err := r.valuesToSlice(values, &suites); err != nil {
+		return nil, err
+	}
+	return &SuitePage{
+		RunningCount:  running,
+		FinishedCount: finished,
+		NextId:        nextId,
+		Suites:        suites,
+	}, nil
+}
+
+func (r *buntSuiteRepo) count(tx *buntdb.Tx, index, k, v string) (int64, error) {
+	var n int64
+	err := tx.AscendEqual(index, `{"`+k+`":"`+v+`"}`, func(k, v string) bool {
+		n++
+		return true
+	})
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func (r *buntSuiteRepo) Find(id string) (*Suite, error) {
 	var s Suite
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		v, err := tx.Get("suites:" + id)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal([]byte(v), &s)
-	})
-	if err != nil {
+	if err := r.find(SuiteCollection, id, &s); err != nil {
 		return nil, err
 	}
 	return &s, nil
 }
 
-func (r *buntSuiteRepo) FuzzyFind(fuzzyIdOrName string, includeArchived bool) ([]Suite, error) {
-	var suites []Suite
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		suites = make([]Suite, 0)
-		var err error
-		if err := tx.Ascend("", func(k, v string) bool {
-			var s Suite
-			if err = json.Unmarshal([]byte(v), &s); err != nil {
-				return false
-			}
-			if (includeArchived || !s.Archived) &&
-				(strings.Contains(s.Id, fuzzyIdOrName) || strings.Contains(s.Name, fuzzyIdOrName)) {
-				suites = append(suites, s)
-			}
-			return true
-		}); err != nil {
-			return err
-		}
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-	return suites, nil
-}
-
-func (r *buntSuiteRepo) FindAll(includeArchived bool) ([]Suite, error) {
+func (r *buntSuiteRepo) FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]Suite, error) {
 	values := make([]string, 0)
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		iterator := func(k, v string) bool {
-			values = append(values, v)
+		return tx.Ascend("", func(k, v string) bool {
+			id := gjson.Get(v, "id").String()
+			name := gjson.Get(v, "name").String()
+			deleted := gjson.Get(v, "deleted").Bool()
+			idMatched := strings.Contains(id, fuzzyIdOrName)
+			nameMatched := strings.Contains(name, fuzzyIdOrName)
+			if (includeDeleted || !deleted) && (idMatched || nameMatched) {
+				values = append(values, v)
+			}
 			return true
-		}
-		if includeArchived {
-			return tx.Ascend("", iterator)
-		}
-		return tx.AscendEqual("suites_archived", `{"archived": false}`, iterator)
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
-	suites := make([]Suite, len(values))
-	for i, v := range values {
-		var s Suite
-		if err := json.Unmarshal([]byte(v), &s); err != nil {
-			return nil, err
-		}
-		suites[i] = s
+	var suites []Suite
+	if err := r.valuesToSlice(values, &suites); err != nil {
+		return nil, err
 	}
 	return suites, nil
 }
 
-func (r *buntSuiteRepo) Archive(id string) error {
-	return r.db.Update(func(tx *buntdb.Tx) error {
-		v, err := tx.Get("suites:" + id)
-		if err != nil {
-			return err
-		}
-		var s Suite
-		if err := json.Unmarshal([]byte(v), &s); err != nil {
-			return err
-		}
-		s.Archived = true
-		s.ArchivedAt = nowTimeMillis()
-		b, err := json.Marshal(&s)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set("suites:"+id, string(b), nil)
-		if err != nil {
-			return err
-		}
-		r.changes <- Change{
-			Op:      ChangeOpUpdate,
-			Coll:    ChangeCollSuites,
-			Payload: s,
-		}
-		return nil
-	})
+func (r *buntSuiteRepo) FindAll(includeDeleted bool) ([]Suite, error) {
+	var suites []Suite
+	if err := r.findAll("suites_deleted", includeDeleted, &suites); err != nil {
+		return nil, err
+	}
+	return suites, nil
 }
 
-func (r *buntSuiteRepo) ArchiveAll() error {
-	return r.db.Update(func(tx *buntdb.Tx) error {
-		values := make([]string, 0)
-		err := tx.AscendEqual("suites_archived", `{"archived": false}`, func(k, v string) bool {
-			values = append(values, v)
-			return true
-		})
-		if err != nil {
-			return err
-		}
-		deletedAt := nowTimeMillis()
-		for _, v := range values {
-			var s Suite
-			if err := json.Unmarshal([]byte(v), &s); err != nil {
-				return err
-			}
-			s.Archived = true
-			s.ArchivedAt = deletedAt
-			b, err := json.Marshal(&s)
-			if err != nil {
-				return err
-			}
-			if _, _, err := tx.Set("suites:"+s.Id, string(b), nil); err != nil {
-				return err
-			}
-			r.changes <- Change{
-				Op:      ChangeOpUpdate,
-				Coll:    ChangeCollSuites,
-				Payload: s,
-			}
-		}
-		return nil
-	})
+func (r *buntSuiteRepo) Delete(id string) error {
+	return r.delete(SuiteCollection, id)
+}
+
+func (r *buntSuiteRepo) DeleteAll() error {
+	return r.deleteAll(SuiteCollection, "suites_deleted")
 }

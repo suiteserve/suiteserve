@@ -63,7 +63,7 @@ package database
 //		return fmt.Errorf("watch db: %v", err)
 //	}
 //	go func() {
-//		for res.Next(d.ctx) {
+//		for res.NextId(d.ctx) {
 //			if err := d.handleChange(fn, res); err != nil {
 //				log.Println(err)
 //			}

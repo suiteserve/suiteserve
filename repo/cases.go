@@ -1,10 +1,6 @@
 package repo
 
-import (
-	"encoding/json"
-	"github.com/tidwall/buntdb"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-)
+import "github.com/tidwall/buntdb"
 
 type (
 	CaseLinkType string
@@ -35,7 +31,7 @@ type CaseArg struct {
 }
 
 type Case struct {
-	Id          string     `json:"id" bson:"_id,omitempty"`
+	*Entity     `bson:",inline"`
 	Suite       string     `json:"suite"`
 	Name        string     `json:"name"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`
@@ -87,134 +83,60 @@ func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = r.db.ReplaceIndex("cases_suite_num", "cases:*",
+		buntdb.IndexJSON("suite"), buntdb.IndexJSON("num"))
+	if err != nil {
+		return nil, err
+	}
+	err = r.db.ReplaceIndex("cases_deleted", "cases:*",
+		buntdb.IndexJSON("deleted"))
+	if err != nil {
+		return nil, err
+	}
 	return &buntCaseRepo{r}, nil
 }
 
 func (r *buntCaseRepo) Save(c Case) (string, error) {
-	var id string
-	err := r.db.Update(func(tx *buntdb.Tx) error {
-		id = primitive.NewObjectID().Hex()
-		c.Id = id
-		b, err := json.Marshal(&c)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set("cases:"+id, string(b), nil)
-		if err != nil {
-			return err
-		}
-		r.changes <- Change{
-			Op:      ChangeOpInsert,
-			Coll:    ChangeCollCases,
-			Payload: c,
-		}
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	return id, nil
+	return r.save(&c, CaseCollection)
 }
 
 func (r *buntCaseRepo) SaveAttachments(id string, attachments ...string) error {
-	return r.db.Update(func(tx *buntdb.Tx) error {
-		v, err := tx.Get("cases:" + id)
-		if err != nil {
-			return err
-		}
-		var c Case
-		if err := json.Unmarshal([]byte(v), &c); err != nil {
-			return err
-		}
-		c.Attachments = append(c.Attachments, attachments...)
-		b, err := json.Marshal(&c)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set("cases:"+id, string(b), nil)
-		if err != nil {
-			return err
-		}
-		r.changes <- Change{
-			Op:      ChangeOpUpdate,
-			Coll:    ChangeCollCases,
-			Payload: c,
-		}
-		return nil
-	})
+	m := make(map[string]interface{})
+	for _, a := range attachments {
+		m["attachments.-1"] = a
+	}
+	return r.set(CaseCollection, id, m)
 }
 
 func (r *buntCaseRepo) SaveStatus(id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error {
-	return r.db.Update(func(tx *buntdb.Tx) error {
-		v, err := tx.Get("cases:" + id)
-		if err != nil {
-			return err
-		}
-		var c Case
-		if err := json.Unmarshal([]byte(v), &c); err != nil {
-			return err
-		}
-		c.Status = status
-		if opts != nil {
-			if opts.flaky != nil {
-				c.Flaky = *opts.flaky
-			}
-			if opts.startedAt != nil {
-				c.StartedAt = *opts.startedAt
-			}
-			if opts.finishedAt != nil {
-				c.FinishedAt = *opts.finishedAt
-			}
-		}
-		b, err := json.Marshal(&c)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set("cases:"+id, string(b), nil)
-		r.changes <- Change{
-			Op:      ChangeOpUpdate,
-			Coll:    ChangeCollCases,
-			Payload: c,
-		}
-		return err
+	return r.set(CaseCollection, id, map[string]interface{}{
+		"status":      status,
+		"flaky":       opts.flaky,
+		"started_at":  opts.startedAt,
+		"finished_at": opts.finishedAt,
 	})
 }
 
 func (r *buntCaseRepo) Find(id string) (*Case, error) {
 	var c Case
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		v, err := tx.Get("cases:" + id)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal([]byte(v), &c)
-	})
-	if err != nil {
+	if err := r.find(CaseCollection, id, Case{}); err != nil {
 		return nil, err
 	}
 	return &c, nil
 }
 
 func (r *buntCaseRepo) FindAllBySuite(suiteId string, num *int64) ([]Case, error) {
-	values := make([]string, 0)
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		return tx.AscendEqual("cases_suite", `{"suite":"`+suiteId+`"}`, func(k, v string) bool {
-			values = append(values, v)
-			return true
-		})
-	})
-	if err != nil {
-		return nil, err
+	m := map[string]interface{}{
+		"suite": suiteId,
 	}
-	cases := make([]Case, 0, len(values))
-	for _, v := range values {
-		var c Case
-		if err := json.Unmarshal([]byte(v), &c); err != nil {
-			return nil, err
-		}
-		if num == nil || c.Num == *num {
-			cases = append(cases, c)
-		}
+	index := "cases_suite"
+	if num != nil {
+		m["num"] = *num
+		index = "cases_suite_num"
+	}
+	var cases []Case
+	if err := r.findAllBy(index, m, &cases); err != nil {
+		return nil, err
 	}
 	return cases, nil
 }
