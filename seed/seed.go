@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"context"
 	"github.com/tmazeika/testpass/repo"
 	"strconv"
 )
@@ -14,7 +15,7 @@ func Seed(repos repo.Repos) error {
 	}()
 
 	for i := 0; i < 30; i++ {
-		suiteId, err := repos.Suites().Save(repo.Suite{
+		suiteId, err := repos.Suites(context.Background()).Save(repo.Suite{
 			Name: "Suite " + strconv.Itoa(i),
 			FailureTypes: []repo.SuiteFailureType{
 				{
@@ -38,7 +39,7 @@ func Seed(repos repo.Repos) error {
 		}
 
 		for j := 0; j < 30; j++ {
-			caseId, err := repos.Cases().Save(repo.Case{
+			caseId, err := repos.Cases(context.Background()).Save(repo.Case{
 				Suite:       suiteId,
 				Name:        "Case " + strconv.Itoa(j),
 				Description: "This is my test case.",
@@ -63,7 +64,7 @@ func Seed(repos repo.Repos) error {
 			}
 
 			for k := 0; k < 30; k++ {
-				_, err := repos.Logs().Save(repo.LogEntry{
+				_, err := repos.Logs(context.Background()).Save(repo.LogEntry{
 					Case:      caseId,
 					Seq:       int64(k),
 					Level:     repo.LogLevelTypeInfo,

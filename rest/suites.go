@@ -10,7 +10,7 @@ import (
 func (s *srv) getSuiteHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-		suite, err := s.repos.Suites().Find(id)
+		suite, err := s.repos.Suites(r.Context()).Find(id)
 		if err != nil {
 			return fmt.Errorf("get suite: %v", err)
 		}
@@ -21,7 +21,7 @@ func (s *srv) getSuiteHandler() http.Handler {
 func (s *srv) deleteSuiteHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-		err := s.repos.Suites().Delete(id)
+		err := s.repos.Suites(r.Context()).Delete(id)
 		if err != nil {
 			return fmt.Errorf("delete suite: %v", err)
 		}
@@ -45,7 +45,7 @@ func (s *srv) getSuiteCollectionHandler() http.Handler {
 			limit = &l
 		}
 
-		suites, err := s.repos.Suites().Page(afterId, *limit, false)
+		suites, err := s.repos.Suites(r.Context()).Page(afterId, *limit, false)
 		if err != nil {
 			return fmt.Errorf("get all suites: %v", err)
 		}
@@ -55,7 +55,7 @@ func (s *srv) getSuiteCollectionHandler() http.Handler {
 
 func (s *srv) deleteSuiteCollectionHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		err := s.repos.Suites().DeleteAll()
+		err := s.repos.Suites(r.Context()).DeleteAll()
 		if err != nil {
 			return fmt.Errorf("delete all suites: %v", err)
 		}

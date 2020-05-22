@@ -9,7 +9,7 @@ import (
 func (s *srv) getCaseHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-		c, err := s.repos.Cases().Find(id)
+		c, err := s.repos.Cases(r.Context()).Find(id)
 		if err != nil {
 			return fmt.Errorf("get case run: %v", err)
 		}
@@ -25,7 +25,7 @@ func (s *srv) getCaseCollectionHandler() http.Handler {
 			return errBadQuery(err)
 		}
 
-		cases, err := s.repos.Cases().FindAllBySuite(suiteId, num)
+		cases, err := s.repos.Cases(r.Context()).FindAllBySuite(suiteId, num)
 		if err != nil {
 			return fmt.Errorf("get all cases for suite: %v", err)
 		}
