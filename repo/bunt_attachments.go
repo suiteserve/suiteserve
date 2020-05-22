@@ -35,10 +35,10 @@ func (r *buntAttachmentRepo) FindAll(includeDeleted bool) ([]Attachment, error) 
 	return attachments, nil
 }
 
-func (r *buntAttachmentRepo) Delete(id string) error {
-	return r.delete(AttachmentCollection, id)
+func (r *buntAttachmentRepo) Delete(id string, at int64) error {
+	return r.delete(AttachmentCollection, id, at)
 }
 
-func (r *buntAttachmentRepo) DeleteAll() error {
-	return r.deleteAll(AttachmentCollection, "attachments_deleted")
+func (r *buntAttachmentRepo) DeleteAll(at int64) error {
+	return r.deleteAll(AttachmentCollection, "attachments_deleted", at)
 }

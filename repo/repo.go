@@ -30,7 +30,7 @@ type Entity struct {
 }
 
 type SoftDeleteEntity struct {
-	*Entity   `bson:",inline"`
+	Entity   `bson:",inline"`
 	Deleted   bool  `json:"deleted"`
 	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
 }

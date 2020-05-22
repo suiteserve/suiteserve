@@ -160,10 +160,10 @@ func (r *buntSuiteRepo) FindAll(includeDeleted bool) ([]Suite, error) {
 	return suites, nil
 }
 
-func (r *buntSuiteRepo) Delete(id string) error {
-	return r.delete(SuiteCollection, id)
+func (r *buntSuiteRepo) Delete(id string, at int64) error {
+	return r.delete(SuiteCollection, id, at)
 }
 
-func (r *buntSuiteRepo) DeleteAll() error {
-	return r.deleteAll(SuiteCollection, "suites_deleted")
+func (r *buntSuiteRepo) DeleteAll(at int64) error {
+	return r.deleteAll(SuiteCollection, "suites_deleted", at)
 }

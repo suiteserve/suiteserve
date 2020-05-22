@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
+	"time"
 )
 
 func (s *srv) getSuiteHandler() http.Handler {
@@ -21,7 +22,8 @@ func (s *srv) getSuiteHandler() http.Handler {
 func (s *srv) deleteSuiteHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-		err := s.repos.Suites(r.Context()).Delete(id)
+		err := s.repos.Suites(r.Context()).
+			Delete(id, time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete suite: %v", err)
 		}
@@ -55,7 +57,8 @@ func (s *srv) getSuiteCollectionHandler() http.Handler {
 
 func (s *srv) deleteSuiteCollectionHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		err := s.repos.Suites(r.Context()).DeleteAll()
+		err := s.repos.Suites(r.Context()).
+			DeleteAll(time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete all suites: %v", err)
 		}

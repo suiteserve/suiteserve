@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/sjson"
-	"github.com/tmazeika/testpass/config"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type buntRepo struct {
 	changes chan Change
 	db      *buntdb.DB
+	idGen   func() string
 
 	attachments AttachmentRepo
 	cases       CaseRepo
@@ -19,14 +18,15 @@ type buntRepo struct {
 	suites      SuiteRepo
 }
 
-func NewBuntRepos(cfg *config.Config) (Repos, error) {
-	db, err := buntdb.Open(cfg.Storage.Bunt.File)
+func NewBuntRepos(filename string, idGen func() string) (Repos, error) {
+	db, err := buntdb.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	r := &buntRepo{
 		changes: make(chan Change),
 		db:      db,
+		idGen:   idGen,
 	}
 	if r.attachments, err = r.newAttachmentRepo(); err != nil {
 		return nil, err
@@ -64,13 +64,17 @@ func (r *buntRepo) Suites(context.Context) SuiteRepo {
 }
 
 func (r *buntRepo) Close() error {
-	return r.db.Close()
+	if err := r.db.Close(); err != nil {
+		return err
+	}
+	close(r.changes)
+	return nil
 }
 
 func (r *buntRepo) save(e interface{}, collection Collection) (string, error) {
 	var id string
 	err := r.db.Update(func(tx *buntdb.Tx) error {
-		id = primitive.NewObjectID().Hex()
+		id = r.idGen()
 		b, err := json.Marshal(e)
 		if err != nil {
 			return err
@@ -178,7 +182,7 @@ func (r *buntRepo) findAllBy(index string, m map[string]interface{}, entities in
 	return valuesToSlice(values, &entities)
 }
 
-func (r *buntRepo) delete(collection Collection, id string) error {
+func (r *buntRepo) delete(collection Collection, id string, at int64) error {
 	return r.db.Update(func(tx *buntdb.Tx) error {
 		k := string(collection) + ":" + id
 		v, err := tx.Get(k)
@@ -188,7 +192,7 @@ func (r *buntRepo) delete(collection Collection, id string) error {
 		if v, err = sjson.Set(v, "deleted", true); err != nil {
 			return err
 		}
-		if v, err = sjson.Set(v, "deleted_at", nowTimeMillis()); err != nil {
+		if v, err = sjson.Set(v, "deleted_at", at); err != nil {
 			return err
 		}
 		if _, _, err := tx.Set(k, v, nil); err != nil {
@@ -207,22 +211,21 @@ func (r *buntRepo) delete(collection Collection, id string) error {
 	})
 }
 
-func (r *buntRepo) deleteAll(collection Collection, deletedIndex string) error {
+func (r *buntRepo) deleteAll(collection Collection, index string, at int64) error {
 	return r.db.Update(func(tx *buntdb.Tx) error {
 		entries := make(map[string]string)
-		err := tx.AscendEqual(deletedIndex, `{"deleted":false}`, func(k, v string) bool {
+		err := tx.AscendEqual(index, `{"deleted":false}`, func(k, v string) bool {
 			entries[k] = v
 			return true
 		})
 		if err != nil {
 			return err
 		}
-		deletedAt := nowTimeMillis()
 		for k, v := range entries {
 			if v, err = sjson.Set(v, "deleted", true); err != nil {
 				return err
 			}
-			if v, err = sjson.Set(v, "deleted_at", deletedAt); err != nil {
+			if v, err = sjson.Set(v, "deleted_at", at); err != nil {
 				return err
 			}
 			if _, _, err := tx.Set(k, v, nil); err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/tmazeika/testpass/repo"
 	"github.com/tmazeika/testpass/rest"
 	"github.com/tmazeika/testpass/seed"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net"
 	"net/http"
@@ -38,7 +39,9 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	repos, err := repo.NewBuntRepos(cfg)
+	repos, err := repo.NewBuntRepos(cfg.Storage.Bunt.File, func() string {
+		return primitive.NewObjectID().Hex()
+	})
 	if err != nil {
 		log.Fatalf("create BuntDB repos: %v\n", err)
 	}

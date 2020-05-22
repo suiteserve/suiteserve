@@ -20,7 +20,7 @@ type SuiteEnvVar struct {
 }
 
 type Suite struct {
-	*SoftDeleteEntity `bson:",inline"`
+	SoftDeleteEntity `bson:",inline"`
 	Name              string             `json:"name,omitempty" bson:",omitempty"`
 	FailureTypes      []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty"`
 	Tags              []string           `json:"tags,omitempty" bson:",omitempty"`
@@ -47,6 +47,6 @@ type SuiteRepo interface {
 	Find(id string) (*Suite, error)
 	FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]Suite, error)
 	FindAll(includeDeleted bool) ([]Suite, error)
-	Delete(id string) error
-	DeleteAll() error
+	Delete(id string, at int64) error
+	DeleteAll(at int64) error
 }

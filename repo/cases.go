@@ -29,7 +29,7 @@ type CaseArg struct {
 }
 
 type Case struct {
-	*Entity     `bson:",inline"`
+	Entity     `bson:",inline"`
 	Suite       string     `json:"suite"`
 	Name        string     `json:"name"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`

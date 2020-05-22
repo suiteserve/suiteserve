@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
+	"time"
 )
 
 func (s *srv) getAttachmentHandler() http.Handler {
@@ -55,7 +56,8 @@ func (s *srv) deleteAttachmentHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
 
-		err := s.repos.Attachments(r.Context()).Delete(id)
+		err := s.repos.Attachments(r.Context()).
+			Delete(id, time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete attachment: %v", err)
 		}
@@ -76,7 +78,8 @@ func (s *srv) getAttachmentCollectionHandler() http.Handler {
 
 func (s *srv) deleteAttachmentCollectionHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		err := s.repos.Attachments(r.Context()).DeleteAll()
+		err := s.repos.Attachments(r.Context()).
+			DeleteAll(time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete all attachments: %v", err)
 		}
