@@ -1,16 +1,23 @@
 package repo
 
 import (
-	"context"
 	"encoding/json"
 	"github.com/tidwall/buntdb"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type IdGenerator func() string
+
+var DefaultIdGenerator = func() string {
+	return primitive.NewObjectID().Hex()
+}
+
 type buntRepo struct {
-	changes chan Change
-	db      *buntdb.DB
-	idGen   func() string
+	changes    chan Change
+	db         *buntdb.DB
+	generateId IdGenerator
 
 	attachments AttachmentRepo
 	cases       CaseRepo
@@ -18,15 +25,15 @@ type buntRepo struct {
 	suites      SuiteRepo
 }
 
-func NewBuntRepos(filename string, idGen func() string) (Repos, error) {
+func NewBuntRepos(filename string, generateId IdGenerator) (Repos, error) {
 	db, err := buntdb.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	r := &buntRepo{
-		changes: make(chan Change),
-		db:      db,
-		idGen:   idGen,
+		changes:    make(chan Change),
+		db:         db,
+		generateId: generateId,
 	}
 	if r.attachments, err = r.newAttachmentRepo(); err != nil {
 		return nil, err
@@ -43,11 +50,11 @@ func NewBuntRepos(filename string, idGen func() string) (Repos, error) {
 	return r, nil
 }
 
-func (r *buntRepo) Attachments(context.Context) AttachmentRepo {
+func (r *buntRepo) Attachments() AttachmentRepo {
 	return r.attachments
 }
 
-func (r *buntRepo) Cases(context.Context) CaseRepo {
+func (r *buntRepo) Cases() CaseRepo {
 	return r.cases
 }
 
@@ -55,11 +62,11 @@ func (r *buntRepo) Changes() <-chan Change {
 	return r.changes
 }
 
-func (r *buntRepo) Logs(context.Context) LogRepo {
+func (r *buntRepo) Logs() LogRepo {
 	return r.logs
 }
 
-func (r *buntRepo) Suites(context.Context) SuiteRepo {
+func (r *buntRepo) Suites() SuiteRepo {
 	return r.suites
 }
 
@@ -74,7 +81,7 @@ func (r *buntRepo) Close() error {
 func (r *buntRepo) save(e interface{}, collection Collection) (string, error) {
 	var id string
 	err := r.db.Update(func(tx *buntdb.Tx) error {
-		id = r.idGen()
+		id = r.generateId()
 		b, err := json.Marshal(e)
 		if err != nil {
 			return err
@@ -243,4 +250,15 @@ func (r *buntRepo) deleteAll(collection Collection, index string, at int64) erro
 		}
 		return nil
 	})
+}
+
+func indexJSONOptional(path string) func(a, b string) bool {
+	return func(a, b string) bool {
+		aResult := gjson.Get(a, path)
+		bResult := gjson.Get(b, path)
+		if aResult.Exists() && bResult.Exists() {
+			return aResult.Less(bResult, false)
+		}
+		return false
+	}
 }

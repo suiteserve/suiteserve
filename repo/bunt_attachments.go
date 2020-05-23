@@ -1,6 +1,9 @@
 package repo
 
-import "github.com/tidwall/buntdb"
+import (
+	"context"
+	"github.com/tidwall/buntdb"
+)
 
 type buntAttachmentRepo struct {
 	*buntRepo
@@ -13,18 +16,18 @@ func (r *buntRepo) newAttachmentRepo() (*buntAttachmentRepo, error) {
 		return nil, err
 	}
 	err = r.db.ReplaceIndex("attachments_deleted", "attachments:*",
-		buntdb.IndexJSON("deleted"), IndexOptionalJSON("id"))
+		buntdb.IndexJSON("deleted"), indexJSONOptional("id"))
 	if err != nil {
 		return nil, err
 	}
 	return &buntAttachmentRepo{r}, nil
 }
 
-func (r *buntAttachmentRepo) Save(a Attachment) (string, error) {
+func (r *buntAttachmentRepo) Save(_ context.Context, a Attachment) (string, error) {
 	return r.save(&a, AttachmentCollection)
 }
 
-func (r *buntAttachmentRepo) Find(id string) (*Attachment, error) {
+func (r *buntAttachmentRepo) Find(_ context.Context, id string) (*Attachment, error) {
 	var a Attachment
 	if err := r.find(AttachmentCollection, id, &a); err != nil {
 		return nil, err
@@ -32,7 +35,7 @@ func (r *buntAttachmentRepo) Find(id string) (*Attachment, error) {
 	return &a, nil
 }
 
-func (r *buntAttachmentRepo) FindAll(includeDeleted bool) ([]Attachment, error) {
+func (r *buntAttachmentRepo) FindAll(_ context.Context, includeDeleted bool) ([]Attachment, error) {
 	var attachments []Attachment
 	index := "attachments_deleted"
 	if includeDeleted {
@@ -44,10 +47,10 @@ func (r *buntAttachmentRepo) FindAll(includeDeleted bool) ([]Attachment, error) 
 	return attachments, nil
 }
 
-func (r *buntAttachmentRepo) Delete(id string, at int64) error {
+func (r *buntAttachmentRepo) Delete(_ context.Context, id string, at int64) error {
 	return r.delete(AttachmentCollection, id, at)
 }
 
-func (r *buntAttachmentRepo) DeleteAll(at int64) error {
+func (r *buntAttachmentRepo) DeleteAll(_ context.Context, at int64) error {
 	return r.deleteAll(AttachmentCollection, "attachments_deleted", at)
 }

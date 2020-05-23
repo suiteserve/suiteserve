@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"context"
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/gjson"
 	"strconv"
@@ -23,31 +24,31 @@ func (r *buntRepo) newSuiteRepo() (*buntSuiteRepo, error) {
 		return nil, err
 	}
 	err = r.db.ReplaceIndex("suites_deleted", "suites:*",
-		buntdb.IndexJSON("deleted"), IndexOptionalJSON("id"))
+		buntdb.IndexJSON("deleted"), indexJSONOptional("id"))
 	if err != nil {
 		return nil, err
 	}
 	return &buntSuiteRepo{r}, nil
 }
 
-func (r *buntSuiteRepo) Save(s Suite) (string, error) {
+func (r *buntSuiteRepo) Save(_ context.Context, s Suite) (string, error) {
 	return r.save(&s, SuiteCollection)
 }
 
-func (r *buntSuiteRepo) SaveAttachment(id string, attachmentId string) error {
+func (r *buntSuiteRepo) SaveAttachment(_ context.Context, id string, attachmentId string) error {
 	return r.set(CaseCollection, id, map[string]interface{}{
 		"attachments.-1": attachmentId,
 	})
 }
 
-func (r *buntSuiteRepo) SaveStatus(id string, status SuiteStatus, finishedAt *int64) error {
+func (r *buntSuiteRepo) SaveStatus(_ context.Context, id string, status SuiteStatus, finishedAt *int64) error {
 	return r.set(SuiteCollection, id, map[string]interface{}{
 		"status":      status,
 		"finished_at": finishedAt,
 	})
 }
 
-func (r *buntSuiteRepo) Page(fromId *string, n int64, includeDeleted bool) (*SuitePage, error) {
+func (r *buntSuiteRepo) Page(_ context.Context, fromId *string, n int64, includeDeleted bool) (*SuitePage, error) {
 	var running int64
 	var finished int64
 	var nextId *string
@@ -105,19 +106,7 @@ func (r *buntSuiteRepo) Page(fromId *string, n int64, includeDeleted bool) (*Sui
 	}, nil
 }
 
-func (r *buntSuiteRepo) count(tx *buntdb.Tx, index, k, v string) (int64, error) {
-	var n int64
-	err := tx.AscendEqual(index, `{"`+k+`":"`+v+`"}`, func(k, v string) bool {
-		n++
-		return true
-	})
-	if err != nil {
-		return 0, err
-	}
-	return n, nil
-}
-
-func (r *buntSuiteRepo) Find(id string) (*Suite, error) {
+func (r *buntSuiteRepo) Find(_ context.Context, id string) (*Suite, error) {
 	var s Suite
 	if err := r.find(SuiteCollection, id, &s); err != nil {
 		return nil, err
@@ -125,7 +114,7 @@ func (r *buntSuiteRepo) Find(id string) (*Suite, error) {
 	return &s, nil
 }
 
-func (r *buntSuiteRepo) FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]Suite, error) {
+func (r *buntSuiteRepo) FuzzyFind(_ context.Context, fuzzyIdOrName string, includeDeleted bool) ([]Suite, error) {
 	values := make([]string, 0)
 	err := r.db.View(func(tx *buntdb.Tx) error {
 		return tx.Ascend("suites_id", func(k, v string) bool {
@@ -150,7 +139,7 @@ func (r *buntSuiteRepo) FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]
 	return suites, nil
 }
 
-func (r *buntSuiteRepo) FindAll(includeDeleted bool) ([]Suite, error) {
+func (r *buntSuiteRepo) FindAll(_ context.Context, includeDeleted bool) ([]Suite, error) {
 	var suites []Suite
 	index := "suites_deleted"
 	if includeDeleted {
@@ -162,10 +151,22 @@ func (r *buntSuiteRepo) FindAll(includeDeleted bool) ([]Suite, error) {
 	return suites, nil
 }
 
-func (r *buntSuiteRepo) Delete(id string, at int64) error {
+func (r *buntSuiteRepo) Delete(_ context.Context, id string, at int64) error {
 	return r.delete(SuiteCollection, id, at)
 }
 
-func (r *buntSuiteRepo) DeleteAll(at int64) error {
+func (r *buntSuiteRepo) DeleteAll(_ context.Context, at int64) error {
 	return r.deleteAll(SuiteCollection, "suites_deleted", at)
+}
+
+func (r *buntSuiteRepo) count(tx *buntdb.Tx, index, k, v string) (int64, error) {
+	var n int64
+	err := tx.AscendEqual(index, `{"`+k+`":"`+v+`"}`, func(k, v string) bool {
+		n++
+		return true
+	})
+	if err != nil {
+		return 0, err
+	}
+	return n, nil
 }

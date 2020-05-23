@@ -52,7 +52,11 @@ func TestBuntRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	i := 0
 	repos, err := NewBuntRepos(filepath.Join(dir, "bunt.db"), func() string {
 		i++
@@ -61,17 +65,23 @@ func TestBuntRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer repos.Close()
+	defer func() {
+		if err := repos.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	go func() {
 		for {
+			if _, ok := <-repos.Changes(); !ok {
+				break
+			}
 			// ignore changes
-			<-repos.Changes()
 		}
 	}()
 
 	t.Run("Attachments", func(t *testing.T) {
-		attachments := repos.Attachments(context.Background())
+		attachments := repos.Attachments()
 
 		t.Run("Save_Find", attachmentsSaveFind(attachments))
 		t.Run("Find*_Delete*", attachmentsFindDelete(attachments))
@@ -81,7 +91,7 @@ func TestBuntRepo(t *testing.T) {
 func attachmentsSaveFind(repo AttachmentRepo) func(*testing.T) {
 	return func(t *testing.T) {
 		for i, expected := range testAttachments {
-			id, err := repo.Save(expected)
+			id, err := repo.Save(context.Background(), expected)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -89,7 +99,7 @@ func attachmentsSaveFind(repo AttachmentRepo) func(*testing.T) {
 				t.Errorf("got %q, want %d", id, i+1)
 			}
 
-			actual, err := repo.Find(id)
+			actual, err := repo.Find(context.Background(), id)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -103,7 +113,7 @@ func attachmentsSaveFind(repo AttachmentRepo) func(*testing.T) {
 
 func attachmentsFindDelete(repo AttachmentRepo) func(*testing.T) {
 	return func(t *testing.T) {
-		attachments, err := repo.FindAll(true)
+		attachments, err := repo.FindAll(context.Background(), true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -118,10 +128,10 @@ func attachmentsFindDelete(repo AttachmentRepo) func(*testing.T) {
 		}
 
 		deletedAt := int64(1590186181968)
-		if err := repo.Delete(attachments[1].Id, deletedAt); err != nil {
+		if err := repo.Delete(context.Background(), attachments[1].Id, deletedAt); err != nil {
 			t.Fatal(err)
 		}
-		attachments, err = repo.FindAll(true)
+		attachments, err = repo.FindAll(context.Background(), true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -138,10 +148,10 @@ func attachmentsFindDelete(repo AttachmentRepo) func(*testing.T) {
 			assertAttachmentEquals(t, &actual, &expected)
 		}
 
-		if err := repo.DeleteAll(deletedAt); err != nil {
+		if err := repo.DeleteAll(context.Background(), deletedAt); err != nil {
 			t.Fatal(err)
 		}
-		attachments, err = repo.FindAll(true)
+		attachments, err = repo.FindAll(context.Background(), true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -157,7 +167,7 @@ func attachmentsFindDelete(repo AttachmentRepo) func(*testing.T) {
 			actual := attachments[i]
 			assertAttachmentEquals(t, &actual, &expected)
 
-			actual2, err := repo.Find(actual.Id)
+			actual2, err := repo.Find(context.Background(), actual.Id)
 			if err != nil {
 				t.Fatal(err)
 			}

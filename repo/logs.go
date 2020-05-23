@@ -1,5 +1,7 @@
 package repo
 
+import "context"
+
 type LogLevelType string
 
 const (
@@ -21,7 +23,7 @@ type LogEntry struct {
 }
 
 type LogRepo interface {
-	Save(LogEntry) (string, error)
-	Find(id string) (*LogEntry, error)
-	FindAllByCase(caseId string) ([]LogEntry, error)
+	Save(ctx context.Context, e LogEntry) (string, error)
+	Find(ctx context.Context, id string) (*LogEntry, error)
+	FindAllByCase(ctx context.Context, caseId string) ([]LogEntry, error)
 }

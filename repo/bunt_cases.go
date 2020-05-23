@@ -1,47 +1,36 @@
 package repo
 
 import (
+	"context"
 	"github.com/tidwall/buntdb"
-	"github.com/tidwall/gjson"
 )
 
 type buntCaseRepo struct {
 	*buntRepo
 }
 
-func IndexOptionalJSON(path string) func(a, b string) bool {
-	return func(a, b string) bool {
-		aResult := gjson.Get(a, path)
-		bResult := gjson.Get(b, path)
-		if aResult.Exists() && bResult.Exists() {
-			return aResult.Less(bResult, false)
-		}
-		return false
-	}
-}
-
 func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
 	err := r.db.ReplaceIndex("cases_suite", "cases:*",
 		buntdb.IndexJSON("suite"),
-		buntdb.Desc(IndexOptionalJSON("num")),
-		buntdb.Desc(IndexOptionalJSON("created_at")))
+		buntdb.Desc(indexJSONOptional("num")),
+		buntdb.Desc(indexJSONOptional("created_at")))
 	if err != nil {
 		return nil, err
 	}
 	return &buntCaseRepo{r}, nil
 }
 
-func (r *buntCaseRepo) Save(c Case) (string, error) {
+func (r *buntCaseRepo) Save(_ context.Context, c Case) (string, error) {
 	return r.save(&c, CaseCollection)
 }
 
-func (r *buntCaseRepo) SaveAttachment(id string, attachmentId string) error {
+func (r *buntCaseRepo) SaveAttachment(_ context.Context, id string, attachmentId string) error {
 	return r.set(CaseCollection, id, map[string]interface{}{
 		"attachments.-1": attachmentId,
 	})
 }
 
-func (r *buntCaseRepo) SaveStatus(id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error {
+func (r *buntCaseRepo) SaveStatus(_ context.Context, id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error {
 	return r.set(CaseCollection, id, map[string]interface{}{
 		"status":      status,
 		"flaky":       opts.flaky,
@@ -50,7 +39,7 @@ func (r *buntCaseRepo) SaveStatus(id string, status CaseStatus, opts *CaseRepoSa
 	})
 }
 
-func (r *buntCaseRepo) Find(id string) (*Case, error) {
+func (r *buntCaseRepo) Find(_ context.Context, id string) (*Case, error) {
 	var c Case
 	if err := r.find(CaseCollection, id, &c); err != nil {
 		return nil, err
@@ -58,7 +47,7 @@ func (r *buntCaseRepo) Find(id string) (*Case, error) {
 	return &c, nil
 }
 
-func (r *buntCaseRepo) FindAllBySuite(suiteId string, num *int64) ([]Case, error) {
+func (r *buntCaseRepo) FindAllBySuite(_ context.Context, suiteId string, num *int64) ([]Case, error) {
 	m := map[string]interface{}{
 		"suite": suiteId,
 	}

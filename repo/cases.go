@@ -1,5 +1,7 @@
 package repo
 
+import "context"
+
 type (
 	CaseLinkType string
 	CaseStatus   string
@@ -64,9 +66,9 @@ func (o *CaseRepoSaveStatusOptions) FinishedAt(finishedAt int64) {
 }
 
 type CaseRepo interface {
-	Save(Case) (string, error)
-	SaveAttachment(id string, attachmentId string) error
-	SaveStatus(id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error
-	Find(id string) (*Case, error)
-	FindAllBySuite(suiteId string, num *int64) ([]Case, error)
+	Save(ctx context.Context, c Case) (string, error)
+	SaveAttachment(ctx context.Context, id string, attachmentId string) error
+	SaveStatus(ctx context.Context, id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error
+	Find(ctx context.Context, id string) (*Case, error)
+	FindAllBySuite(ctx context.Context, suiteId string, num *int64) ([]Case, error)
 }

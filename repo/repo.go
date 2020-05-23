@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -17,11 +16,11 @@ const (
 )
 
 type Repos interface {
-	Attachments(context.Context) AttachmentRepo
-	Cases(context.Context) CaseRepo
+	Attachments() AttachmentRepo
+	Cases() CaseRepo
 	Changes() <-chan Change
-	Logs(context.Context) LogRepo
-	Suites(context.Context) SuiteRepo
+	Logs() LogRepo
+	Suites() SuiteRepo
 	Close() error
 }
 

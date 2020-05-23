@@ -1,5 +1,7 @@
 package repo
 
+import "context"
+
 type SuiteStatus string
 
 const (
@@ -40,13 +42,13 @@ type SuitePage struct {
 }
 
 type SuiteRepo interface {
-	Save(Suite) (string, error)
-	SaveAttachment(id string, attachmentId string) error
-	SaveStatus(id string, status SuiteStatus, finishedAt *int64) error
-	Page(fromId *string, n int64, includeDeleted bool) (*SuitePage, error)
-	Find(id string) (*Suite, error)
-	FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]Suite, error)
-	FindAll(includeDeleted bool) ([]Suite, error)
-	Delete(id string, at int64) error
-	DeleteAll(at int64) error
+	Save(ctx context.Context, s Suite) (string, error)
+	SaveAttachment(ctx context.Context, id string, attachmentId string) error
+	SaveStatus(ctx context.Context, id string, status SuiteStatus, finishedAt *int64) error
+	Page(ctx context.Context, fromId *string, n int64, includeDeleted bool) (*SuitePage, error)
+	Find(ctx context.Context, id string) (*Suite, error)
+	FuzzyFind(ctx context.Context, fuzzyIdOrName string, includeDeleted bool) ([]Suite, error)
+	FindAll(ctx context.Context, includeDeleted bool) ([]Suite, error)
+	Delete(ctx context.Context, id string, at int64) error
+	DeleteAll(ctx context.Context, at int64) error
 }
