@@ -145,7 +145,7 @@ func (r *buntRepo) find(collection Collection, id string, e interface{}) error {
 	})
 }
 
-func (r *buntRepo) findAll(deletedIndex string, includeDeleted bool, entities interface{}) error {
+func (r *buntRepo) findAll(index string, includeDeleted bool, entities interface{}) error {
 	var values []string
 	err := r.db.View(func(tx *buntdb.Tx) error {
 		iterator := func(k, v string) bool {
@@ -153,9 +153,9 @@ func (r *buntRepo) findAll(deletedIndex string, includeDeleted bool, entities in
 			return true
 		}
 		if includeDeleted {
-			return tx.Ascend("", iterator)
+			return tx.Ascend(index, iterator)
 		}
-		return tx.AscendEqual(deletedIndex, `{"deleted":false}`, iterator)
+		return tx.AscendEqual(index, `{"deleted":false}`, iterator)
 	})
 	if err != nil {
 		return err

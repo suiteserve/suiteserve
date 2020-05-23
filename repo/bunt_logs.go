@@ -8,7 +8,7 @@ type buntLogRepo struct {
 
 func (r *buntRepo) newLogRepo() (*buntLogRepo, error) {
 	err := r.db.ReplaceIndex("logs_case", "logs:*",
-		buntdb.IndexJSON("case"))
+		buntdb.IndexJSON("case"), IndexOptionalJSON("timestamp"), IndexOptionalJSON("seq"))
 	if err != nil {
 		return nil, err
 	}

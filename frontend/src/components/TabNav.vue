@@ -9,16 +9,18 @@
         </p>
       </div>
     </header>
-    <a class="tab" href="#" v-for="item in items" :key="item.id"
-       @click="openTab($event, item)" :class="{ active: item.id === activeTabId }">
-      <div>
-        <div class="status-icon" :class="item.status"></div>
-      </div>
-      <slot name="tab" :item="item"></slot>
-    </a>
-    <a class="tab" href="#" v-if="more" @click="loadMore">
-      <p>Load More</p>
-    </a>
+    <div class="items">
+      <a class="tab" href="#" v-for="item in items" :key="item.id"
+         @click="openTab($event, item)" :class="{ active: item.id === activeTabId }">
+        <div>
+          <div class="status-icon" :class="item.status"></div>
+        </div>
+        <slot name="tab" :item="item"></slot>
+      </a>
+      <a class="tab" href="#" v-if="more" @click="loadMore">
+        <p>Load More</p>
+      </a>
+    </div>
   </nav>
 </template>
 
@@ -60,7 +62,9 @@
     width: max-content;
     max-width: 18em;
     height: 100vh;
-    overflow-y: scroll;
+
+    display: flex;
+    flex-direction: column;
   }
 
   p {
@@ -90,6 +94,10 @@
 
   .stats > *:not(:last-child) {
     margin-right: 1em;
+  }
+
+  .items {
+    overflow-y: scroll;
   }
 
   .tab {

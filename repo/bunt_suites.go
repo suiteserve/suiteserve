@@ -23,7 +23,7 @@ func (r *buntRepo) newSuiteRepo() (*buntSuiteRepo, error) {
 		return nil, err
 	}
 	err = r.db.ReplaceIndex("suites_deleted", "suites:*",
-		buntdb.IndexJSON("deleted"))
+		buntdb.IndexJSON("deleted"), IndexOptionalJSON("id"))
 	if err != nil {
 		return nil, err
 	}
@@ -34,12 +34,10 @@ func (r *buntSuiteRepo) Save(s Suite) (string, error) {
 	return r.save(&s, SuiteCollection)
 }
 
-func (r *buntSuiteRepo) SaveAttachments(id string, attachments ...string) error {
-	m := make(map[string]interface{})
-	for _, a := range attachments {
-		m["attachments.-1"] = a
-	}
-	return r.set(CaseCollection, id, m)
+func (r *buntSuiteRepo) SaveAttachment(id string, attachmentId string) error {
+	return r.set(CaseCollection, id, map[string]interface{}{
+		"attachments.-1": attachmentId,
+	})
 }
 
 func (r *buntSuiteRepo) SaveStatus(id string, status SuiteStatus, finishedAt *int64) error {
@@ -130,7 +128,7 @@ func (r *buntSuiteRepo) Find(id string) (*Suite, error) {
 func (r *buntSuiteRepo) FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]Suite, error) {
 	values := make([]string, 0)
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		return tx.Ascend("", func(k, v string) bool {
+		return tx.Ascend("suites_id", func(k, v string) bool {
 			id := gjson.Get(v, "id").String()
 			name := gjson.Get(v, "name").String()
 			deleted := gjson.Get(v, "deleted").Bool()
@@ -154,7 +152,11 @@ func (r *buntSuiteRepo) FuzzyFind(fuzzyIdOrName string, includeDeleted bool) ([]
 
 func (r *buntSuiteRepo) FindAll(includeDeleted bool) ([]Suite, error) {
 	var suites []Suite
-	if err := r.findAll("suites_deleted", includeDeleted, &suites); err != nil {
+	index := "suites_deleted"
+	if includeDeleted {
+		index = "suites_id"
+	}
+	if err := r.findAll(index, includeDeleted, &suites); err != nil {
 		return nil, err
 	}
 	return suites, nil

@@ -41,8 +41,8 @@
     async created() {
       const suitesRes = await fetchSuites(null, 10)
       this.suites = suitesRes.suites
-      this.runningSuites = suitesRes.running
-      this.finishedSuites = suitesRes.finished
+      this.runningSuites = suitesRes.running_count
+      this.finishedSuites = suitesRes.finished_count
       this.nextId = suitesRes.next_id
     },
     data() {
@@ -84,8 +84,8 @@
         }
 
         this.suites.push(...suitesRes.suites)
-        this.runningSuites = suitesRes.running
-        this.finishedSuites = suitesRes.finished
+        this.runningSuites = suitesRes.running_count
+        this.finishedSuites = suitesRes.finished_count
         this.nextId = suitesRes.next_id
       },
     },

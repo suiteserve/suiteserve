@@ -43,7 +43,7 @@ func Seed(repos repo.Repos) error {
 			},
 			PlannedCases: int64(i % 10),
 			Status:       repo.SuiteStatusRunning,
-			StartedAt:    1589947257188,
+			StartedAt:    1589947257188 + int64(i),
 		})
 		if err != nil {
 			return err
@@ -68,7 +68,7 @@ func Seed(repos repo.Repos) error {
 					{Key: "y", Value: "five"},
 				},
 				Status:    repo.CaseStatusCreated,
-				CreatedAt: 1589949229585,
+				CreatedAt: 1589949229585 + int64(j),
 			})
 			if err != nil {
 				return err
@@ -77,11 +77,11 @@ func Seed(repos repo.Repos) error {
 			for k := 0; k < 30; k++ {
 				_, err := repos.Logs(context.Background()).Save(repo.LogEntry{
 					Case:      caseId,
-					Seq:       int64(k),
+					Index:     int64(k) % 28,
 					Level:     repo.LogLevelTypeInfo,
 					Trace:     "",
 					Message:   "This is a log message!",
-					Timestamp: 1589950443438,
+					Timestamp: 1589950443438 + int64(k),
 				})
 				if err != nil {
 					return err

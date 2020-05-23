@@ -29,7 +29,7 @@ type CaseArg struct {
 }
 
 type Case struct {
-	Entity     `bson:",inline"`
+	Entity      `bson:",inline"`
 	Suite       string     `json:"suite"`
 	Name        string     `json:"name"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`
@@ -65,7 +65,7 @@ func (o *CaseRepoSaveStatusOptions) FinishedAt(finishedAt int64) {
 
 type CaseRepo interface {
 	Save(Case) (string, error)
-	SaveAttachments(id string, attachments ...string) error
+	SaveAttachment(id string, attachmentId string) error
 	SaveStatus(id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error
 	Find(id string) (*Case, error)
 	FindAllBySuite(suiteId string, num *int64) ([]Case, error)

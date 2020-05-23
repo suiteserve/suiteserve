@@ -2,9 +2,9 @@ package repo
 
 type Attachment struct {
 	SoftDeleteEntity `bson:",inline"`
-	Filename          string `json:"filename"`
-	Size              int64  `json:"size"`
-	ContentType       string `json:"content_type" bson:"content_type"`
+	Filename         string `json:"filename"`
+	Size             int64  `json:"size"`
+	ContentType      string `json:"content_type" bson:"content_type"`
 }
 
 type AttachmentRepo interface {

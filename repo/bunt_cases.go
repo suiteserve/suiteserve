@@ -9,27 +9,22 @@ type buntCaseRepo struct {
 	*buntRepo
 }
 
-func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
-	err := r.db.ReplaceIndex("cases_suite_num", "cases:*", func(a, b string) bool {
-		suiteLess := buntdb.IndexJSON("suite")
-		if suiteLess(a, b) {
-			return true
-		}
-		if suiteLess(b, a) {
-			return false
-		}
-		aNum := gjson.Get(a, "num")
-		bNum := gjson.Get(b, "num")
-		if aNum.Exists() && bNum.Exists() {
-			return aNum.Less(bNum, false)
+func IndexOptionalJSON(path string) func(a, b string) bool {
+	return func(a, b string) bool {
+		aResult := gjson.Get(a, path)
+		bResult := gjson.Get(b, path)
+		if aResult.Exists() && bResult.Exists() {
+			return aResult.Less(bResult, false)
 		}
 		return false
-	})
-	if err != nil {
-		return nil, err
 	}
-	err = r.db.ReplaceIndex("cases_deleted", "cases:*",
-		buntdb.IndexJSON("deleted"))
+}
+
+func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
+	err := r.db.ReplaceIndex("cases_suite", "cases:*",
+		buntdb.IndexJSON("suite"),
+		buntdb.Desc(IndexOptionalJSON("num")),
+		buntdb.Desc(IndexOptionalJSON("created_at")))
 	if err != nil {
 		return nil, err
 	}
@@ -40,12 +35,10 @@ func (r *buntCaseRepo) Save(c Case) (string, error) {
 	return r.save(&c, CaseCollection)
 }
 
-func (r *buntCaseRepo) SaveAttachments(id string, attachments ...string) error {
-	m := make(map[string]interface{})
-	for _, a := range attachments {
-		m["attachments.-1"] = a
-	}
-	return r.set(CaseCollection, id, m)
+func (r *buntCaseRepo) SaveAttachment(id string, attachmentId string) error {
+	return r.set(CaseCollection, id, map[string]interface{}{
+		"attachments.-1": attachmentId,
+	})
 }
 
 func (r *buntCaseRepo) SaveStatus(id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error {
@@ -59,7 +52,7 @@ func (r *buntCaseRepo) SaveStatus(id string, status CaseStatus, opts *CaseRepoSa
 
 func (r *buntCaseRepo) Find(id string) (*Case, error) {
 	var c Case
-	if err := r.find(CaseCollection, id, Case{}); err != nil {
+	if err := r.find(CaseCollection, id, &c); err != nil {
 		return nil, err
 	}
 	return &c, nil
@@ -73,7 +66,7 @@ func (r *buntCaseRepo) FindAllBySuite(suiteId string, num *int64) ([]Case, error
 		m["num"] = *num
 	}
 	var cases []Case
-	if err := r.findAllBy("cases_suite_num", m, &cases); err != nil {
+	if err := r.findAllBy("cases_suite", m, &cases); err != nil {
 		return nil, err
 	}
 	return cases, nil

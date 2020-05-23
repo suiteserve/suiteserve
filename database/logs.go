@@ -21,7 +21,7 @@ package database
 //)
 //
 //type NewLogMessage struct {
-//	Seq         uint64       `json:"seq" validate:"gte=0"`
+//	Index         uint64       `json:"seq" validate:"gte=0"`
 //	Level       LogLevelType `json:"level" validate:"oneof=trace debug info warn error"`
 //	Trace       string       `json:"trace,omitempty" bson:",omitempty"`
 //	Message     string       `json:"message,omitempty" bson:",omitempty"`

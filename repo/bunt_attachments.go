@@ -7,8 +7,13 @@ type buntAttachmentRepo struct {
 }
 
 func (r *buntRepo) newAttachmentRepo() (*buntAttachmentRepo, error) {
-	err := r.db.ReplaceIndex("attachments_deleted", "attachments:*",
-		buntdb.IndexJSON("deleted"))
+	err := r.db.ReplaceIndex("attachments_id", "attachments:*",
+		buntdb.IndexJSON("id"))
+	if err != nil {
+		return nil, err
+	}
+	err = r.db.ReplaceIndex("attachments_deleted", "attachments:*",
+		buntdb.IndexJSON("deleted"), IndexOptionalJSON("id"))
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +34,11 @@ func (r *buntAttachmentRepo) Find(id string) (*Attachment, error) {
 
 func (r *buntAttachmentRepo) FindAll(includeDeleted bool) ([]Attachment, error) {
 	var attachments []Attachment
-	if err := r.findAll("attachments_deleted", includeDeleted, &attachments); err != nil {
+	index := "attachments_deleted"
+	if includeDeleted {
+		index = "attachments_id"
+	}
+	if err := r.findAll(index, includeDeleted, &attachments); err != nil {
 		return nil, err
 	}
 	return attachments, nil

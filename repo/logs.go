@@ -11,9 +11,9 @@ const (
 )
 
 type LogEntry struct {
-	Entity   `bson:",inline"`
+	Entity    `bson:",inline"`
 	Case      string       `json:"case"`
-	Seq       int64        `json:"seq"`
+	Index     int64        `json:"index"`
 	Level     LogLevelType `json:"level"`
 	Trace     string       `json:"trace,omitempty" bson:",omitempty"`
 	Message   string       `json:"message,omitempty" bson:",omitempty"`

@@ -21,15 +21,15 @@ type SuiteEnvVar struct {
 
 type Suite struct {
 	SoftDeleteEntity `bson:",inline"`
-	Name              string             `json:"name,omitempty" bson:",omitempty"`
-	FailureTypes      []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty"`
-	Tags              []string           `json:"tags,omitempty" bson:",omitempty"`
-	EnvVars           []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty"`
-	Attachments       []string           `json:"attachments,omitempty" bson:",omitempty"`
-	PlannedCases      int64              `json:"planned_cases" bson:"planned_cases"`
-	Status            SuiteStatus        `json:"status"`
-	StartedAt         int64              `json:"started_at" bson:"started_at"`
-	FinishedAt        int64              `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+	Name             string             `json:"name,omitempty" bson:",omitempty"`
+	FailureTypes     []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty"`
+	Tags             []string           `json:"tags,omitempty" bson:",omitempty"`
+	EnvVars          []SuiteEnvVar      `json:"env_vars,omitempty" bson:"env_vars,omitempty"`
+	Attachments      []string           `json:"attachments,omitempty" bson:",omitempty"`
+	PlannedCases     int64              `json:"planned_cases" bson:"planned_cases"`
+	Status           SuiteStatus        `json:"status"`
+	StartedAt        int64              `json:"started_at" bson:"started_at"`
+	FinishedAt       int64              `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
 }
 
 type SuitePage struct {
@@ -41,7 +41,7 @@ type SuitePage struct {
 
 type SuiteRepo interface {
 	Save(Suite) (string, error)
-	SaveAttachments(id string, attachments ...string) error
+	SaveAttachment(id string, attachmentId string) error
 	SaveStatus(id string, status SuiteStatus, finishedAt *int64) error
 	Page(fromId *string, n int64, includeDeleted bool) (*SuitePage, error)
 	Find(id string) (*Suite, error)
