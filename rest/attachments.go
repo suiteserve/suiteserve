@@ -16,7 +16,7 @@ func (s *srv) getAttachmentHandler() http.Handler {
 		if err != nil {
 			return errBadQuery(err)
 		}
-		attachment, err := s.repos.Attachments(r.Context()).Find(id)
+		attachment, err := s.repos.Attachments().Find(r.Context(), id)
 		if err != nil {
 			return fmt.Errorf("get attachment: %v", err)
 		}
@@ -56,8 +56,8 @@ func (s *srv) deleteAttachmentHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
 
-		err := s.repos.Attachments(r.Context()).
-			Delete(id, time.Duration(time.Now().UnixNano()).Milliseconds())
+		err := s.repos.Attachments().
+			Delete(r.Context(), id, time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete attachment: %v", err)
 		}
@@ -68,7 +68,7 @@ func (s *srv) deleteAttachmentHandler() http.Handler {
 
 func (s *srv) getAttachmentCollectionHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		attachments, err := s.repos.Attachments(r.Context()).FindAll(false)
+		attachments, err := s.repos.Attachments().FindAll(r.Context(), false)
 		if err != nil {
 			return fmt.Errorf("get all attachments: %v", err)
 		}
@@ -78,8 +78,8 @@ func (s *srv) getAttachmentCollectionHandler() http.Handler {
 
 func (s *srv) deleteAttachmentCollectionHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		err := s.repos.Attachments(r.Context()).
-			DeleteAll(time.Duration(time.Now().UnixNano()).Milliseconds())
+		err := s.repos.Attachments().
+			DeleteAll(r.Context(), time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete all attachments: %v", err)
 		}

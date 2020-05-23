@@ -11,7 +11,7 @@ import (
 func (s *srv) getSuiteHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-		suite, err := s.repos.Suites(r.Context()).Find(id)
+		suite, err := s.repos.Suites().Find(r.Context(), id)
 		if err != nil {
 			return fmt.Errorf("get suite: %v", err)
 		}
@@ -22,8 +22,8 @@ func (s *srv) getSuiteHandler() http.Handler {
 func (s *srv) deleteSuiteHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-		err := s.repos.Suites(r.Context()).
-			Delete(id, time.Duration(time.Now().UnixNano()).Milliseconds())
+		err := s.repos.Suites().
+			Delete(r.Context(), id, time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete suite: %v", err)
 		}
@@ -47,7 +47,7 @@ func (s *srv) getSuiteCollectionHandler() http.Handler {
 			limit = &l
 		}
 
-		suites, err := s.repos.Suites(r.Context()).Page(fromId, *limit, false)
+		suites, err := s.repos.Suites().Page(r.Context(), fromId, *limit, false)
 		if err != nil {
 			return fmt.Errorf("get all suites: %v", err)
 		}
@@ -57,8 +57,8 @@ func (s *srv) getSuiteCollectionHandler() http.Handler {
 
 func (s *srv) deleteSuiteCollectionHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		err := s.repos.Suites(r.Context()).
-			DeleteAll(time.Duration(time.Now().UnixNano()).Milliseconds())
+		err := s.repos.Suites().
+			DeleteAll(r.Context(), time.Duration(time.Now().UnixNano()).Milliseconds())
 		if err != nil {
 			return fmt.Errorf("delete all suites: %v", err)
 		}

@@ -7,7 +7,6 @@ import (
 	"github.com/tmazeika/testpass/repo"
 	"github.com/tmazeika/testpass/rest"
 	"github.com/tmazeika/testpass/seed"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"log"
 	"net"
 	"net/http"
@@ -19,6 +18,8 @@ import (
 var (
 	configFileFlag = flag.String("config", "config/config.json",
 		"The path to the JSON configuration file")
+	debugFlag = flag.Bool("debug", false,
+		"Whether to print extra debug information with log messages")
 	dbFlag = flag.String("db", "bunt",
 		"The database implementation to use: bunt, mongo")
 	helpFlag = flag.Bool("help", false,
@@ -29,6 +30,12 @@ var (
 
 func main() {
 	flag.Parse()
+
+	if *debugFlag {
+		log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Llongfile)
+		log.Println("Debug mode enabled")
+	}
+
 	if *helpFlag {
 		flag.PrintDefaults()
 		return
@@ -44,22 +51,20 @@ func main() {
 	switch *dbFlag {
 	case "bunt":
 		log.Println("Using BuntDB")
-		repos, err = repo.NewBuntRepos(cfg.Storage.Bunt.File, func() string {
-			return primitive.NewObjectID().Hex()
-		})
+		repos, err = repo.NewBuntRepos(cfg.Storage.Bunt.File, repo.DefaultIdGenerator)
 		if err != nil {
 			log.Fatalf("create BuntDB repos: %v\n", err)
 		}
-		defer func() {
-			if err := repos.Close(); err != nil {
-				log.Printf("close BuntDB repos: %v\n", err)
-			}
-		}()
 	case "mongo":
 		log.Fatalln("MongoDB not yet implemented")
 	default:
 		log.Fatalf("unknown db %q\n", *dbFlag)
 	}
+	defer func() {
+		if err := repos.Close(); err != nil {
+			log.Printf("close repos: %v\n", err)
+		}
+	}()
 
 	if *seedFlag {
 		log.Println("Seeding DB...")

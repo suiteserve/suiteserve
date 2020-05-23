@@ -9,13 +9,15 @@ import (
 func Seed(repos repo.Repos) error {
 	go func() {
 		for {
+			if _, ok := <-repos.Changes(); !ok {
+				break
+			}
 			// ignore changes
-			<-repos.Changes()
 		}
 	}()
 
 	for i := 0; i < 50; i++ {
-		_, err := repos.Attachments(context.Background()).Save(repo.Attachment{
+		_, err := repos.Attachments().Save(context.Background(), repo.Attachment{
 			Filename:    "Attachment " + strconv.Itoa(i),
 			Size:        (int64(i) % 28) * 1000,
 			ContentType: "text/plain; charset=utf-8",
@@ -26,7 +28,7 @@ func Seed(repos repo.Repos) error {
 	}
 
 	for i := 0; i < 30; i++ {
-		suiteId, err := repos.Suites(context.Background()).Save(repo.Suite{
+		suiteId, err := repos.Suites().Save(context.Background(), repo.Suite{
 			Name: "Suite " + strconv.Itoa(i),
 			FailureTypes: []repo.SuiteFailureType{
 				{
@@ -50,7 +52,7 @@ func Seed(repos repo.Repos) error {
 		}
 
 		for j := 0; j < 30; j++ {
-			caseId, err := repos.Cases(context.Background()).Save(repo.Case{
+			caseId, err := repos.Cases().Save(context.Background(), repo.Case{
 				Suite:       suiteId,
 				Name:        "Case " + strconv.Itoa(j),
 				Description: "This is my test case.",
@@ -75,7 +77,7 @@ func Seed(repos repo.Repos) error {
 			}
 
 			for k := 0; k < 30; k++ {
-				_, err := repos.Logs(context.Background()).Save(repo.LogEntry{
+				_, err := repos.Logs().Save(context.Background(), repo.LogEntry{
 					Case:      caseId,
 					Index:     int64(k) % 28,
 					Level:     repo.LogLevelTypeInfo,
