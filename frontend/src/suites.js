@@ -1,7 +1,7 @@
-export async function fetchSuites(afterId, limit) {
-  let url = new URL('/v1/suites', window.location.href);
-  if (afterId) {
-    url.searchParams.append('after_id', afterId);
+export async function fetchSuites(fromId, limit) {
+  const url = new URL('/v1/suites', window.location.href);
+  if (fromId) {
+    url.searchParams.append('from_id', fromId);
   }
   if (limit) {
     url.searchParams.append('limit', limit);

@@ -1,13 +1,13 @@
 <template>
   <main id="app">
-    <TabNav title="Suites" :items="suites" :more="moreSuites" :stats="{
+    <TabNav title="Suites" :items="suites" :more="nextId != null" :stats="{
       'Running': runningSuites,
       'Finished': finishedSuites,
     }" @open-tab="openSuite" @load-more="loadMoreSuites">
       <template #tab="{ item }">
         <div>
           <p>{{ item.name }}</p>
-          <p class="muted">{{ formatTime(item.created_at) }}</p>
+          <p class="muted">{{ formatTime(item.started_at) }}</p>
         </div>
       </template>
     </TabNav>
@@ -43,7 +43,7 @@
       this.suites = suitesRes.suites
       this.runningSuites = suitesRes.running
       this.finishedSuites = suitesRes.finished
-      this.moreSuites = suitesRes.more
+      this.nextId = suitesRes.next_id
     },
     data() {
       return {
@@ -51,7 +51,7 @@
         suites: [],
         runningSuites: 0,
         finishedSuites: 0,
-        moreSuites: true,
+        nextId: null,
       };
     },
     computed: {
@@ -78,7 +78,7 @@
       async loadMoreSuites() {
         let suitesRes;
         if (this.suites.length) {
-          suitesRes = await fetchSuites(this.suites[this.suites.length - 1].id, 10);
+          suitesRes = await fetchSuites(this.nextId, 10);
         } else {
           suitesRes = await fetchSuites(null, 10);
         }
@@ -86,7 +86,7 @@
         this.suites.push(...suitesRes.suites)
         this.runningSuites = suitesRes.running
         this.finishedSuites = suitesRes.finished
-        this.moreSuites = suitesRes.more
+        this.nextId = suitesRes.next_id
       },
     },
     components: {

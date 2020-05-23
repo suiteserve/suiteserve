@@ -24,7 +24,7 @@ var (
 	helpFlag = flag.Bool("help", false,
 		"Shows this help")
 	seedFlag = flag.Bool("seed", false,
-		"Whether to seed the database with test data")
+		"Whether to first seed the database with test data")
 )
 
 func main() {
@@ -34,32 +34,41 @@ func main() {
 		return
 	}
 
+	log.Printf("Using config at %q", *configFileFlag)
 	cfg, err := config.New(*configFileFlag)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	repos, err := repo.NewBuntRepos(cfg.Storage.Bunt.File, func() string {
-		return primitive.NewObjectID().Hex()
-	})
-	if err != nil {
-		log.Fatalf("create BuntDB repos: %v\n", err)
-	}
-	defer func() {
-		if err := repos.Close(); err != nil {
-			log.Printf("close BuntDB repos: %v\n", err)
+	var repos repo.Repos
+	switch *dbFlag {
+	case "bunt":
+		log.Println("Using BuntDB")
+		repos, err = repo.NewBuntRepos(cfg.Storage.Bunt.File, func() string {
+			return primitive.NewObjectID().Hex()
+		})
+		if err != nil {
+			log.Fatalf("create BuntDB repos: %v\n", err)
 		}
-	}()
+		defer func() {
+			if err := repos.Close(); err != nil {
+				log.Printf("close BuntDB repos: %v\n", err)
+			}
+		}()
+	case "mongo":
+		log.Fatalln("MongoDB not yet implemented")
+	default:
+		log.Fatalf("unknown db %q\n", *dbFlag)
+	}
 
 	if *seedFlag {
-		log.Println("Seeding...")
+		log.Println("Seeding DB...")
 		if err := seed.Seed(repos); err != nil {
 			log.Fatalln(err)
 		}
-	} else {
-		log.Println("Starting up...")
-		listenHttp(cfg, repos)
 	}
+
+	listenHttp(cfg, repos)
 }
 
 func listenHttp(cfg *config.Config, repos repo.Repos) {
@@ -67,7 +76,7 @@ func listenHttp(cfg *config.Config, repos repo.Repos) {
 		Addr:    net.JoinHostPort(cfg.Http.Host, strconv.Itoa(int(cfg.Http.Port))),
 		Handler: rest.Handler(repos),
 	}
-	srvDone := make(chan interface{})
+	done := make(chan interface{})
 
 	go func() {
 		sigint := make(chan os.Signal, 1)
@@ -79,13 +88,17 @@ func listenHttp(cfg *config.Config, repos repo.Repos) {
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Printf("shutdown http: %v\n", err)
 		}
-		close(srvDone)
+		close(done)
 	}()
 
 	log.Println("Binding to", srv.Addr)
+	srv.RegisterOnShutdown(func() {
+		log.Println("Cleaned up")
+	})
+
 	err := srv.ListenAndServeTLS(cfg.Http.TlsCertFile, cfg.Http.TlsKeyFile)
 	if err != http.ErrServerClosed {
 		log.Fatalf("listen http: %v\n", err)
 	}
-	<-srvDone
+	<-done
 }

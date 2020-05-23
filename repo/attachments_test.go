@@ -74,7 +74,7 @@ func TestBuntRepo(t *testing.T) {
 		attachments := repos.Attachments(context.Background())
 
 		t.Run("Save_Find", attachmentsSaveFind(attachments))
-		t.Run("FindAll_Delete_DeleteAll", attachmentsFindDelete(attachments))
+		t.Run("Find*_Delete*", attachmentsFindDelete(attachments))
 	})
 }
 

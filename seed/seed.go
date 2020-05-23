@@ -14,6 +14,17 @@ func Seed(repos repo.Repos) error {
 		}
 	}()
 
+	for i := 0; i < 50; i++ {
+		_, err := repos.Attachments(context.Background()).Save(repo.Attachment{
+			Filename:    "Attachment " + strconv.Itoa(i),
+			Size:        (int64(i) % 28) * 1000,
+			ContentType: "text/plain; charset=utf-8",
+		})
+		if err != nil {
+			return err
+		}
+	}
+
 	for i := 0; i < 30; i++ {
 		suiteId, err := repos.Suites(context.Background()).Save(repo.Suite{
 			Name: "Suite " + strconv.Itoa(i),

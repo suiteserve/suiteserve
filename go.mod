@@ -11,5 +11,4 @@ require (
 	github.com/tidwall/gjson v1.6.0
 	github.com/tidwall/sjson v1.1.1
 	go.mongodb.org/mongo-driver v1.3.1
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 )

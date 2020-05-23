@@ -1,19 +1,30 @@
 package repo
 
-import "github.com/tidwall/buntdb"
+import (
+	"github.com/tidwall/buntdb"
+	"github.com/tidwall/gjson"
+)
 
 type buntCaseRepo struct {
 	*buntRepo
 }
 
 func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
-	err := r.db.ReplaceIndex("cases_suite", "cases:*",
-		buntdb.IndexJSON("suite"))
-	if err != nil {
-		return nil, err
-	}
-	err = r.db.ReplaceIndex("cases_suite_num", "cases:*",
-		buntdb.IndexJSON("suite"), buntdb.IndexJSON("num"))
+	err := r.db.ReplaceIndex("cases_suite_num", "cases:*", func(a, b string) bool {
+		suiteLess := buntdb.IndexJSON("suite")
+		if suiteLess(a, b) {
+			return true
+		}
+		if suiteLess(b, a) {
+			return false
+		}
+		aNum := gjson.Get(a, "num")
+		bNum := gjson.Get(b, "num")
+		if aNum.Exists() && bNum.Exists() {
+			return aNum.Less(bNum, false)
+		}
+		return false
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -58,13 +69,11 @@ func (r *buntCaseRepo) FindAllBySuite(suiteId string, num *int64) ([]Case, error
 	m := map[string]interface{}{
 		"suite": suiteId,
 	}
-	index := "cases_suite"
 	if num != nil {
 		m["num"] = *num
-		index = "cases_suite_num"
 	}
 	var cases []Case
-	if err := r.findAllBy(index, m, &cases); err != nil {
+	if err := r.findAllBy("cases_suite_num", m, &cases); err != nil {
 		return nil, err
 	}
 	return cases, nil

@@ -17,7 +17,7 @@
       <slot name="tab" :item="item"></slot>
     </a>
     <a class="tab" href="#" v-if="more" @click="loadMore">
-      <p>Load 10 More</p>
+      <p>Load More</p>
     </a>
   </nav>
 </template>
