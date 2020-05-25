@@ -5,19 +5,14 @@ import (
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"os"
 )
 
-type IdGenerator func() string
-
-var DefaultIdGenerator = func() string {
-	return primitive.NewObjectID().Hex()
-}
-
 type buntRepo struct {
-	changes    chan Change
-	db         *buntdb.DB
-	generateId IdGenerator
+	changes      chan Change
+	db           *buntdb.DB
+	startedEmpty bool
+	generateId   IdGenerator
 
 	attachments AttachmentRepo
 	cases       CaseRepo
@@ -25,15 +20,21 @@ type buntRepo struct {
 	suites      SuiteRepo
 }
 
-func NewBuntRepos(filename string, generateId IdGenerator) (Repos, error) {
+func OpenBuntRepos(filename string, generateId IdGenerator) (Repos, error) {
+	if generateId == nil {
+		generateId = uniqueIdGenerator
+	}
+
+	_, dbStatErr := os.Stat(filename)
 	db, err := buntdb.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	r := &buntRepo{
-		changes:    make(chan Change),
-		db:         db,
-		generateId: generateId,
+		changes:      make(chan Change),
+		db:           db,
+		startedEmpty: os.IsNotExist(dbStatErr),
+		generateId:   generateId,
 	}
 	if r.attachments, err = r.newAttachmentRepo(); err != nil {
 		return nil, err
@@ -66,6 +67,10 @@ func (r *buntRepo) Logs() LogRepo {
 	return r.logs
 }
 
+func (r *buntRepo) StartedEmpty() bool {
+	return r.startedEmpty
+}
+
 func (r *buntRepo) Suites() SuiteRepo {
 	return r.suites
 }
@@ -78,19 +83,20 @@ func (r *buntRepo) Close() error {
 	return nil
 }
 
-func (r *buntRepo) save(e interface{}, collection Collection) (string, error) {
+func (r *buntRepo) save(coll Collection, e interface{}) (string, error) {
+	b, err := json.Marshal(&e)
+	if err != nil {
+		return "", err
+	}
+	v := string(b)
 	var id string
-	err := r.db.Update(func(tx *buntdb.Tx) error {
+	err = r.db.Update(func(tx *buntdb.Tx) error {
 		id = r.generateId()
-		b, err := json.Marshal(e)
+		v, err := sjson.Set(v, "id", id)
 		if err != nil {
 			return err
 		}
-		v, err := sjson.Set(string(b), "id", id)
-		if err != nil {
-			return err
-		}
-		_, _, err = tx.Set(string(collection)+":"+id, v, nil)
+		_, _, err = tx.Set(string(coll)+":"+id, v, nil)
 		if err != nil {
 			return err
 		}
@@ -99,9 +105,9 @@ func (r *buntRepo) save(e interface{}, collection Collection) (string, error) {
 			return err
 		}
 		r.changes <- Change{
-			Op:         ChangeOpInsert,
-			Collection: collection,
-			Payload:    payload,
+			Op:      ChangeOpInsert,
+			Coll:    coll,
+			Payload: payload,
 		}
 		return nil
 	})
@@ -111,9 +117,9 @@ func (r *buntRepo) save(e interface{}, collection Collection) (string, error) {
 	return id, nil
 }
 
-func (r *buntRepo) set(collection Collection, id string, m map[string]interface{}) error {
+func (r *buntRepo) set(coll Collection, id string, m map[string]interface{}) error {
+	k := string(coll) + ":" + id
 	return r.db.Update(func(tx *buntdb.Tx) error {
-		k := string(collection) + ":" + id
 		v, err := tx.Get(k)
 		if err != nil {
 			return err
@@ -134,31 +140,35 @@ func (r *buntRepo) set(collection Collection, id string, m map[string]interface{
 			return err
 		}
 		r.changes <- Change{
-			Op:         ChangeOpUpdate,
-			Collection: collection,
-			Payload:    payload,
+			Op:      ChangeOpUpdate,
+			Coll:    coll,
+			Payload: payload,
 		}
 		return nil
 	})
 }
 
-func (r *buntRepo) find(collection Collection, id string, e interface{}) error {
-	return r.db.View(func(tx *buntdb.Tx) error {
-		v, err := tx.Get(string(collection) + ":" + id)
-		if err != nil {
-			return err
-		}
-		return json.Unmarshal([]byte(v), e)
+func (r *buntRepo) find(coll Collection, id string, e interface{}) error {
+	k := string(coll) + ":" + id
+	var v string
+	err := r.db.View(func(tx *buntdb.Tx) error {
+		var err error
+		v, err = tx.Get(k)
+		return err
 	})
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(v), &e)
 }
 
 func (r *buntRepo) findAll(index string, includeDeleted bool, entities interface{}) error {
 	var values []string
+	iterator := func(k, v string) bool {
+		values = append(values, v)
+		return true
+	}
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		iterator := func(k, v string) bool {
-			values = append(values, v)
-			return true
-		}
 		if includeDeleted {
 			return tx.Ascend(index, iterator)
 		}
@@ -167,31 +177,32 @@ func (r *buntRepo) findAll(index string, includeDeleted bool, entities interface
 	if err != nil {
 		return err
 	}
-	return valuesToSlice(values, &entities)
+	return jsonValuesToArr(values, &entities)
 }
 
 func (r *buntRepo) findAllBy(index string, m map[string]interface{}, entities interface{}) error {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	pivot := string(b)
 	var values []string
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		iterator := func(k, v string) bool {
-			values = append(values, v)
-			return true
-		}
-		b, err := json.Marshal(m)
-		if err != nil {
-			return err
-		}
-		return tx.AscendEqual(index, string(b), iterator)
+	iterator := func(k, v string) bool {
+		values = append(values, v)
+		return true
+	}
+	err = r.db.View(func(tx *buntdb.Tx) error {
+		return tx.AscendEqual(index, pivot, iterator)
 	})
 	if err != nil {
 		return err
 	}
-	return valuesToSlice(values, &entities)
+	return jsonValuesToArr(values, &entities)
 }
 
-func (r *buntRepo) delete(collection Collection, id string, at int64) error {
+func (r *buntRepo) delete(coll Collection, id string, at int64) error {
 	return r.db.Update(func(tx *buntdb.Tx) error {
-		k := string(collection) + ":" + id
+		k := string(coll) + ":" + id
 		v, err := tx.Get(k)
 		if err != nil {
 			return err
@@ -210,21 +221,22 @@ func (r *buntRepo) delete(collection Collection, id string, at int64) error {
 			return err
 		}
 		r.changes <- Change{
-			Op:         ChangeOpUpdate,
-			Collection: collection,
-			Payload:    payload,
+			Op:      ChangeOpUpdate,
+			Coll:    coll,
+			Payload: payload,
 		}
 		return nil
 	})
 }
 
-func (r *buntRepo) deleteAll(collection Collection, index string, at int64) error {
+func (r *buntRepo) deleteAll(coll Collection, index string, at int64) error {
+	entries := make(map[string]string)
+	iterator := func(k, v string) bool {
+		entries[k] = v
+		return true
+	}
 	return r.db.Update(func(tx *buntdb.Tx) error {
-		entries := make(map[string]string)
-		err := tx.AscendEqual(index, `{"deleted":false}`, func(k, v string) bool {
-			entries[k] = v
-			return true
-		})
+		err := tx.AscendEqual(index, `{"deleted":false}`, iterator)
 		if err != nil {
 			return err
 		}
@@ -243,9 +255,9 @@ func (r *buntRepo) deleteAll(collection Collection, index string, at int64) erro
 				return err
 			}
 			r.changes <- Change{
-				Op:         ChangeOpUpdate,
-				Collection: collection,
-				Payload:    payload,
+				Op:      ChangeOpUpdate,
+				Coll:    coll,
+				Payload: payload,
 			}
 		}
 		return nil

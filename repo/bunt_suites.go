@@ -32,7 +32,7 @@ func (r *buntRepo) newSuiteRepo() (*buntSuiteRepo, error) {
 }
 
 func (r *buntSuiteRepo) Save(_ context.Context, s Suite) (string, error) {
-	return r.save(&s, SuiteCollection)
+	return r.save(SuiteCollection, &s)
 }
 
 func (r *buntSuiteRepo) SaveAttachment(_ context.Context, id string, attachmentId string) error {
@@ -49,28 +49,29 @@ func (r *buntSuiteRepo) SaveStatus(_ context.Context, id string, status SuiteSta
 }
 
 func (r *buntSuiteRepo) Page(_ context.Context, fromId *string, n int64, includeDeleted bool) (*SuitePage, error) {
+	index := "suites_id"
 	var running int64
 	var finished int64
 	var nextId *string
 	values := make([]string, 0)
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		iterator := func(k, v string) bool {
-			id := gjson.Get(v, "id").String()
-			if int64(len(values)) == n {
-				nextId = &id
-				return false
-			}
-			if includeDeleted || !gjson.Get(v, "deleted").Bool() {
-				values = append(values, v)
-			}
-			return true
+	iterator := func(k, v string) bool {
+		id := gjson.Get(v, "id").String()
+		if int64(len(values)) == n {
+			nextId = &id
+			return false
 		}
+		if includeDeleted || !gjson.Get(v, "deleted").Bool() {
+			values = append(values, v)
+		}
+		return true
+	}
+	err := r.db.View(func(tx *buntdb.Tx) error {
 		var err error
 		if fromId == nil {
-			err = tx.Descend("suites_id", iterator)
+			err = tx.Descend(index, iterator)
 		} else {
 			escapedFromId := strconv.Quote(*fromId)
-			err = tx.DescendLessOrEqual("suites_id", `{"id":`+escapedFromId+`}`, iterator)
+			err = tx.DescendLessOrEqual(index, `{"id":`+escapedFromId+`}`, iterator)
 		}
 		if err != nil {
 			return err
@@ -95,7 +96,7 @@ func (r *buntSuiteRepo) Page(_ context.Context, fromId *string, n int64, include
 		return nil, err
 	}
 	var suites []Suite
-	if err := valuesToSlice(values, &suites); err != nil {
+	if err := jsonValuesToArr(values, &suites); err != nil {
 		return nil, err
 	}
 	return &SuitePage{
@@ -133,18 +134,18 @@ func (r *buntSuiteRepo) FuzzyFind(_ context.Context, fuzzyIdOrName string, inclu
 		return nil, err
 	}
 	var suites []Suite
-	if err := valuesToSlice(values, &suites); err != nil {
+	if err := jsonValuesToArr(values, &suites); err != nil {
 		return nil, err
 	}
 	return suites, nil
 }
 
 func (r *buntSuiteRepo) FindAll(_ context.Context, includeDeleted bool) ([]Suite, error) {
-	var suites []Suite
 	index := "suites_deleted"
 	if includeDeleted {
 		index = "suites_id"
 	}
+	var suites []Suite
 	if err := r.findAll(index, includeDeleted, &suites); err != nil {
 		return nil, err
 	}
@@ -160,8 +161,10 @@ func (r *buntSuiteRepo) DeleteAll(_ context.Context, at int64) error {
 }
 
 func (r *buntSuiteRepo) count(tx *buntdb.Tx, index, k, v string) (int64, error) {
+	k = strconv.Quote(k)
+	v = strconv.Quote(v)
 	var n int64
-	err := tx.AscendEqual(index, `{"`+k+`":"`+v+`"}`, func(k, v string) bool {
+	err := tx.AscendEqual(index, `{`+k+`:`+v+`}`, func(k, v string) bool {
 		n++
 		return true
 	})

@@ -28,19 +28,19 @@ type Config struct {
 			MaxSizeMb   int    `json:"max_size_mb" validate:"min=-1"`
 		} `json:"attachments"`
 
-		Bunt *struct {
+		BuntDb *struct {
 			File string `json:"file" validate:"required"`
-		} `json:"bunt" validate:"required_without_all=Mongo"`
+		} `json:"buntdb" validate:"required_without_all=MongoDb"`
 
-		Mongo *struct {
+		MongoDb *struct {
 			Host     string `json:"host" validate:"required"`
 			Port     uint16 `json:"port"`
 			Rs       string `json:"rs" validate:"required"`
 			Db       string `json:"db" validate:"required"`
 			User     string `json:"user" validate:"required"`
 			PassFile string `json:"pass_file" validate:"required,file"`
-		} `json:"mongo" validate:"required_without_all=Bunt"`
-	} `json:"storage" validate:"dive"`
+		} `json:"mongodb" validate:"required_without_all=BuntDb"`
+	} `json:"storage"`
 }
 
 var validate = validator.New()

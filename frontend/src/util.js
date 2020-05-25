@@ -4,9 +4,8 @@
  * @param {int} millis
  * @returns {string}
  */
-export function formatTime(millis) {
-  const date = new Date(millis);
-  const opts = {
+export function formatUnix(millis) {
+  return new Date(millis).toLocaleString(navigator.languages, {
     weekday: 'short',
     year: 'numeric',
     month: 'short',
@@ -14,6 +13,5 @@ export function formatTime(millis) {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-  };
-  return date.toLocaleString(navigator.languages, opts);
+  });
 }

@@ -32,7 +32,7 @@
 
 <script>
   import {fetchSuites} from './suites';
-  import {formatTime} from './util';
+  import {formatUnix} from './util';
   import TabNav from './components/TabNav';
   import {fetchCases} from './cases';
 
@@ -68,7 +68,7 @@
       },
     },
     methods: {
-      formatTime,
+      formatTime: formatUnix,
       openCase(c) {
         console.log('TODO');
       },

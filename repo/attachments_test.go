@@ -2,9 +2,7 @@ package repo
 
 import (
 	"context"
-	"io/ioutil"
-	"os"
-	"path/filepath"
+	util "github.com/tmazeika/testpass/internal"
 	"strconv"
 	"testing"
 )
@@ -47,62 +45,17 @@ var testAttachments = []Attachment{
 	},
 }
 
-func TestBuntRepo(t *testing.T) {
-	dir, err := ioutil.TempDir("", "data")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Fatal(err)
-		}
-	}()
-	i := 0
-	repos, err := NewBuntRepos(filepath.Join(dir, "bunt.db"), func() string {
-		i++
-		return strconv.Itoa(i)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := repos.Close(); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	go func() {
-		for {
-			if _, ok := <-repos.Changes(); !ok {
-				break
-			}
-			// ignore changes
-		}
-	}()
-
-	t.Run("Attachments", func(t *testing.T) {
-		attachments := repos.Attachments()
-
-		t.Run("Save_Find", attachmentsSaveFind(attachments))
-		t.Run("Find*_Delete*", attachmentsFindDelete(attachments))
-	})
-}
-
 func attachmentsSaveFind(repo AttachmentRepo) func(*testing.T) {
 	return func(t *testing.T) {
 		for i, expected := range testAttachments {
 			id, err := repo.Save(context.Background(), expected)
-			if err != nil {
-				t.Fatal(err)
-			}
+			util.RequireNil(t, err)
 			if id != strconv.Itoa(i+1) {
-				t.Errorf("got %q, want %d", id, i+1)
+				t.Errorf("got %q, want %q", id, i+1)
 			}
 
 			actual, err := repo.Find(context.Background(), id)
-			if err != nil {
-				t.Fatal(err)
-			}
+			util.RequireNil(t, err)
 			if actual.Id != id {
 				t.Errorf("got %q, want %q", actual.Id, id)
 			}
@@ -114,12 +67,10 @@ func attachmentsSaveFind(repo AttachmentRepo) func(*testing.T) {
 func attachmentsFindDelete(repo AttachmentRepo) func(*testing.T) {
 	return func(t *testing.T) {
 		attachments, err := repo.FindAll(context.Background(), true)
-		if err != nil {
-			t.Fatal(err)
-		}
+		util.RequireNil(t, err)
 
 		if len(attachments) != len(testAttachments) {
-			t.Errorf("got %d attachments, want %d attachments",
+			t.Errorf("got %d attachments, want %d",
 				len(attachments), len(testAttachments))
 		}
 		for i, expected := range testAttachments {
@@ -127,16 +78,14 @@ func attachmentsFindDelete(repo AttachmentRepo) func(*testing.T) {
 			assertAttachmentEquals(t, &actual, &expected)
 		}
 
-		deletedAt := int64(1590186181968)
-		if err := repo.Delete(context.Background(), attachments[1].Id, deletedAt); err != nil {
-			t.Fatal(err)
-		}
+		const deletedAt = 100
+		util.RequireNil(t,
+			repo.Delete(context.Background(), attachments[1].Id, deletedAt))
 		attachments, err = repo.FindAll(context.Background(), true)
-		if err != nil {
-			t.Fatal(err)
-		}
+		util.RequireNil(t, err)
+
 		if len(attachments) != len(testAttachments) {
-			t.Errorf("got %d attachments, want %d attachments",
+			t.Errorf("got %d attachments, want %d",
 				len(attachments), len(testAttachments))
 		}
 		for i, expected := range testAttachments {
@@ -148,30 +97,41 @@ func attachmentsFindDelete(repo AttachmentRepo) func(*testing.T) {
 			assertAttachmentEquals(t, &actual, &expected)
 		}
 
-		if err := repo.DeleteAll(context.Background(), deletedAt); err != nil {
-			t.Fatal(err)
-		}
+		const deletedAt2 = 200
+		util.RequireNil(t,
+			repo.DeleteAll(context.Background(), deletedAt2))
 		attachments, err = repo.FindAll(context.Background(), true)
-		if err != nil {
-			t.Fatal(err)
-		}
+		util.RequireNil(t, err)
 		if len(attachments) != len(testAttachments) {
-			t.Errorf("got %d attachments, want %d attachments",
+			t.Errorf("got %d attachments, want %d",
 				len(attachments), len(testAttachments))
 		}
 		for i, expected := range testAttachments {
-			if !expected.Deleted {
-				expected.Deleted = true
+			if i == 1 {
 				expected.DeletedAt = deletedAt
+			} else if !expected.Deleted {
+				expected.DeletedAt = deletedAt2
 			}
+			expected.Deleted = true
+
 			actual := attachments[i]
 			assertAttachmentEquals(t, &actual, &expected)
 
 			actual2, err := repo.Find(context.Background(), actual.Id)
-			if err != nil {
-				t.Fatal(err)
-			}
+			util.RequireNil(t, err)
 			assertAttachmentEquals(t, actual2, &expected)
+		}
+	}
+}
+
+func attachmentsFindAll(repo AttachmentRepo) func(*testing.T) {
+	return func(t *testing.T) {
+		attachments, err := repo.FindAll(context.Background(), false)
+		util.RequireNil(t, err)
+
+		if len(attachments) != 0 {
+			t.Errorf("got %d attachments, want %d",
+				len(attachments), 0)
 		}
 	}
 }

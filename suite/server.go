@@ -9,15 +9,15 @@ import (
 
 type Server struct {
 	wg sync.WaitGroup
-	l  net.Listener
+	ln net.Listener
 }
 
 func Serve(addr string) (*Server, error) {
-	l, err := net.Listen("tcp", addr)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{l: l}
+	s := &Server{ln: ln}
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
@@ -29,7 +29,7 @@ func Serve(addr string) (*Server, error) {
 }
 
 func (s *Server) Close() error {
-	if err := s.l.Close(); err != nil {
+	if err := s.ln.Close(); err != nil {
 		return err
 	}
 	s.wg.Wait()
@@ -42,7 +42,7 @@ func (s *Server) listen() error {
 	var err error
 	for {
 		var conn net.Conn
-		conn, err = s.l.Accept()
+		conn, err = s.ln.Accept()
 		if err != nil {
 			break
 		}

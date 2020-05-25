@@ -51,14 +51,15 @@ func main() {
 	switch *dbFlag {
 	case "bunt":
 		log.Println("Using BuntDB")
-		repos, err = repo.NewBuntRepos(cfg.Storage.Bunt.File, repo.DefaultIdGenerator)
-		if err != nil {
-			log.Fatalf("create BuntDB repos: %v\n", err)
-		}
+		repos, err = repo.OpenBuntRepos(cfg.Storage.BuntDb.File, nil)
 	case "mongo":
+		// TODO
 		log.Fatalln("MongoDB not yet implemented")
 	default:
 		log.Fatalf("unknown db %q\n", *dbFlag)
+	}
+	if err != nil {
+		log.Fatalf("open repos: %v\n", err)
 	}
 	defer func() {
 		if err := repos.Close(); err != nil {
@@ -67,9 +68,13 @@ func main() {
 	}()
 
 	if *seedFlag {
-		log.Println("Seeding DB...")
-		if err := seed.Seed(repos); err != nil {
-			log.Fatalln(err)
+		if repos.StartedEmpty() {
+			log.Println("Seeding DB...")
+			if err := seed.Seed(repos); err != nil {
+				log.Fatalln(err)
+			}
+		} else {
+			log.Println("Not seeding non-empty DB")
 		}
 	}
 
@@ -89,21 +94,28 @@ func listenHttp(cfg *config.Config, repos repo.Repos) {
 		<-sigint
 		log.Println("Shutting down...")
 
-		ctx, _ := context.WithTimeout(context.Background(), cfg.Http.ShutdownTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Http.ShutdownTimeout)
+		defer cancel()
 		if err := srv.Shutdown(ctx); err != nil {
 			log.Printf("shutdown http: %v\n", err)
 		}
 		close(done)
 	}()
 
-	log.Println("Binding to", srv.Addr)
+	ln, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		log.Fatalf("listen http: %v\n", err)
+	}
+	defer ln.Close()
+
+	log.Println("Bound to", ln.Addr())
 	srv.RegisterOnShutdown(func() {
 		log.Println("Cleaned up")
 	})
 
-	err := srv.ListenAndServeTLS(cfg.Http.TlsCertFile, cfg.Http.TlsKeyFile)
+	err = srv.ServeTLS(ln, cfg.Http.TlsCertFile, cfg.Http.TlsKeyFile)
 	if err != http.ErrServerClosed {
-		log.Fatalf("listen http: %v\n", err)
+		log.Fatalf("serve http: %v\n", err)
 	}
 	<-done
 }

@@ -24,7 +24,7 @@ func (r *buntRepo) newAttachmentRepo() (*buntAttachmentRepo, error) {
 }
 
 func (r *buntAttachmentRepo) Save(_ context.Context, a Attachment) (string, error) {
-	return r.save(&a, AttachmentCollection)
+	return r.save(AttachmentCollection, &a)
 }
 
 func (r *buntAttachmentRepo) Find(_ context.Context, id string) (*Attachment, error) {

@@ -8,7 +8,7 @@ const (
 )
 
 type Change struct {
-	Op         ChangeOp
-	Collection Collection
-	Payload    interface{}
+	Op      ChangeOp
+	Coll    Collection
+	Payload interface{}
 }

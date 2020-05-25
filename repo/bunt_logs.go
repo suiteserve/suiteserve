@@ -11,7 +11,10 @@ type buntLogRepo struct {
 
 func (r *buntRepo) newLogRepo() (*buntLogRepo, error) {
 	err := r.db.ReplaceIndex("logs_case", "logs:*",
-		buntdb.IndexJSON("case"), indexJSONOptional("timestamp"), indexJSONOptional("seq"))
+		buntdb.IndexJSON("case"),
+		indexJSONOptional("timestamp"),
+		indexJSONOptional("seq"),
+		indexJSONOptional("id"))
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +22,7 @@ func (r *buntRepo) newLogRepo() (*buntLogRepo, error) {
 }
 
 func (r *buntLogRepo) Save(_ context.Context, e LogEntry) (string, error) {
-	return r.save(&e, LogCollection)
+	return r.save(LogCollection, &e)
 }
 
 func (r *buntLogRepo) Find(_ context.Context, id string) (*LogEntry, error) {

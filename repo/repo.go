@@ -2,8 +2,10 @@ package repo
 
 import (
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"strconv"
 	"strings"
-	"time"
+	"sync/atomic"
 )
 
 type Collection string
@@ -21,6 +23,7 @@ type Repos interface {
 	Changes() <-chan Change
 	Logs() LogRepo
 	Suites() SuiteRepo
+	StartedEmpty() bool
 	Close() error
 }
 
@@ -34,14 +37,20 @@ type SoftDeleteEntity struct {
 	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
 }
 
-func valuesToSlice(values []string, slice interface{}) error {
-	v := "[" + strings.Join(values, ",") + "]"
-	return json.Unmarshal([]byte(v), slice)
-}
+type IdGenerator func() string
 
-func nowTimeMillis() int64 {
-	now := time.Now()
-	// Doesn't use now.UnixNano() to avoid Y2K262.
-	return now.Unix()*time.Second.Milliseconds() +
-		time.Duration(now.Nanosecond()).Milliseconds()
+var (
+	IncIntIdGenerator = func() string {
+		return strconv.FormatInt(atomic.AddInt64(&incIntId, 1), 10)
+	}
+
+	incIntId          int64 = 0
+	uniqueIdGenerator       = func() string {
+		return primitive.NewObjectID().Hex()
+	}
+)
+
+func jsonValuesToArr(values []string, arr interface{}) error {
+	v := "[" + strings.Join(values, ",") + "]"
+	return json.Unmarshal([]byte(v), &arr)
 }

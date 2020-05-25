@@ -13,7 +13,8 @@ func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
 	err := r.db.ReplaceIndex("cases_suite", "cases:*",
 		buntdb.IndexJSON("suite"),
 		buntdb.Desc(indexJSONOptional("num")),
-		buntdb.Desc(indexJSONOptional("created_at")))
+		buntdb.Desc(indexJSONOptional("created_at")),
+		buntdb.Desc(indexJSONOptional("id")))
 	if err != nil {
 		return nil, err
 	}
@@ -21,7 +22,7 @@ func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
 }
 
 func (r *buntCaseRepo) Save(_ context.Context, c Case) (string, error) {
-	return r.save(&c, CaseCollection)
+	return r.save(CaseCollection, &c)
 }
 
 func (r *buntCaseRepo) SaveAttachment(_ context.Context, id string, attachmentId string) error {
