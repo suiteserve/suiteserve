@@ -21,18 +21,18 @@ func (r *buntRepo) newCaseRepo() (*buntCaseRepo, error) {
 	return &buntCaseRepo{r}, nil
 }
 
-func (r *buntCaseRepo) Save(_ context.Context, c Case) (string, error) {
-	return r.save(CaseCollection, &c)
+func (r *buntCaseRepo) Save(_ context.Context, c UnsavedCase) (string, error) {
+	return r.save(CaseColl, &c)
 }
 
 func (r *buntCaseRepo) SaveAttachment(_ context.Context, id string, attachmentId string) error {
-	return r.set(CaseCollection, id, map[string]interface{}{
+	return r.set(CaseColl, id, map[string]interface{}{
 		"attachments.-1": attachmentId,
 	})
 }
 
 func (r *buntCaseRepo) SaveStatus(_ context.Context, id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error {
-	return r.set(CaseCollection, id, map[string]interface{}{
+	return r.set(CaseColl, id, map[string]interface{}{
 		"status":      status,
 		"flaky":       opts.flaky,
 		"started_at":  opts.startedAt,
@@ -42,7 +42,7 @@ func (r *buntCaseRepo) SaveStatus(_ context.Context, id string, status CaseStatu
 
 func (r *buntCaseRepo) Find(_ context.Context, id string) (*Case, error) {
 	var c Case
-	if err := r.find(CaseCollection, id, &c); err != nil {
+	if err := r.find(CaseColl, id, &c); err != nil {
 		return nil, err
 	}
 	return &c, nil

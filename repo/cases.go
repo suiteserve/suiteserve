@@ -30,8 +30,7 @@ type CaseArg struct {
 	Value interface{} `json:"value"`
 }
 
-type Case struct {
-	Entity      `bson:",inline"`
+type UnsavedCase struct {
 	Suite       string     `json:"suite"`
 	Name        string     `json:"name"`
 	Description string     `json:"description,omitempty" bson:",omitempty"`
@@ -45,6 +44,11 @@ type Case struct {
 	CreatedAt   int64      `json:"created_at" bson:"created_at"`
 	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty"`
 	FinishedAt  int64      `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+}
+
+type Case struct {
+	SavedEntity `bson:",inline"`
+	UnsavedCase `bson:",inline"`
 }
 
 type CaseRepoSaveStatusOptions struct {
@@ -66,7 +70,7 @@ func (o *CaseRepoSaveStatusOptions) FinishedAt(finishedAt int64) {
 }
 
 type CaseRepo interface {
-	Save(ctx context.Context, c Case) (string, error)
+	Save(ctx context.Context, c UnsavedCase) (string, error)
 	SaveAttachment(ctx context.Context, id string, attachmentId string) error
 	SaveStatus(ctx context.Context, id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error
 	Find(ctx context.Context, id string) (*Case, error)

@@ -20,7 +20,7 @@ type buntRepo struct {
 	suites      SuiteRepo
 }
 
-func OpenBuntRepos(filename string, generateId IdGenerator) (Repos, error) {
+func OpenBuntRepos(filename, attachmentsPattern string, generateId IdGenerator) (Repos, error) {
 	if generateId == nil {
 		generateId = uniqueIdGenerator
 	}
@@ -36,16 +36,20 @@ func OpenBuntRepos(filename string, generateId IdGenerator) (Repos, error) {
 		startedEmpty: os.IsNotExist(dbStatErr),
 		generateId:   generateId,
 	}
-	if r.attachments, err = r.newAttachmentRepo(); err != nil {
+	r.attachments, err = r.newAttachmentRepo(newFileRepo(attachmentsPattern))
+	if err != nil {
 		return nil, err
 	}
-	if r.cases, err = r.newCaseRepo(); err != nil {
+	r.cases, err = r.newCaseRepo()
+	if err != nil {
 		return nil, err
 	}
-	if r.logs, err = r.newLogRepo(); err != nil {
+	r.logs, err = r.newLogRepo()
+	if err != nil {
 		return nil, err
 	}
-	if r.suites, err = r.newSuiteRepo(); err != nil {
+	r.suites, err = r.newSuiteRepo()
+	if err != nil {
 		return nil, err
 	}
 	return r, nil
@@ -84,15 +88,23 @@ func (r *buntRepo) Close() error {
 }
 
 func (r *buntRepo) save(coll Collection, e interface{}) (string, error) {
-	b, err := json.Marshal(&e)
-	if err != nil {
-		return "", err
-	}
-	v := string(b)
+	return r.funcSave(coll, e, func(string) error {
+		return nil
+	})
+}
+
+func (r *buntRepo) funcSave(coll Collection, e interface{}, fn func(id string) error) (string, error) {
 	var id string
-	err = r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		id = r.generateId()
-		v, err := sjson.Set(v, "id", id)
+		if err := fn(id); err != nil {
+			return err
+		}
+		b, err := json.Marshal(&e)
+		if err != nil {
+			return err
+		}
+		v, err := sjson.Set(string(b), "id", id)
 		if err != nil {
 			return err
 		}
@@ -100,15 +112,11 @@ func (r *buntRepo) save(coll Collection, e interface{}) (string, error) {
 		if err != nil {
 			return err
 		}
-		var payload interface{}
-		if err := json.Unmarshal([]byte(v), &payload); err != nil {
+		change, err := newChangeFromJson(ChangeOpInsert, coll, v)
+		if err != nil {
 			return err
 		}
-		r.changes <- Change{
-			Op:      ChangeOpInsert,
-			Coll:    coll,
-			Payload: payload,
-		}
+		r.changes <- *change
 		return nil
 	})
 	if err != nil {
@@ -135,25 +143,20 @@ func (r *buntRepo) set(coll Collection, id string, m map[string]interface{}) err
 		if _, _, err = tx.Set(k, v, nil); err != nil {
 			return err
 		}
-		var payload interface{}
-		if err := json.Unmarshal([]byte(v), &payload); err != nil {
+		change, err := newChangeFromJson(ChangeOpUpdate, coll, v)
+		if err != nil {
 			return err
 		}
-		r.changes <- Change{
-			Op:      ChangeOpUpdate,
-			Coll:    coll,
-			Payload: payload,
-		}
+		r.changes <- *change
 		return nil
 	})
 }
 
 func (r *buntRepo) find(coll Collection, id string, e interface{}) error {
-	k := string(coll) + ":" + id
 	var v string
 	err := r.db.View(func(tx *buntdb.Tx) error {
 		var err error
-		v, err = tx.Get(k)
+		v, err = tx.Get(string(coll) + ":" + id)
 		return err
 	})
 	if err != nil {
@@ -186,6 +189,7 @@ func (r *buntRepo) findAllBy(index string, m map[string]interface{}, entities in
 		return err
 	}
 	pivot := string(b)
+
 	var values []string
 	iterator := func(k, v string) bool {
 		values = append(values, v)
@@ -201,8 +205,8 @@ func (r *buntRepo) findAllBy(index string, m map[string]interface{}, entities in
 }
 
 func (r *buntRepo) delete(coll Collection, id string, at int64) error {
+	k := string(coll) + ":" + id
 	return r.db.Update(func(tx *buntdb.Tx) error {
-		k := string(coll) + ":" + id
 		v, err := tx.Get(k)
 		if err != nil {
 			return err
@@ -216,26 +220,24 @@ func (r *buntRepo) delete(coll Collection, id string, at int64) error {
 		if _, _, err := tx.Set(k, v, nil); err != nil {
 			return err
 		}
-		var payload interface{}
-		if err := json.Unmarshal([]byte(v), &payload); err != nil {
+		change, err := newChangeFromJson(ChangeOpUpdate, coll, v)
+		if err != nil {
 			return err
 		}
-		r.changes <- Change{
-			Op:      ChangeOpUpdate,
-			Coll:    coll,
-			Payload: payload,
-		}
+		r.changes <- *change
 		return nil
 	})
 }
 
-func (r *buntRepo) deleteAll(coll Collection, index string, at int64) error {
+func (r *buntRepo) deleteAll(coll Collection, index string, at int64) ([]string, error) {
 	entries := make(map[string]string)
+	ids := make([]string, 0)
 	iterator := func(k, v string) bool {
 		entries[k] = v
+		ids = append(ids, gjson.Get(v, "id").String())
 		return true
 	}
-	return r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		err := tx.AscendEqual(index, `{"deleted":false}`, iterator)
 		if err != nil {
 			return err
@@ -250,18 +252,18 @@ func (r *buntRepo) deleteAll(coll Collection, index string, at int64) error {
 			if _, _, err := tx.Set(k, v, nil); err != nil {
 				return err
 			}
-			var payload interface{}
-			if err := json.Unmarshal([]byte(v), &payload); err != nil {
+			change, err := newChangeFromJson(ChangeOpUpdate, coll, v)
+			if err != nil {
 				return err
 			}
-			r.changes <- Change{
-				Op:      ChangeOpUpdate,
-				Coll:    coll,
-				Payload: payload,
-			}
+			r.changes <- *change
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func indexJSONOptional(path string) func(a, b string) bool {

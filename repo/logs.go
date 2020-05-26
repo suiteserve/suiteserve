@@ -12,8 +12,7 @@ const (
 	LogLevelTypeError LogLevelType = "error"
 )
 
-type LogEntry struct {
-	Entity    `bson:",inline"`
+type UnsavedLogEntry struct {
 	Case      string       `json:"case"`
 	Index     int64        `json:"index"`
 	Level     LogLevelType `json:"level"`
@@ -22,8 +21,13 @@ type LogEntry struct {
 	Timestamp int64        `json:"timestamp"`
 }
 
+type LogEntry struct {
+	SavedEntity     `bson:",inline"`
+	UnsavedLogEntry `bson:",inline"`
+}
+
 type LogRepo interface {
-	Save(ctx context.Context, e LogEntry) (string, error)
+	Save(ctx context.Context, e UnsavedLogEntry) (string, error)
 	Find(ctx context.Context, id string) (*LogEntry, error)
 	FindAllByCase(ctx context.Context, caseId string) ([]LogEntry, error)
 }

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-type event interface {}
+type event interface{}
 
 type eventBus struct {
 	sync.RWMutex
@@ -91,7 +91,7 @@ func (s *srv) eventsHandler(res http.ResponseWriter, req *http.Request) {
 		case err := <-doneCh:
 			writeErr := conn.WriteControl(websocket.CloseMessage,
 				websocket.FormatCloseMessage(err.Code, err.Text),
-				time.Now().Add(timeout))
+				time.Now().Add(10*time.Second))
 			if writeErr != nil {
 				log.Printf("write control to ws: %v\n", writeErr)
 			}

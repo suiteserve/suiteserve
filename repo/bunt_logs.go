@@ -21,13 +21,13 @@ func (r *buntRepo) newLogRepo() (*buntLogRepo, error) {
 	return &buntLogRepo{r}, nil
 }
 
-func (r *buntLogRepo) Save(_ context.Context, e LogEntry) (string, error) {
-	return r.save(LogCollection, &e)
+func (r *buntLogRepo) Save(_ context.Context, e UnsavedLogEntry) (string, error) {
+	return r.save(LogColl, &e)
 }
 
 func (r *buntLogRepo) Find(_ context.Context, id string) (*LogEntry, error) {
 	var e LogEntry
-	if err := r.find(LogCollection, id, &e); err != nil {
+	if err := r.find(LogColl, id, &e); err != nil {
 		return nil, err
 	}
 	return &e, nil

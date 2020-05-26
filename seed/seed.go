@@ -5,6 +5,7 @@ import (
 	"github.com/tmazeika/testpass/repo"
 	"math/rand"
 	"strconv"
+	"strings"
 )
 
 func Seed(repos repo.Repos) error {
@@ -20,16 +21,20 @@ func Seed(repos repo.Repos) error {
 	}()
 
 	for i := 0; i < 50; i++ {
-		_, err := repos.Attachments().Save(context.Background(), repo.Attachment{
+		_, err := repos.Attachments().Save(context.Background(), repo.UnsavedAttachmentInfo{
 			Filename: "attachment" + strconv.Itoa(i),
-			Size:     rnd.Int63n(1000000),
 			ContentType: randStr(rnd, []string{
 				"application/json",
 				"image/jpeg",
 				"image/png",
 				"text/plain; charset=utf-8",
 			}),
-		})
+		}, strings.NewReader(randStr(rnd, []string{
+			"Hello, world! I'm some plain text.\nI'm on another line...",
+			`This is a plain text file.`,
+			`{"x": 3, "y": 5}`,
+			`I'm a 🐸 lol`,
+		})))
 		if err != nil {
 			return err
 		}
@@ -42,7 +47,7 @@ func Seed(repos repo.Repos) error {
 			"all",
 			"fast",
 		}
-		suiteId, err := repos.Suites().Save(context.Background(), repo.Suite{
+		suiteId, err := repos.Suites().Save(context.Background(), repo.UnsavedSuite{
 			Name: "A Suite " + strconv.Itoa(i),
 			FailureTypes: []repo.SuiteFailureType{
 				{
@@ -77,14 +82,14 @@ func Seed(repos repo.Repos) error {
 			return err
 		}
 
-		caseCount := int(rnd.NormFloat64()*17+26)
+		caseCount := int(rnd.NormFloat64()*17 + 26)
 		for j := 0; j < caseCount; j++ {
 			seedDescriptions := []string{
 				"This is my test case.",
 				"There are many like it.",
 				"But this one is mine!",
 			}
-			caseId, err := repos.Cases().Save(context.Background(), repo.Case{
+			caseId, err := repos.Cases().Save(context.Background(), repo.UnsavedCase{
 				Suite:       suiteId,
 				Name:        "A Case " + strconv.Itoa(j),
 				Description: randStr(rnd, seedDescriptions),
@@ -152,7 +157,7 @@ func Seed(repos repo.Repos) error {
 			}
 
 			for k := 0; k < rnd.Intn(50); k++ {
-				_, err := repos.Logs().Save(context.Background(), repo.LogEntry{
+				_, err := repos.Logs().Save(context.Background(), repo.UnsavedLogEntry{
 					Case:  caseId,
 					Index: int64(k) % 40,
 					Level: randLogLevelType(rnd),

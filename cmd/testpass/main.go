@@ -51,7 +51,8 @@ func main() {
 	switch *dbFlag {
 	case "bunt":
 		log.Println("Using BuntDB")
-		repos, err = repo.OpenBuntRepos(cfg.Storage.BuntDb.File, nil)
+		repos, err = repo.OpenBuntRepos(cfg.Storage.BuntDb.File,
+			cfg.Storage.Attachments.FilePattern, nil)
 	case "mongo":
 		// TODO
 		log.Fatalln("MongoDB not yet implemented")
@@ -84,7 +85,7 @@ func main() {
 func listenHttp(cfg *config.Config, repos repo.Repos) {
 	srv := http.Server{
 		Addr:    net.JoinHostPort(cfg.Http.Host, strconv.Itoa(int(cfg.Http.Port))),
-		Handler: rest.Handler(repos),
+		Handler: rest.Handler(repos, cfg.Http.PublicDir),
 	}
 	done := make(chan interface{})
 

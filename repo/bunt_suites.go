@@ -31,18 +31,18 @@ func (r *buntRepo) newSuiteRepo() (*buntSuiteRepo, error) {
 	return &buntSuiteRepo{r}, nil
 }
 
-func (r *buntSuiteRepo) Save(_ context.Context, s Suite) (string, error) {
-	return r.save(SuiteCollection, &s)
+func (r *buntSuiteRepo) Save(_ context.Context, s UnsavedSuite) (string, error) {
+	return r.save(SuiteColl, &s)
 }
 
 func (r *buntSuiteRepo) SaveAttachment(_ context.Context, id string, attachmentId string) error {
-	return r.set(CaseCollection, id, map[string]interface{}{
+	return r.set(CaseColl, id, map[string]interface{}{
 		"attachments.-1": attachmentId,
 	})
 }
 
 func (r *buntSuiteRepo) SaveStatus(_ context.Context, id string, status SuiteStatus, finishedAt *int64) error {
-	return r.set(SuiteCollection, id, map[string]interface{}{
+	return r.set(SuiteColl, id, map[string]interface{}{
 		"status":      status,
 		"finished_at": finishedAt,
 	})
@@ -109,7 +109,7 @@ func (r *buntSuiteRepo) Page(_ context.Context, fromId *string, n int64, include
 
 func (r *buntSuiteRepo) Find(_ context.Context, id string) (*Suite, error) {
 	var s Suite
-	if err := r.find(SuiteCollection, id, &s); err != nil {
+	if err := r.find(SuiteColl, id, &s); err != nil {
 		return nil, err
 	}
 	return &s, nil
@@ -153,11 +153,12 @@ func (r *buntSuiteRepo) FindAll(_ context.Context, includeDeleted bool) ([]Suite
 }
 
 func (r *buntSuiteRepo) Delete(_ context.Context, id string, at int64) error {
-	return r.delete(SuiteCollection, id, at)
+	return r.delete(SuiteColl, id, at)
 }
 
 func (r *buntSuiteRepo) DeleteAll(_ context.Context, at int64) error {
-	return r.deleteAll(SuiteCollection, "suites_deleted", at)
+	_, err := r.deleteAll(SuiteColl, "suites_deleted", at)
+	return err
 }
 
 func (r *buntSuiteRepo) count(tx *buntdb.Tx, index, k, v string) (int64, error) {

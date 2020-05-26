@@ -11,10 +11,10 @@ import (
 type Collection string
 
 const (
-	AttachmentCollection Collection = "attachments"
-	CaseCollection       Collection = "cases"
-	LogCollection        Collection = "logs"
-	SuiteCollection      Collection = "suites"
+	AttachmentColl Collection = "attachments"
+	CaseColl       Collection = "cases"
+	LogColl        Collection = "logs"
+	SuiteColl      Collection = "suites"
 )
 
 type Repos interface {
@@ -27,12 +27,11 @@ type Repos interface {
 	Close() error
 }
 
-type Entity struct {
+type SavedEntity struct {
 	Id string `json:"id" bson:"_id,omitempty"`
 }
 
 type SoftDeleteEntity struct {
-	Entity    `bson:",inline"`
 	Deleted   bool  `json:"deleted"`
 	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
 }

@@ -1,7 +1,8 @@
-package repo
+package repotest
 
 import (
 	util "github.com/tmazeika/testpass/internal"
+	"github.com/tmazeika/testpass/repo"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,7 +11,7 @@ import (
 	"time"
 )
 
-const changeTimeout = 5 * time.Second
+const changeTimeout = 3 * time.Second
 
 func TestRepo(t *testing.T) {
 	dir, err := ioutil.TempDir("", "")
@@ -19,26 +20,27 @@ func TestRepo(t *testing.T) {
 		util.RequireNil(t, os.RemoveAll(dir))
 	}()
 
-	repoTests := func(t *testing.T, repos Repos) {
+	repoTests := func(t *testing.T, repos repo.Repos) {
 		t.Run("Attachments", func(t *testing.T) {
 			t.Run("Save_Find", countChangesTest(
 				repos.Changes(),
 				attachmentsSaveFind(repos.Attachments()),
-				ChangeOpInsert,
-				AttachmentCollection,
+				repo.ChangeOpInsert,
+				repo.AttachmentColl,
 				len(testAttachments)))
 			t.Run("Find*_Delete*", countChangesTest(
 				repos.Changes(),
 				attachmentsFindDelete(repos.Attachments()),
-				ChangeOpUpdate,
-				AttachmentCollection,
+				repo.ChangeOpUpdate,
+				repo.AttachmentColl,
 				3))
 			t.Run("FindAll", attachmentsFindAll(repos.Attachments()))
 		})
 	}
 
 	t.Run("BuntDB", func(t *testing.T) {
-		repos, err := OpenBuntRepos(filepath.Join(dir, "bunt.db"), IncIntIdGenerator)
+		repos, err := repo.OpenBuntRepos(filepath.Join(dir, "bunt.db"),
+			filepath.Join(dir, "*.attachment"), repo.IncIntIdGenerator)
 		util.RequireNil(t, err)
 		defer func() {
 			util.RequireNil(t, repos.Close())
@@ -47,11 +49,10 @@ func TestRepo(t *testing.T) {
 	})
 }
 
-func countChangesTest(changeCh <-chan Change, test func(t *testing.T),
-	op ChangeOp, coll Collection, n int) func(t *testing.T) {
+func countChangesTest(changeCh <-chan repo.Change, test func(t *testing.T), op repo.ChangeOp, coll repo.Collection, n int) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Helper()
-		var changes []Change
+		var changes []repo.Change
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
@@ -88,7 +89,7 @@ func countChangesTest(changeCh <-chan Change, test func(t *testing.T),
 			}
 		}
 		if count != n {
-			t.Errorf("want %d %s %s changes, got %d", n, op, coll, count)
+			t.Errorf("want %d '%s %s' changes, got %d", n, op, coll, count)
 		}
 	}
 }

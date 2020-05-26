@@ -21,7 +21,7 @@ type SuiteEnvVar struct {
 	Value interface{} `json:"value"`
 }
 
-type Suite struct {
+type UnsavedSuite struct {
 	SoftDeleteEntity `bson:",inline"`
 	Name             string             `json:"name,omitempty" bson:",omitempty"`
 	FailureTypes     []SuiteFailureType `json:"failure_types,omitempty" bson:"failure_types,omitempty"`
@@ -34,6 +34,11 @@ type Suite struct {
 	FinishedAt       int64              `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
 }
 
+type Suite struct {
+	SavedEntity  `bson:",inline"`
+	UnsavedSuite `bson:",inline"`
+}
+
 type SuitePage struct {
 	RunningCount  int64   `json:"running_count" bson:"running_count"`
 	FinishedCount int64   `json:"finished_count" bson:"finished_count"`
@@ -42,7 +47,7 @@ type SuitePage struct {
 }
 
 type SuiteRepo interface {
-	Save(ctx context.Context, s Suite) (string, error)
+	Save(ctx context.Context, s UnsavedSuite) (string, error)
 	SaveAttachment(ctx context.Context, id string, attachmentId string) error
 	SaveStatus(ctx context.Context, id string, status SuiteStatus, finishedAt *int64) error
 	Page(ctx context.Context, fromId *string, n int64, includeDeleted bool) (*SuitePage, error)
