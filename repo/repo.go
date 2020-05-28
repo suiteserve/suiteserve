@@ -2,6 +2,7 @@ package repo
 
 import (
 	"encoding/json"
+	"errors"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"strconv"
 	"strings"
@@ -47,6 +48,10 @@ var (
 	uniqueIdGenerator       = func() string {
 		return primitive.NewObjectID().Hex()
 	}
+)
+
+var (
+	ErrNotFound = errors.New("not found")
 )
 
 func jsonValuesToArr(values []string, arr interface{}) error {

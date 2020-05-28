@@ -127,7 +127,7 @@ func (r *buntRepo) funcSave(coll Collection, e interface{}, fn func(id string) e
 
 func (r *buntRepo) set(coll Collection, id string, m map[string]interface{}) error {
 	k := string(coll) + ":" + id
-	return r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		v, err := tx.Get(k)
 		if err != nil {
 			return err
@@ -150,6 +150,10 @@ func (r *buntRepo) set(coll Collection, id string, m map[string]interface{}) err
 		r.changes <- *change
 		return nil
 	})
+	if err == buntdb.ErrNotFound {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (r *buntRepo) find(coll Collection, id string, e interface{}) error {
@@ -159,7 +163,9 @@ func (r *buntRepo) find(coll Collection, id string, e interface{}) error {
 		v, err = tx.Get(string(coll) + ":" + id)
 		return err
 	})
-	if err != nil {
+	if err == buntdb.ErrNotFound {
+		return ErrNotFound
+	} else if err != nil {
 		return err
 	}
 	return json.Unmarshal([]byte(v), &e)
@@ -206,7 +212,7 @@ func (r *buntRepo) findAllBy(index string, m map[string]interface{}, entities in
 
 func (r *buntRepo) delete(coll Collection, id string, at int64) error {
 	k := string(coll) + ":" + id
-	return r.db.Update(func(tx *buntdb.Tx) error {
+	err := r.db.Update(func(tx *buntdb.Tx) error {
 		v, err := tx.Get(k)
 		if err != nil {
 			return err
@@ -227,6 +233,10 @@ func (r *buntRepo) delete(coll Collection, id string, at int64) error {
 		r.changes <- *change
 		return nil
 	})
+	if err == buntdb.ErrNotFound {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (r *buntRepo) deleteAll(coll Collection, index string, at int64) ([]string, error) {

@@ -4,14 +4,14 @@ import (
 	"strconv"
 )
 
-func parseString(s string) *string {
+func parseStringPtr(s string) *string {
 	if s == "" {
 		return nil
 	}
 	return &s
 }
 
-func parseUint(s string) (*uint, error) {
+func parseUintPtr(s string) (*uint, error) {
 	if s == "" {
 		return nil, nil
 	}
@@ -20,7 +20,7 @@ func parseUint(s string) (*uint, error) {
 	return &ui, err
 }
 
-func parseInt64(s string) (*int64, error) {
+func parseInt64Ptr(s string) (*int64, error) {
 	if s == "" {
 		return nil, nil
 	}

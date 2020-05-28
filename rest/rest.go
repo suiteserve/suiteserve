@@ -39,10 +39,6 @@ func Handler(repos repo.Repos, publicDir string) http.Handler {
 	// attachments
 	v1Router.Path("/attachments/{id}").
 		Handler(srv.getAttachmentHandler()).
-		Methods(http.MethodGet).
-		Queries("download", "{download:true|false}")
-	v1Router.Path("/attachments/{id}").
-		Handler(srv.getAttachmentHandler()).
 		Methods(http.MethodGet)
 	v1Router.Path("/attachments/{id}").
 		Handler(srv.deleteAttachmentHandler()).

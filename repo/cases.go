@@ -40,7 +40,6 @@ type UnsavedCase struct {
 	Args        []CaseArg  `json:"args,omitempty" bson:",omitempty"`
 	Attachments []string   `json:"attachments,omitempty" bson:",omitempty"`
 	Status      CaseStatus `json:"status"`
-	Flaky       bool       `json:"flaky"`
 	CreatedAt   int64      `json:"created_at" bson:"created_at"`
 	StartedAt   int64      `json:"started_at,omitempty" bson:"started_at,omitempty"`
 	FinishedAt  int64      `json:"finished_at,omitempty" bson:"finished_at,omitempty"`

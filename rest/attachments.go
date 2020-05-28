@@ -4,111 +4,63 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
+	util "github.com/tmazeika/testpass/internal"
+	"github.com/tmazeika/testpass/repo"
+	"io"
+	"log"
 	"net/http"
-	"time"
+	"strconv"
 )
 
 func (s *srv) getAttachmentHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		id, ok := mux.Vars(r)["id"]
-		if !ok {
-			panic(ok)
-		}
-		download, ok := mux.Vars(r)["download"]
-		if !ok {
-			download = "false"
-		}
-
+		id := mux.Vars(r)["id"]
 		attachment, err := s.repos.Attachments().Find(r.Context(), id)
-		if err != nil {
+		if err == repo.ErrNotFound {
+			return errNotFound(err)
+		} else if err != nil {
 			return fmt.Errorf("get attachment: %v", err)
 		}
-
-		if download == "false" {
+		if r.FormValue("download") != "true" {
 			return writeJson(w, http.StatusOK, attachment)
-		} else if attachment.Info().Deleted {
+		}
+
+		info := attachment.Info()
+		if info.Deleted {
 			return errNotFound(errors.New(id))
 		}
 
-		panic("nyi")
+		w.Header().Set("cache-control", "private, max-age=31536000")
+		w.Header().Set("content-disposition", "inline; filename="+
+			strconv.Quote(info.Filename))
+		w.Header().Set("content-size",
+			strconv.FormatInt(attachment.Info().Size, 10))
+		w.Header().Set("content-type", info.ContentType)
 
-		//file, err := attachment.OpenFile()
-		//if err != nil {
-		//	return fmt.Errorf("open attachment: %v", err)
-		//}
-		//defer func() {
-		//	if err := file.Close(); err != nil {
-		//		log.Printf("close attachment: %v\n", err)
-		//	}
-		//}()
-		//
-		//w.Header().Set("cache-control", "private, max-age=31536000")
-		//w.Header().Set("content-size", strconv.FormatInt(attachment.Size, 10))
-		//w.Header().Set("content-disposition", "inline; filename="+
-		//	strconv.Quote(attachment.Filename))
-		//w.Header().Set("content-type", attachment.ContentType)
-		//
-		//if _, err := io.Copy(w, file); err != nil {
-		//	return fmt.Errorf("write attachment: %v", err)
-		//}
-		//return nil
-	})
-}
-
-func (s *srv) getAttachmentDownloadHandler() http.Handler {
-	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		id, ok := mux.Vars(r)["id"]
-		if !ok {
-			panic(ok)
-		}
-		download, ok := mux.Vars(r)["download"]
-		if !ok {
-			download = "false"
-		}
-
-		attachment, err := s.repos.Attachments().Find(r.Context(), id)
+		file, err := attachment.Open()
 		if err != nil {
-			return fmt.Errorf("get attachment: %v", err)
+			return fmt.Errorf("open attachment: %v", err)
 		}
+		defer func() {
+			if err := file.Close(); err != nil {
+				log.Printf("close attachment: %v\n", err)
+			}
+		}()
 
-		if download == "false" {
-			return writeJson(w, http.StatusOK, attachment)
-		} else if attachment.Info().Deleted {
-			return errNotFound(errors.New(id))
+		if _, err := io.Copy(w, file); err != nil {
+			return fmt.Errorf("write attachment: %v", err)
 		}
-
-		panic("nyi")
-
-		//file, err := attachment.OpenFile()
-		//if err != nil {
-		//	return fmt.Errorf("open attachment: %v", err)
-		//}
-		//defer func() {
-		//	if err := file.Close(); err != nil {
-		//		log.Printf("close attachment: %v\n", err)
-		//	}
-		//}()
-		//
-		//w.Header().Set("cache-control", "private, max-age=31536000")
-		//w.Header().Set("content-size", strconv.FormatInt(attachment.Size, 10))
-		//w.Header().Set("content-disposition", "inline; filename="+
-		//	strconv.Quote(attachment.Filename))
-		//w.Header().Set("content-type", attachment.ContentType)
-		//
-		//if _, err := io.Copy(w, file); err != nil {
-		//	return fmt.Errorf("write attachment: %v", err)
-		//}
-		//return nil
+		return nil
 	})
 }
 
 func (s *srv) deleteAttachmentHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-
-		err := s.repos.Attachments().
-			Delete(r.Context(), id, time.Duration(time.Now().UnixNano()).Milliseconds())
-		if err != nil {
+		err := s.repos.Attachments().Delete(r.Context(), id, util.NowTimeMillis())
+		if err == repo.ErrNotFound {
+			return errNotFound(err)
+		} else if err != nil {
 			return fmt.Errorf("delete attachment: %v", err)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -128,12 +80,10 @@ func (s *srv) getAttachmentCollectionHandler() http.Handler {
 
 func (s *srv) deleteAttachmentCollectionHandler() http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		err := s.repos.Attachments().
-			DeleteAll(r.Context(), time.Duration(time.Now().UnixNano()).Milliseconds())
+		err := s.repos.Attachments().DeleteAll(r.Context(), util.NowTimeMillis())
 		if err != nil {
 			return fmt.Errorf("delete all attachments: %v", err)
 		}
-
 		w.WriteHeader(http.StatusNoContent)
 		return nil
 	})
