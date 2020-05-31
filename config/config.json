@@ -6,9 +6,11 @@
     "tls_key_file": "config/key.pem",
     "public_dir": "frontend/dist/"
   },
-  "suite": {
+  "suite_srv": {
     "host": "localhost",
     "port": 8081,
+    "tls_cert_file": "config/cert.pem",
+    "tls_key_file": "config/key.pem",
     "reconnect_period": 60
   },
   "storage": {

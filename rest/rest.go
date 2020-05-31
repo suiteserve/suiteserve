@@ -35,49 +35,49 @@ func Handler(repos repo.Repos, publicDir string) http.Handler {
 	router.Use(defaultSecureHeadersMiddleware)
 
 	// API v1
-	v1Router := router.PathPrefix("/v1/").Subrouter()
+	apiRouter := router.PathPrefix("/v1/").Subrouter()
 	// attachments
-	v1Router.Path("/attachments/{id}").
+	apiRouter.Path("/attachments/{id}").
 		Handler(srv.getAttachmentHandler()).
 		Methods(http.MethodGet)
-	v1Router.Path("/attachments/{id}").
+	apiRouter.Path("/attachments/{id}").
 		Handler(srv.deleteAttachmentHandler()).
 		Methods(http.MethodDelete)
-	v1Router.Path("/attachments").
+	apiRouter.Path("/attachments").
 		Handler(srv.getAttachmentCollectionHandler()).
 		Methods(http.MethodGet)
-	v1Router.Path("/attachments").
+	apiRouter.Path("/attachments").
 		Handler(srv.deleteAttachmentCollectionHandler()).
 		Methods(http.MethodDelete)
 	// suites
-	v1Router.Path("/suites/{id}").
+	apiRouter.Path("/suites/{id}").
 		Handler(srv.getSuiteHandler()).
 		Methods(http.MethodGet)
-	v1Router.Path("/suites/{id}").
+	apiRouter.Path("/suites/{id}").
 		Handler(srv.deleteSuiteHandler()).
 		Methods(http.MethodDelete)
-	v1Router.Path("/suites").
+	apiRouter.Path("/suites").
 		Handler(srv.getSuiteCollectionHandler()).
 		Methods(http.MethodGet)
-	v1Router.Path("/suites").
+	apiRouter.Path("/suites").
 		Handler(srv.deleteSuiteCollectionHandler()).
 		Methods(http.MethodDelete)
 	// cases
-	v1Router.Path("/cases/{id}").
+	apiRouter.Path("/cases/{id}").
 		Handler(srv.getCaseHandler()).
 		Methods(http.MethodGet)
-	v1Router.Path("/suites/{suite_id}/cases").
+	apiRouter.Path("/suites/{suite_id}/cases").
 		Handler(srv.getCaseCollectionHandler()).
 		Methods(http.MethodGet)
 	// logs
-	v1Router.Path("/logs/{id}").
+	apiRouter.Path("/logs/{id}").
 		Handler(srv.getLogHandler()).
 		Methods(http.MethodGet)
-	v1Router.Path("/cases/{case_id}/logs").
+	apiRouter.Path("/cases/{case_id}/logs").
 		Handler(srv.getLogCollectionHandler()).
 		Methods(http.MethodGet)
 	// events
-	v1Router.Path("/events").
+	apiRouter.Path("/events").
 		HandlerFunc(srv.eventsHandler).
 		Methods(http.MethodGet)
 	go func() {

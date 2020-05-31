@@ -20,11 +20,13 @@ type Config struct {
 		ShutdownTimeout time.Duration `json:"-"`
 	} `json:"http"`
 
-	Suite struct {
-		Host string `json:"host" validate:"required"`
-		Port uint16 `json:"port"`
-		ReconnectPeriod int `json:"reconnect_period" validate:"min=0"`
-	} `json:"suite"`
+	SuiteSrv struct {
+		Host            string `json:"host" validate:"required"`
+		Port            uint16 `json:"port"`
+		TlsCertFile     string `json:"tls_cert_file" validate:"required,file"`
+		TlsKeyFile      string `json:"tls_key_file" validate:"required,file"`
+		ReconnectPeriod int    `json:"reconnect_period" validate:"min=0"`
+	} `json:"suite_srv"`
 
 	Storage struct {
 		Timeout int `json:"timeout" validate:"min=1"`

@@ -27,25 +27,42 @@ func (h *session) detach() error {
 	return nil
 }
 
-func (h *session) helloHandler(r *request) (handler, error) {
-	cmd, ok := r.obj["cmd"].(string)
-	if !ok {
-		return nil, errBadCmd(r.seq, r.obj["cmd"], "not a string")
+func (h *session) hello(m *msg) (handler, error) {
+	if m.Cmd != "hello" {
+		return nil, errBadCmd(m.Seq, m.Cmd, `expected "hello"`)
 	}
-	switch cmd {
-	case "start":
-		return h.startHandler(r)
+	versionJson, ok := m.Payload["version"].(json.Number)
+	if !ok {
+		return nil, errBadVersion(m.Seq, m.Payload["version"], "expected int")
+	}
+	version, err := versionJson.Int64()
+	if err != nil {
+		return nil, errBadVersion(m.Seq, versionJson, "expected int")
+	}
+	if version == 1 {
+		if err := h.enc.Encode(newHelloResponse(m.Seq)); err != nil {
+			return nil, err
+		}
+		return h.entry, nil
+	}
+	return nil, errBadVersion(m.Seq, version, "unsupported")
+}
+
+func (h *session) entry(m *msg) (handler, error) {
+	switch m.Cmd {
+	case "start_new":
+		return h.startNew(m)
 	case "reattach":
-		return h.reattachHandler(r)
+		return h.reattach(m)
 	default:
-		return nil, errBadCmd(r.seq, cmd, "not one of [start, reattach]")
+		return nil, errBadCmd(m.Seq, m.Cmd, `expected one of ["start_new", "reattach"]`)
 	}
 }
 
-func (h *session) startHandler(r *request) (handler, error) {
-	suite, ok := r.obj["suite"].(map[string]interface{})
+func (h *session) startNew(m *msg) (handler, error) {
+	suite, ok := m.Payload["suite"].(map[string]interface{})
 	if !ok {
-		return nil, errBadSuite(r.seq, r.obj["suite"], "not an object")
+		return nil, errBadSuite(m.Seq, m.Payload["suite"], "expected object")
 	}
 
 	// TODO
@@ -53,19 +70,19 @@ func (h *session) startHandler(r *request) (handler, error) {
 	return nil, nil
 }
 
-func (h *session) reattachHandler(r *request) (handler, error) {
-	id, ok := r.obj["id"].(string)
+func (h *session) reattach(m *msg) (handler, error) {
+	id, ok := m.Payload["id"].(string)
 	if !ok {
-		return nil, errSuiteNotFound(r.seq, r.obj["id"])
+		return nil, errSuiteNotFound(m.Seq, m.Payload["id"])
 	}
 	if !h.detachedSuites.reattach(id) {
-		return nil, errSuiteNotFound(r.seq, id)
+		return nil, errSuiteNotFound(m.Seq, id)
 	}
 	h.id = id
 	return h.progressHandler, nil
 }
 
-func (h *session) progressHandler(r *request) (handler, error) {
+func (h *session) progressHandler(m *msg) (handler, error) {
 	// TODO
 	return nil, nil
 }

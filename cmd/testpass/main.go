@@ -67,18 +67,18 @@ func main() {
 	}
 	defer func() {
 		if err := repos.Close(); err != nil {
-			log.Printf("close repos: %v\n", err)
+			log.Fatalf("close repos: %v\n", err)
 		}
 	}()
 
 	if *seedFlag {
 		if repos.StartedEmpty() {
-			log.Println("Seeding DB...")
+			log.Println("Seeding database...")
 			if err := seed.Seed(repos); err != nil {
 				log.Fatalln(err)
 			}
 		} else {
-			log.Println("Not seeding non-empty DB")
+			log.Println("Not seeding non-empty database")
 		}
 	}
 
@@ -93,12 +93,12 @@ func main() {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go listenHttp(&wg, cfg, repos, done)
-	go listenSuiteSrv(&wg, cfg, repos.Suites(), done)
+	go startHttp(&wg, cfg, repos, done)
+	go startSuiteSrv(&wg, cfg, repos.Suites(), done)
 	wg.Wait()
 }
 
-func listenHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-chan interface{}) {
+func startHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-chan interface{}) {
 	defer wg.Done()
 	srv := http.Server{
 		Addr:    net.JoinHostPort(cfg.Http.Host, strconv.Itoa(int(cfg.Http.Port))),
@@ -109,12 +109,8 @@ func listenHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <
 	if err != nil {
 		log.Fatalf("listen http: %v\n", err)
 	}
-	defer func() {
-		if err := ln.Close(); err != nil {
-			log.Printf("close http: %v\n", err)
-		}
-	}()
-	log.Println("Bound HTTP to", ln.Addr())
+	defer ln.Close()
+	log.Println("Bound HTTP server to", ln.Addr())
 
 	go func() {
 		<-done
@@ -131,18 +127,21 @@ func listenHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <
 	}
 }
 
-func listenSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, suiteRepo repo.SuiteRepo, done <-chan interface{}) {
+func startSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, suiteRepo repo.SuiteRepo, done <-chan interface{}) {
 	defer wg.Done()
-	srv, err := suite.Serve(net.JoinHostPort(cfg.Suite.Host, strconv.Itoa(int(cfg.Suite.Port))), suiteRepo, &suite.ServerOptions{
+	addr := net.JoinHostPort(cfg.SuiteSrv.Host, strconv.Itoa(int(cfg.SuiteSrv.Port)))
+	srv, err := suite.Serve(addr, suiteRepo, &suite.ServerOptions{
 		Timeout:         secondsToDuration(cfg.Storage.Timeout),
-		ReconnectPeriod: secondsToDuration(cfg.Suite.ReconnectPeriod),
+		ReconnectPeriod: secondsToDuration(cfg.SuiteSrv.ReconnectPeriod),
+		TlsCertFile:     cfg.SuiteSrv.TlsCertFile,
+		TlsKeyFile:      cfg.SuiteSrv.TlsKeyFile,
 	})
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("start suite srv: %v\n", err)
 	}
 	<-done
 	if err := srv.Close(); err != nil {
-		log.Println(err)
+		log.Printf("close suite srv: %v\n", err)
 	}
 }
 
