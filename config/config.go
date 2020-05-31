@@ -20,8 +20,14 @@ type Config struct {
 		ShutdownTimeout time.Duration `json:"-"`
 	} `json:"http"`
 
+	Suite struct {
+		Host string `json:"host" validate:"required"`
+		Port uint16 `json:"port"`
+		ReconnectPeriod int `json:"reconnect_period" validate:"min=0"`
+	} `json:"suite"`
+
 	Storage struct {
-		Timeout int `json:"timeout" validate:"min=-1"`
+		Timeout int `json:"timeout" validate:"min=1"`
 
 		Attachments struct {
 			FilePattern string `json:"file_pattern" validate:"contains=*"`

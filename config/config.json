@@ -6,6 +6,11 @@
     "tls_key_file": "config/key.pem",
     "public_dir": "frontend/dist/"
   },
+  "suite": {
+    "host": "localhost",
+    "port": 8081,
+    "reconnect_period": 60
+  },
   "storage": {
     "timeout": 10,
     "attachments": {

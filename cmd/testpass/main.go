@@ -7,12 +7,15 @@ import (
 	"github.com/tmazeika/testpass/repo"
 	"github.com/tmazeika/testpass/rest"
 	"github.com/tmazeika/testpass/seed"
+	"github.com/tmazeika/testpass/suite"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
+	"time"
 )
 
 var (
@@ -79,44 +82,70 @@ func main() {
 		}
 	}
 
-	listenHttp(cfg, repos)
-}
-
-func listenHttp(cfg *config.Config, repos repo.Repos) {
-	srv := http.Server{
-		Addr:    net.JoinHostPort(cfg.Http.Host, strconv.Itoa(int(cfg.Http.Port))),
-		Handler: rest.Handler(repos, cfg.Http.PublicDir),
-	}
 	done := make(chan interface{})
-
 	go func() {
 		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt)
 		<-sigint
 		log.Println("Shutting down...")
-
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.Http.ShutdownTimeout)
-		defer cancel()
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("shutdown http: %v\n", err)
-		}
 		close(done)
 	}()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go listenHttp(&wg, cfg, repos, done)
+	go listenSuiteSrv(&wg, cfg, repos.Suites(), done)
+	wg.Wait()
+}
+
+func listenHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-chan interface{}) {
+	defer wg.Done()
+	srv := http.Server{
+		Addr:    net.JoinHostPort(cfg.Http.Host, strconv.Itoa(int(cfg.Http.Port))),
+		Handler: rest.Handler(repos, cfg.Http.PublicDir),
+	}
 
 	ln, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
 		log.Fatalf("listen http: %v\n", err)
 	}
-	defer ln.Close()
+	defer func() {
+		if err := ln.Close(); err != nil {
+			log.Printf("close http: %v\n", err)
+		}
+	}()
+	log.Println("Bound HTTP to", ln.Addr())
 
-	log.Println("Bound to", ln.Addr())
-	srv.RegisterOnShutdown(func() {
-		log.Println("Cleaned up")
-	})
+	go func() {
+		<-done
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.Http.ShutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("shutdown http: %v\n", err)
+		}
+	}()
 
 	err = srv.ServeTLS(ln, cfg.Http.TlsCertFile, cfg.Http.TlsKeyFile)
 	if err != http.ErrServerClosed {
 		log.Fatalf("serve http: %v\n", err)
 	}
+}
+
+func listenSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, suiteRepo repo.SuiteRepo, done <-chan interface{}) {
+	defer wg.Done()
+	srv, err := suite.Serve(net.JoinHostPort(cfg.Suite.Host, strconv.Itoa(int(cfg.Suite.Port))), suiteRepo, &suite.ServerOptions{
+		Timeout:         secondsToDuration(cfg.Storage.Timeout),
+		ReconnectPeriod: secondsToDuration(cfg.Suite.ReconnectPeriod),
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
 	<-done
+	if err := srv.Close(); err != nil {
+		log.Println(err)
+	}
+}
+
+func secondsToDuration(seconds int) time.Duration {
+	return time.Duration(int64(seconds) * time.Second.Nanoseconds())
 }
