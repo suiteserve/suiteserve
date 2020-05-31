@@ -13,8 +13,8 @@ func readRequests(conn net.Conn, handler handler) error {
 	dec := json.NewDecoder(conn)
 	dec.UseNumber()
 	for {
-		var m msg
-		if err := dec.Decode(&m); err != nil {
+		var msgJson interface{}
+		if err := dec.Decode(&msgJson); err != nil {
 			if err == io.EOF {
 				return nil
 			}
@@ -30,8 +30,12 @@ func readRequests(conn net.Conn, handler handler) error {
 			}
 			return enc.Encode(errBadJson(err.Error()))
 		}
+		m, err := newMsg(msgJson)
+		if err != nil {
+			return enc.Encode(err)
+		}
 
-		next, err := handler(&m)
+		next, err := handler(m)
 		if err != nil {
 			if err, ok := err.(*msg); ok {
 				if err := enc.Encode(err); err != nil {

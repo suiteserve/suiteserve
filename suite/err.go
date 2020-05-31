@@ -18,13 +18,34 @@ func errBadJson(reason string) error {
 	}
 }
 
-func errBadCmd(seq int64, cmd string, reason string) error {
+func errBadSeq(seq interface{}, reason string) error {
+	return &msg{
+		Cmd: "bad_seq",
+		Payload: map[string]interface{}{
+			"seq":    seq,
+			"reason": reason,
+		},
+	}
+}
+
+func errBadCmd(seq int64, cmd interface{}, reason string) error {
 	return &msg{
 		Seq: seq,
 		Cmd: "bad_cmd",
 		Payload: map[string]interface{}{
 			"cmd":    cmd,
 			"reason": reason,
+		},
+	}
+}
+
+func errBadPayload(seq int64, payload interface{}, reason string) error {
+	return &msg{
+		Seq: seq,
+		Cmd: "bad_payload",
+		Payload: map[string]interface{}{
+			"payload": payload,
+			"reason":  reason,
 		},
 	}
 }
