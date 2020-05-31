@@ -6,7 +6,7 @@ import (
 )
 
 type msg struct {
-	Seq     int64                  `json:"seq,omitempty"`
+	Seq     int64                  `json:"seq"`
 	Cmd     string                 `json:"cmd"`
 	Payload map[string]interface{} `json:"payload,omitempty"`
 }
