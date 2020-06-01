@@ -1,6 +1,7 @@
-package suite
+package suitesrv
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/tmazeika/testpass/repo"
@@ -11,12 +12,12 @@ import (
 )
 
 type Server struct {
-	timeout        time.Duration
-	wg             sync.WaitGroup
-	ln             net.Listener
-	suiteRepo      repo.SuiteRepo
-	detachedSuites *detachedSuiteStore
-	closing        bool
+	timeout         time.Duration
+	reconnectPeriod time.Duration
+	wg              sync.WaitGroup
+	ln              net.Listener
+	repos           repo.Repos
+	closing         bool
 }
 
 type ServerOptions struct {
@@ -26,7 +27,7 @@ type ServerOptions struct {
 	TlsKeyFile      string
 }
 
-func Serve(addr string, suiteRepo repo.SuiteRepo, opts *ServerOptions) (*Server, error) {
+func Serve(addr string, repos repo.Repos, opts *ServerOptions) (*Server, error) {
 	cert, err := tls.LoadX509KeyPair(opts.TlsCertFile, opts.TlsKeyFile)
 	if err != nil {
 		return nil, err
@@ -39,20 +40,18 @@ func Serve(addr string, suiteRepo repo.SuiteRepo, opts *ServerOptions) (*Server,
 	}
 	log.Println("Bound suite server to", ln.Addr())
 
-	done := make(chan interface{})
 	srv := Server{
-		timeout:        opts.Timeout,
-		ln:             ln,
-		suiteRepo:      suiteRepo,
-		detachedSuites: newDetachedSuiteStore(opts.ReconnectPeriod, done),
+		timeout:         opts.Timeout,
+		reconnectPeriod: opts.ReconnectPeriod,
+		ln:              ln,
+		repos:           repos,
 	}
 	srv.wg.Add(1)
 	go func() {
 		defer srv.wg.Done()
-		if err := srv.listen(done); err != nil && !srv.closing {
+		if err := srv.listen(); err != nil && !srv.closing {
 			log.Printf("listen suite srv: %v\n", err)
 		}
-		close(done)
 	}()
 	return &srv, nil
 }
@@ -66,7 +65,9 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func (s *Server) listen(done <-chan interface{}) error {
+func (s *Server) listen() error {
+	done := make(chan interface{})
+	defer close(done)
 	var err error
 	for {
 		var conn net.Conn
@@ -86,6 +87,8 @@ func (s *Server) listen(done <-chan interface{}) error {
 func (s *Server) handleConn(conn net.Conn, earlyDone <-chan interface{}) {
 	done := make(chan interface{})
 	defer close(done)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
 		select {
 		case <-earlyDone:
@@ -94,12 +97,14 @@ func (s *Server) handleConn(conn net.Conn, earlyDone <-chan interface{}) {
 		if err := conn.Close(); err != nil {
 			log.Printf("close suite srv conn: %v\n", err)
 		}
+		cancel()
 	}()
-	handlers := s.newSession(conn)
-	if err := readRequests(conn, handlers.hello); err != nil && !s.closing {
+	handlers := s.newSession(ctx, conn)
+	err := readRequests(conn, handlers.hello)
+	if err != nil && !s.closing {
 		log.Printf("read suite srv conn: %v\n", err)
 	}
-	if err := handlers.detach(); err != nil {
-		log.Printf("detach suite srv conn: %v\n", err)
+	if err := handlers.disconnect(); err != nil {
+		log.Printf("disconnect suite srv conn: %v\n", err)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/tmazeika/testpass/repo"
 	"github.com/tmazeika/testpass/rest"
 	"github.com/tmazeika/testpass/seed"
-	"github.com/tmazeika/testpass/suite"
+	"github.com/tmazeika/testpass/suitesrv"
 	"log"
 	"net"
 	"net/http"
@@ -94,7 +94,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go startHttp(&wg, cfg, repos, done)
-	go startSuiteSrv(&wg, cfg, repos.Suites(), done)
+	go startSuiteSrv(&wg, cfg, repos, done)
 	wg.Wait()
 }
 
@@ -127,10 +127,10 @@ func startHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-
 	}
 }
 
-func startSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, suiteRepo repo.SuiteRepo, done <-chan interface{}) {
+func startSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-chan interface{}) {
 	defer wg.Done()
 	addr := net.JoinHostPort(cfg.SuiteSrv.Host, strconv.Itoa(int(cfg.SuiteSrv.Port)))
-	srv, err := suite.Serve(addr, suiteRepo, &suite.ServerOptions{
+	srv, err := suitesrv.Serve(addr, repos, &suitesrv.ServerOptions{
 		Timeout:         secondsToDuration(cfg.Storage.Timeout),
 		ReconnectPeriod: secondsToDuration(cfg.SuiteSrv.ReconnectPeriod),
 		TlsCertFile:     cfg.SuiteSrv.TlsCertFile,

@@ -34,7 +34,6 @@ func (r *buntCaseRepo) SaveAttachment(_ context.Context, id string, attachmentId
 func (r *buntCaseRepo) SaveStatus(_ context.Context, id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error {
 	return r.set(CaseColl, id, map[string]interface{}{
 		"status":      status,
-		"flaky":       opts.flaky,
 		"started_at":  opts.startedAt,
 		"finished_at": opts.finishedAt,
 	})

@@ -51,7 +51,9 @@ var (
 )
 
 var (
+	ErrExpired = errors.New("expired")
 	ErrNotFound = errors.New("not found")
+	ErrNotReconnectable = errors.New("not reconnectable")
 )
 
 func jsonValuesToArr(values []string, arr interface{}) error {

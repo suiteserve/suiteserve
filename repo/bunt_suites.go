@@ -4,8 +4,10 @@ import (
 	"context"
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type buntSuiteRepo struct {
@@ -41,10 +43,11 @@ func (r *buntSuiteRepo) SaveAttachment(_ context.Context, id string, attachmentI
 	})
 }
 
-func (r *buntSuiteRepo) SaveStatus(_ context.Context, id string, status SuiteStatus, finishedAt *int64) error {
+func (r *buntSuiteRepo) SaveStatus(_ context.Context, id string, status SuiteStatus, opts *SuiteRepoSaveStatusOptions) error {
 	return r.set(SuiteColl, id, map[string]interface{}{
 		"status":      status,
-		"finished_at": finishedAt,
+		"finished_at": opts.finishedAt,
+		"disconnected_at": opts.disconnectedAt,
 	})
 }
 
@@ -113,6 +116,44 @@ func (r *buntSuiteRepo) Find(_ context.Context, id string) (*Suite, error) {
 		return nil, err
 	}
 	return &s, nil
+}
+
+func (r *buntSuiteRepo) Reconnect(_ context.Context, id string, at int64, ttl time.Duration) error {
+	k := string(SuiteColl) + ":" + id
+	err := r.db.Update(func(tx *buntdb.Tx) error {
+		v, err := tx.Get(k)
+		if err != nil {
+			return err
+		}
+		if gjson.Get(v, "status").String() != string(SuiteStatusDisconnected) {
+			return ErrNotReconnectable
+		}
+		now := time.Unix(at, 0)
+		disconnectedAt := time.Unix(gjson.Get(v, "disconnected_at").Int(), 0)
+		exp := disconnectedAt.Add(ttl)
+		if !now.Before(exp) {
+			return ErrExpired
+		}
+		if v, err = sjson.Set(v, "status", SuiteStatusRunning); err != nil {
+			return err
+		}
+		if v, err = sjson.Set(v, "disconnected_at", 0); err != nil {
+			return err
+		}
+		if _, _, err = tx.Set(k, v, nil); err != nil {
+			return err
+		}
+		change, err := newChangeFromJson(ChangeOpUpdate, SuiteColl, v)
+		if err != nil {
+			return err
+		}
+		r.changes <- *change
+		return nil
+	})
+	if err == buntdb.ErrNotFound {
+		return ErrNotFound
+	}
+	return err
 }
 
 func (r *buntSuiteRepo) FuzzyFind(_ context.Context, fuzzyIdOrName string, includeDeleted bool) ([]Suite, error) {

@@ -1,4 +1,4 @@
-package suite
+package suitesrv
 
 import (
 	"encoding/json"
@@ -6,15 +6,20 @@ import (
 	"net"
 )
 
-type handler func(*msg) (handler, error)
+type request struct {
+	Seq     int64           `json:"seq"`
+	Cmd     string          `json:"cmd"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+type handler func(*request) (handler, error)
 
 func readRequests(conn net.Conn, handler handler) error {
 	enc := json.NewEncoder(conn)
 	dec := json.NewDecoder(conn)
-	dec.UseNumber()
 	for {
-		var msgJson interface{}
-		if err := dec.Decode(&msgJson); err != nil {
+		var req request
+		if err := dec.Decode(&req); err != nil {
 			if err == io.EOF {
 				return nil
 			}
@@ -30,14 +35,10 @@ func readRequests(conn net.Conn, handler handler) error {
 			}
 			return enc.Encode(errBadJson(err.Error()))
 		}
-		m, err := newMsg(msgJson)
-		if err != nil {
-			return enc.Encode(err)
-		}
 
-		next, err := handler(m)
+		next, err := handler(&req)
 		if err != nil {
-			if err, ok := err.(*msg); ok {
+			if err, ok := err.(*response); ok {
 				if err := enc.Encode(err); err != nil {
 					return err
 				}
@@ -47,6 +48,9 @@ func readRequests(conn net.Conn, handler handler) error {
 				}
 			}
 			continue
+		}
+		if next == nil {
+			return nil
 		}
 		handler = next
 	}

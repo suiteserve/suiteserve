@@ -1,7 +1,7 @@
-package suite
+package suitesrv
 
 func errTmpIo(reason string) error {
-	return &msg{
+	return &response{
 		Cmd: "tmp_io",
 		Payload: map[string]interface{}{
 			"reason": reason,
@@ -10,7 +10,7 @@ func errTmpIo(reason string) error {
 }
 
 func errBadJson(reason string) error {
-	return &msg{
+	return &response{
 		Cmd: "bad_json",
 		Payload: map[string]interface{}{
 			"reason": reason,
@@ -18,18 +18,8 @@ func errBadJson(reason string) error {
 	}
 }
 
-func errBadSeq(seq interface{}, reason string) error {
-	return &msg{
-		Cmd: "bad_seq",
-		Payload: map[string]interface{}{
-			"seq":    seq,
-			"reason": reason,
-		},
-	}
-}
-
-func errBadCmd(seq int64, cmd interface{}, reason string) error {
-	return &msg{
+func errBadCmd(seq int64, cmd string, reason string) error {
+	return &response{
 		Seq: seq,
 		Cmd: "bad_cmd",
 		Payload: map[string]interface{}{
@@ -39,19 +29,19 @@ func errBadCmd(seq int64, cmd interface{}, reason string) error {
 	}
 }
 
-func errBadPayload(seq int64, payload interface{}, reason string) error {
-	return &msg{
+func errBadPayload(seq int64, payload interface{}, err error) error {
+	return &response{
 		Seq: seq,
 		Cmd: "bad_payload",
 		Payload: map[string]interface{}{
 			"payload": payload,
-			"reason":  reason,
+			"reason":  err.Error(),
 		},
 	}
 }
 
-func errBadVersion(seq int64, version interface{}, reason string) error {
-	return &msg{
+func errBadVersion(seq int64, version int, reason string) error {
+	return &response{
 		Seq: seq,
 		Cmd: "bad_version",
 		Payload: map[string]interface{}{
@@ -61,29 +51,40 @@ func errBadVersion(seq int64, version interface{}, reason string) error {
 	}
 }
 
-func errBadSuite(seq int64, suite interface{}, reason string) error {
-	return &msg{
+func errSuiteNotReconnectable(seq int64, id string, err error) error {
+	return &response{
 		Seq: seq,
-		Cmd: "bad_suite",
+		Cmd: "suite_not_reconnectable",
 		Payload: map[string]interface{}{
-			"suite":  suite,
-			"reason": reason,
+			"id": id,
+			"reason": err.Error(),
 		},
 	}
 }
 
-func errSuiteNotFound(seq int64, id interface{}) error {
-	return &msg{
+func errCaseNotFound(seq int64, id string) error {
+	return &response{
 		Seq: seq,
-		Cmd: "suite_not_found",
+		Cmd: "case_not_found",
 		Payload: map[string]interface{}{
 			"id": id,
 		},
 	}
 }
 
+func errBadStatus(seq int64, status, reason string) error {
+	return &response{
+		Seq: seq,
+		Cmd: "bad_status",
+		Payload: map[string]interface{}{
+			"status": status,
+			"reason": reason,
+		},
+	}
+}
+
 func errOther(seq int64, err error) error {
-	return &msg{
+	return &response{
 		Seq: seq,
 		Cmd: "error",
 		Payload: map[string]interface{}{

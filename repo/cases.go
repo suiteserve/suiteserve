@@ -45,27 +45,32 @@ type UnsavedCase struct {
 	FinishedAt  int64      `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
 }
 
+func (c UnsavedCase) Finished() bool {
+	return c.Status != CaseStatusCreated && c.Status != CaseStatusRunning
+}
+
 type Case struct {
 	SavedEntity `bson:",inline"`
 	UnsavedCase `bson:",inline"`
 }
 
 type CaseRepoSaveStatusOptions struct {
-	flaky      *bool
 	startedAt  *int64
 	finishedAt *int64
 }
 
-func (o *CaseRepoSaveStatusOptions) Flaky(flaky bool) {
-	o.flaky = &flaky
+func NewCaseRepoSaveStatusOptions() *CaseRepoSaveStatusOptions {
+	return &CaseRepoSaveStatusOptions{}
 }
 
-func (o *CaseRepoSaveStatusOptions) StartedAt(startedAt int64) {
+func (o *CaseRepoSaveStatusOptions) StartedAt(startedAt int64) *CaseRepoSaveStatusOptions {
 	o.startedAt = &startedAt
+	return o
 }
 
-func (o *CaseRepoSaveStatusOptions) FinishedAt(finishedAt int64) {
+func (o *CaseRepoSaveStatusOptions) FinishedAt(finishedAt int64) *CaseRepoSaveStatusOptions {
 	o.finishedAt = &finishedAt
+	return o
 }
 
 type CaseRepo interface {

@@ -1,6 +1,9 @@
 package repo
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type SuiteStatus string
 
@@ -32,6 +35,7 @@ type UnsavedSuite struct {
 	Status           SuiteStatus        `json:"status"`
 	StartedAt        int64              `json:"started_at" bson:"started_at"`
 	FinishedAt       int64              `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+	DisconnectedAt   int64              `json:"disconnected_at,omitempty" bson:"disconnected_at,omitempty"`
 }
 
 type Suite struct {
@@ -46,12 +50,32 @@ type SuitePage struct {
 	Suites        []Suite `json:"suites" bson:",omitempty"`
 }
 
+type SuiteRepoSaveStatusOptions struct {
+	finishedAt     *int64
+	disconnectedAt *int64
+}
+
+func NewSuiteRepoSaveStatusOptions() *SuiteRepoSaveStatusOptions {
+	return &SuiteRepoSaveStatusOptions{}
+}
+
+func (o *SuiteRepoSaveStatusOptions) FinishedAt(finishedAt int64) *SuiteRepoSaveStatusOptions {
+	o.finishedAt = &finishedAt
+	return o
+}
+
+func (o *SuiteRepoSaveStatusOptions) DisconnectedAt(disconnectedAt int64) *SuiteRepoSaveStatusOptions {
+	o.disconnectedAt = &disconnectedAt
+	return o
+}
+
 type SuiteRepo interface {
 	Save(ctx context.Context, s UnsavedSuite) (string, error)
 	SaveAttachment(ctx context.Context, id string, attachmentId string) error
-	SaveStatus(ctx context.Context, id string, status SuiteStatus, finishedAt *int64) error
+	SaveStatus(ctx context.Context, id string, status SuiteStatus, opts *SuiteRepoSaveStatusOptions) error
 	Page(ctx context.Context, fromId *string, n int64, includeDeleted bool) (*SuitePage, error)
 	Find(ctx context.Context, id string) (*Suite, error)
+	Reconnect(ctx context.Context, id string, at int64, ttl time.Duration) error
 	FuzzyFind(ctx context.Context, fuzzyIdOrName string, includeDeleted bool) ([]Suite, error)
 	FindAll(ctx context.Context, includeDeleted bool) ([]Suite, error)
 	Delete(ctx context.Context, id string, at int64) error
