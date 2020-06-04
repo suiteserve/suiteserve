@@ -5,37 +5,39 @@ import (
 	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
+	"github.com/tmazeika/testpass/event"
 	"github.com/tmazeika/testpass/repo"
 	"net/http"
 )
 
 type srv struct {
-	repos      repo.Repos
-	eventBus   *eventBus
-	router     *mux.Router
-	wsUpgrader *websocket.Upgrader
+	repos  repo.Repos
+	events event.Bus
+	router *mux.Router
+}
+
+func newSrv(repos repo.Repos) *srv {
+	return &srv{
+		repos: repos,
+		router: mux.NewRouter(),
+	}
+}
+
+func (s *srv) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.router.ServeHTTP(w, r)
 }
 
 func Handler(repos repo.Repos, publicDir string) http.Handler {
-	router := mux.NewRouter()
-	srv := &srv{
-		repos,
-		&eventBus{
-			subscribers: make([]chan event, 0),
-		},
-		router,
-		&websocket.Upgrader{},
-	}
+	srv := newSrv(repos)
 
 	// middleware
-	router.Use(methodOverrideMiddleware)
-	router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
-	router.Use(loggingMiddleware)
-	router.Use(defaultSecureHeadersMiddleware)
+	srv.router.Use(methodOverrideMiddleware)
+	srv.router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
+	srv.router.Use(loggingMiddleware)
+	srv.router.Use(defaultSecureHeadersMiddleware)
 
 	// API v1
-	apiRouter := router.PathPrefix("/v1/").Subrouter()
+	apiRouter := srv.router.PathPrefix("/v1/").Subrouter()
 	// attachments
 	apiRouter.Path("/attachments/{id}").
 		Handler(srv.getAttachmentHandler()).
@@ -80,26 +82,25 @@ func Handler(repos repo.Repos, publicDir string) http.Handler {
 	apiRouter.Path("/events").
 		HandlerFunc(srv.eventsHandler).
 		Methods(http.MethodGet)
-	go func() {
-		for {
-			// TODO: handle!
-			<-repos.Changes()
-		}
-	}()
+	go srv.consumeRepoChanges()
 
 	// frontend
 	publicSrv := http.FileServer(http.Dir(publicDir))
-	frontendRouter := router.PathPrefix("/").Subrouter()
+	frontendRouter := srv.router.PathPrefix("/").Subrouter()
 	frontendRouter.Use(frontendSecureHeadersMiddleware)
 	frontendRouter.PathPrefix("/").Handler(publicSrv)
 
-	return router
+	return srv
 }
 
 func writeJson(w http.ResponseWriter, code int, msg interface{}) error {
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(&msg); err != nil {
+	b, err := json.Marshal(&msg)
+	if err != nil {
+		return fmt.Errorf("marshal json: %v", err)
+	}
+	if _, err := w.Write(b); err != nil {
 		return fmt.Errorf("write json: %v", err)
 	}
 	return nil

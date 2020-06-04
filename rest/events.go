@@ -1,103 +1,45 @@
 package rest
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
-	"sync"
-	"time"
+	"strings"
 )
 
-type event interface{}
-
-type eventBus struct {
-	sync.RWMutex
-	subscribers []chan event
-}
-
-func (b *eventBus) subscribe() <-chan event {
-	ch := make(chan event)
-	b.Lock()
-	b.subscribers = append(b.subscribers, ch)
-	b.Unlock()
-	return ch
-}
-
-func (b *eventBus) unsubscribe(ch <-chan event) bool {
-	b.Lock()
-	defer b.Unlock()
-	for i, s := range b.subscribers {
-		if ch == s {
-			b.subscribers = append(b.subscribers[:i], b.subscribers[i+1:]...)
-			return true
+func (s *srv) consumeRepoChanges() {
+	for change := range s.repos.Changes() {
+		b, err := json.Marshal(change)
+		if err != nil {
+			log.Printf("marshal json: %v\n", err)
 		}
+		s.events.Publish(string(b))
 	}
-	return false
 }
 
-func (b *eventBus) publish(e event) {
-	b.RLock()
-	for _, s := range b.subscribers {
-		go func(ch chan<- event) {
-			ch <- e
-		}(s)
-	}
-	b.RUnlock()
-}
+func (s *srv) eventsHandler(w http.ResponseWriter, r *http.Request) {
+	flusher := w.(http.Flusher)
 
-func (s *srv) eventsHandler(res http.ResponseWriter, req *http.Request) {
-	conn, err := s.wsUpgrader.Upgrade(res, req, nil)
-	if err != nil {
-		log.Printf("upgrade to ws: %v\n", err)
-		return
-	}
-	defer func() {
-		if err := conn.Close(); err != nil {
-			log.Printf("close ws conn: %v\n", err)
-		}
-		log.Println("Disconnected WS", conn.RemoteAddr())
-	}()
-	log.Println("Connected WS", conn.RemoteAddr())
+	w.Header().Set("access-control-allow-origin", "*")
+	w.Header().Set("cache-control", "no-cache")
+	w.Header().Set("connection", "keep-alive")
+	w.Header().Set("content-type", "text/event-stream")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
 
-	eventCh := s.eventBus.subscribe()
-	defer s.eventBus.unsubscribe(eventCh)
-	doneCh := make(chan websocket.CloseError)
-	errCh := make(chan error)
-
-	conn.SetCloseHandler(func(code int, text string) error {
-		doneCh <- websocket.CloseError{Code: code, Text: text}
-		return nil
-	})
-
-	// Ignore messages from peer.
-	go func() {
-		for {
-			if _, _, err := conn.NextReader(); err != nil {
-				errCh <- fmt.Errorf("read from ws: %v", err)
-				break
-			}
-		}
-	}()
-
+	sub := s.events.Subscribe()
+	defer sub.Unsubscribe()
 	for {
 		select {
-		case e := <-eventCh:
-			if err := conn.WriteJSON(&e); err != nil {
-				go func() {
-					errCh <- fmt.Errorf("write json to ws: %v", err)
-				}()
+		case e := <-sub.Ch():
+			data := strings.ReplaceAll(e.(string), "\n", "\ndata:")
+			if _, err := fmt.Fprintf(w, "data:%s\n\n", data); err != nil {
+				log.Printf("write data: %v\n", err)
+				return
 			}
-		case err := <-doneCh:
-			writeErr := conn.WriteControl(websocket.CloseMessage,
-				websocket.FormatCloseMessage(err.Code, err.Text),
-				time.Now().Add(10*time.Second))
-			if writeErr != nil {
-				log.Printf("write control to ws: %v\n", writeErr)
-			}
-			return
-		case err := <-errCh:
-			log.Println(err)
+			flusher.Flush()
+		case <-r.Context().Done():
 			return
 		}
 	}
