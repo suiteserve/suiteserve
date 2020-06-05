@@ -2,23 +2,27 @@
   <nav>
     <header>
       <h3 class="title">{{ title }}</h3>
-      <slot name="header"></slot>
       <div class="stats">
-        <p v-for="(value, name) in stats">
-          <span class="muted">{{ name }}</span> {{ value }}
+        <p v-for="(value, key) in stats">
+          <span class="muted">{{ key }}</span> {{ value }}
         </p>
       </div>
+      <slot name="header"></slot>
     </header>
     <div class="items">
       <a class="tab" href="#" v-for="item in items" :key="item.id"
-         @click="openTab($event, item)" :class="{ active: item.id === activeTabId }">
-        <div>
-          <div class="status-icon" :class="item.status"></div>
+         @click="openTab($event, item)">
+        <div class="inner-tab" :class="{ active: item.id === activeTabId }">
+          <div class="status-icon-container">
+            <div class="status-icon" :class="item.status"></div>
+          </div>
+          <slot name="tab" :item="item"></slot>
         </div>
-        <slot name="tab" :item="item"></slot>
       </a>
       <a class="tab" href="#" v-if="more" @click="loadMore">
-        <p>Load More</p>
+        <div class="inner-tab">
+          <p>Load More</p>
+        </div>
       </a>
     </div>
   </nav>
@@ -57,7 +61,7 @@
     --status-passed-color: #52af5c;
     --status-flaky-color: #afa352;
     --status-failed-color: #af525a;
-    --padding: 0.6em;
+    --padding: 10px;
 
     width: max-content;
     max-width: 18em;
@@ -77,15 +81,15 @@
     padding: var(--padding);
   }
 
+  header > *:not(:last-child) {
+    margin-bottom: var(--padding);
+  }
+
   .title {
     font-size: 1em;
     font-weight: 400;
 
     margin: 0;
-  }
-
-  header > *:not(:last-child) {
-    margin-bottom: var(--padding);
   }
 
   .stats {
@@ -102,9 +106,18 @@
 
   .tab {
     border-top: 1px solid var(--line-color);
-    border-left: 3px solid transparent;
     color: inherit;
     text-decoration: none;
+
+    display: block;
+  }
+
+  .tab:hover {
+    background-color: var(--hover-color);
+  }
+
+  .inner-tab {
+    border-left: 3px solid transparent;
 
     padding: var(--padding);
     padding-left: calc(var(--padding) - 3px);
@@ -112,59 +125,52 @@
     align-items: center;
   }
 
-  .tab.active {
+  .inner-tab.active {
     border-left-color: var(--highlight-color);
   }
 
-  .tab:hover {
-    background-color: var(--hover-color);
-  }
-
-  .tab > *:not(:last-child):not(.flex-spacer) {
+  .inner-tab > *:not(.flex-spacer):not(:last-child) {
     margin-right: var(--padding)
   }
 
   .status-icon {
-    --border-width: 4px;
-    --size: 1em;
+    --border-width: 3px;
+    --size: 0.9em;
 
-    border: var(--border-width) solid var(--line-color);
     border-radius: 50%;
 
     transition: border var(--transition-speed);
 
     width: var(--size);
     height: var(--size);
+    margin: var(--border-width);
     box-sizing: content-box;
   }
 
-  .status-icon.disabled {
-    border: none;
-    margin: var(--border-width);
+  .status-icon.created {
+    border: var(--border-width) solid var(--line-color);
+
+    margin: 0;
+  }
+
+  .status-icon.disabled, .status-icon.disconnected {
     background-color: var(--line-color);
   }
 
   .status-icon.running {
+    border: var(--border-width) solid var(--line-color);
     border-top-color: var(--highlight-color);
 
     animation: spin var(--spin-speed) linear infinite;
+
+    margin: 0;
   }
 
   .status-icon.passed {
-    border: none;
-    margin: var(--border-width);
     background-color: var(--status-passed-color);
   }
 
-  .status-icon.flaky {
-    border: none;
-    margin: var(--border-width);
-    background-color: var(--status-flaky-color);
-  }
-
   .status-icon.failed, .status-icon.errored {
-    border: none;
-    margin: var(--border-width);
     background-color: var(--status-failed-color);
   }
 
