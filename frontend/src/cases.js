@@ -1,5 +1,6 @@
 export async function fetchCases(suiteId) {
-  const res = await fetch(`/v1/suites/${suiteId}/cases`);
+  const url = new URL(`/v1/suites/${suiteId}/cases`, window.location.href);
+  const res = await fetch(url.href);
   const json = await res.json();
 
   if (res.ok) {

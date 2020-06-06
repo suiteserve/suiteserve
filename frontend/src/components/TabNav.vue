@@ -14,7 +14,7 @@
          @click="openTab($event, item)">
         <div class="inner-tab" :class="{ active: item.id === activeTabId }">
           <div class="status-icon-container">
-            <div class="status-icon" :class="item.status"></div>
+            <div class="status-icon" :class="`status-${item.status}`"></div>
           </div>
           <slot name="tab" :item="item"></slot>
         </div>
@@ -59,12 +59,11 @@
 <style scoped>
   nav {
     --status-passed-color: #52af5c;
-    --status-flaky-color: #afa352;
     --status-failed-color: #af525a;
     --padding: 10px;
 
     width: max-content;
-    max-width: 18em;
+    max-width: 25em;
     height: 100vh;
 
     display: flex;
@@ -72,8 +71,6 @@
   }
 
   p {
-    font-size: 0.75em;
-
     margin: 0;
   }
 
@@ -86,7 +83,7 @@
   }
 
   .title {
-    font-size: 1em;
+    font-size: 1rem;
     font-weight: 400;
 
     margin: 0;
@@ -134,8 +131,8 @@
   }
 
   .status-icon {
-    --border-width: 3px;
-    --size: 0.9em;
+    --border-width: 0.25em;
+    --size: 1em;
 
     border-radius: 50%;
 
@@ -147,17 +144,17 @@
     box-sizing: content-box;
   }
 
-  .status-icon.created {
+  .status-icon.status-created {
     border: var(--border-width) solid var(--line-color);
 
     margin: 0;
   }
 
-  .status-icon.disabled, .status-icon.disconnected {
+  .status-icon.status-disabled, .status-icon.status-disconnected {
     background-color: var(--line-color);
   }
 
-  .status-icon.running {
+  .status-icon.status-running {
     border: var(--border-width) solid var(--line-color);
     border-top-color: var(--highlight-color);
 
@@ -166,11 +163,11 @@
     margin: 0;
   }
 
-  .status-icon.passed {
+  .status-icon.status-passed {
     background-color: var(--status-passed-color);
   }
 
-  .status-icon.failed, .status-icon.errored {
+  .status-icon.status-failed, .status-icon.status-errored {
     background-color: var(--status-failed-color);
   }
 
