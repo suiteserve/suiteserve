@@ -16,7 +16,7 @@ type Config struct {
 		Port            uint16        `json:"port"`
 		TlsCertFile     string        `json:"tls_cert_file" validate:"required,file"`
 		TlsKeyFile      string        `json:"tls_key_file" validate:"required,file"`
-		PublicDir       string        `json:"public_dir" validate:"required,dir"`
+		PublicDir       string        `json:"public_dir" validate:"required"`
 		ShutdownTimeout time.Duration `json:"-"`
 	} `json:"http"`
 

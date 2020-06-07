@@ -9,7 +9,10 @@
   --muted-color: #6c6c80;
   --highlight-color: #9f9fcc;
 
-  --spin-speed: 1.5s;
+  --status-passed-color: #52af5c;
+  --status-failed-color: #af525a;
+
+  --anim-speed: 1.5s;
   --transition-speed: 0.3s;
 
   scrollbar-color: var(--line-color) transparent;
@@ -28,6 +31,10 @@
   background-color: var(--line-color);
   border: 3px solid var(--bg-color);
   border-radius: 6px;
+}
+
+p {
+  margin: 0;
 }
 
 .muted {
