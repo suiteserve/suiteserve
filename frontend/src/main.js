@@ -7,6 +7,12 @@ import Cases from './components/Cases';
 Vue.use(VueRouter);
 Vue.use(Vuex);
 
+/**
+ * @typedef {Object} SuiteStats
+ * @property {number} runningCount
+ * @property {number} finishedCount
+ */
+
 new Vue({
   el: '#app',
   render: h => h(App),
@@ -33,12 +39,48 @@ new Vue({
   }),
   store: new Vuex.Store({
     state: {
-      count: 0,
+      /** @type {SuiteStats} */
+      suiteStats: {},
+      /** @type {Suite[]} */
+      suites: [],
     },
     mutations: {
-      increment(state) {
-        state.count++;
+      /**
+       * @param state
+       * @param {SuiteStats} stats
+       * @param {Suite[]} suites
+       */
+      setSuites(state, {stats, suites}) {
+        state.suiteStats = stats;
+        state.suites = suites;
+      },
+      /**
+       * @param state
+       * @param {Suite} suite
+       */
+      saveSuite(state, suite) {
+        const old = state.suites.find(s => s.id === suite.id);
+        if (old) {
+          if (old.status === 'running') {
+            state.suiteStats.runningCount--;
+          } else {
+            state.suiteStats.finishedCount--;
+          }
+        }
+
+        state.suites = state.suites.filter(s => s.id !== suite.id);
+
+        if (!suite.deleted) {
+          state.suites.push(suite);
+
+          if (suite.status === 'running') {
+            state.suiteStats.runningCount++;
+          } else {
+            state.suiteStats.finishedCount++;
+          }
+        }
       },
     },
+    actions: {},
   }),
 });

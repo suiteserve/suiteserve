@@ -80,3 +80,11 @@ func ReadFile(filename, defVal string) string {
 	}
 	return strings.TrimRight(string(b), "\r\n")
 }
+
+func MustReadFile(filename string) string {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatalf("read file from config: %v\n", err)
+	}
+	return strings.TrimRight(string(b), "\r\n")
+}

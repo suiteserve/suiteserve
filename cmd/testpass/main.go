@@ -21,10 +21,10 @@ import (
 var (
 	configFileFlag = flag.String("config", "config/config.json",
 		"The path to the JSON configuration file")
-	debugFlag = flag.Bool("debug", false,
-		"Whether to print extra debug information with log messages")
 	dbFlag = flag.String("db", "bunt",
 		"The database implementation to use: bunt, mongo")
+	debugFlag = flag.Bool("debug", false,
+		"Whether to print extra debug information with log messages")
 	helpFlag = flag.Bool("help", false,
 		"Shows this help")
 	seedFlag = flag.Bool("seed", false,
