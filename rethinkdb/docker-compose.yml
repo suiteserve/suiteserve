@@ -8,8 +8,8 @@ services:
     - '8080:8080'
     - '28015:28015'
     volumes:
-    - ../config:/tls:ro
-    - rethinkdb:/data
+    - ../config/:/tls/:ro
+    - rethinkdb:/data/
 
 volumes:
   rethinkdb:
