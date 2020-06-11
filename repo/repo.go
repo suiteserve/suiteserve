@@ -40,19 +40,19 @@ type SoftDeleteEntity struct {
 type IdGenerator func() string
 
 var (
-	IncIntIdGenerator = func() string {
+	IncIntIdGenerator IdGenerator = func() string {
 		return strconv.FormatInt(atomic.AddInt64(&incIntId, 1), 10)
 	}
 
-	incIntId          int64 = 0
-	uniqueIdGenerator       = func() string {
+	incIntId          int64       = 0
+	uniqueIdGenerator IdGenerator = func() string {
 		return primitive.NewObjectID().Hex()
 	}
 )
 
 var (
-	ErrExpired = errors.New("expired")
-	ErrNotFound = errors.New("not found")
+	ErrExpired          = errors.New("expired")
+	ErrNotFound         = errors.New("not found")
 	ErrNotReconnectable = errors.New("not reconnectable")
 )
 

@@ -3,7 +3,8 @@ WORKDIR /app/
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN cd cmd/testpass && CGO_ENABLED=0 go install
+WORKDIR /app/cmd/testpass
+RUN CGO_ENABLED=0 go install
 
 FROM node:14-alpine AS frontend-builder
 WORKDIR /app/
