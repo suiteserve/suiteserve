@@ -140,14 +140,14 @@ func (r *buntSuiteRepo) Reconnect(_ context.Context, id string, at int64, ttl ti
 		if v, err = sjson.Set(v, "disconnected_at", 0); err != nil {
 			return err
 		}
+		version := gjson.Get(v, "version").Uint()
+		if v, err = sjson.Set(v, "version", version + 1); err != nil {
+			return err
+		}
 		if _, _, err = tx.Set(k, v, nil); err != nil {
 			return err
 		}
-		change, err := newChangeFromJson(ChangeOpUpdate, SuiteColl, v)
-		if err != nil {
-			return err
-		}
-		r.changes <- *change
+		r.changes <- *newChange(SuiteColl, []byte(v))
 		return nil
 	})
 	if err == buntdb.ErrNotFound {

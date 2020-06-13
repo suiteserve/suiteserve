@@ -29,12 +29,16 @@ type Repos interface {
 }
 
 type SavedEntity struct {
-	Id string `json:"id" bson:"_id,omitempty"`
+	Id      string `json:"id" bson:"_id,omitempty"`
 }
 
 type SoftDeleteEntity struct {
 	Deleted   bool  `json:"deleted"`
 	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
+}
+
+type VersionedEntity struct {
+	Version uint64 `json:"version"`
 }
 
 type IdGenerator func() string

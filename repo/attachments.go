@@ -13,6 +13,7 @@ type UnsavedAttachmentInfo struct {
 
 type AttachmentInfo struct {
 	SavedEntity           `bson:",inline"`
+	VersionedEntity       `bson:",inline"`
 	UnsavedAttachmentInfo `bson:",inline"`
 	Size                  int64 `json:"size"`
 }

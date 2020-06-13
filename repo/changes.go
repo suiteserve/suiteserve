@@ -2,23 +2,36 @@ package repo
 
 import "encoding/json"
 
-type ChangeOp string
+type ChangeType string
 
 const (
-	ChangeOpInsert ChangeOp = "insert"
-	ChangeOpUpdate ChangeOp = "update"
+	ChangeTypeAttachment ChangeType = "attachment"
+	ChangeTypeCase       ChangeType = "case"
+	ChangeTypeLog        ChangeType = "log"
+	ChangeTypeSuite      ChangeType = "suite"
 )
 
 type Change struct {
-	Op      ChangeOp    `json:"op"`
-	Coll    Collection  `json:"coll"`
-	Payload interface{} `json:"payload"`
+	Type    ChangeType      `json:"type"`
+	Payload json.RawMessage `json:"payload"`
 }
 
-func newChangeFromJson(op ChangeOp, coll Collection, payloadJson string) (*Change, error) {
-	var payload interface{}
-	if err := json.Unmarshal([]byte(payloadJson), &payload); err != nil {
-		return nil, err
+func newChange(coll Collection, payload json.RawMessage) *Change {
+	var t ChangeType
+	switch coll {
+	case AttachmentColl:
+		t = ChangeTypeAttachment
+	case CaseColl:
+		t = ChangeTypeCase
+	case LogColl:
+		t = ChangeTypeLog
+	case SuiteColl:
+		t = ChangeTypeSuite
+	default:
+		panic("unknown coll " + coll)
 	}
-	return &Change{op, coll, payload}, nil
+	return &Change{
+		Type:    t,
+		Payload: payload,
+	}
 }

@@ -112,11 +112,7 @@ func (r *buntRepo) funcSave(coll Collection, e interface{}, fn func(id string) e
 		if err != nil {
 			return err
 		}
-		change, err := newChangeFromJson(ChangeOpInsert, coll, v)
-		if err != nil {
-			return err
-		}
-		r.changes <- *change
+		r.changes <- *newChange(coll, []byte(v))
 		return nil
 	})
 	if err != nil {
@@ -140,14 +136,14 @@ func (r *buntRepo) set(coll Collection, id string, m map[string]interface{}) err
 				return err
 			}
 		}
+		version := gjson.Get(v, "version").Uint()
+		if v, err = sjson.Set(v, "version", version + 1); err != nil {
+			return err
+		}
 		if _, _, err = tx.Set(k, v, nil); err != nil {
 			return err
 		}
-		change, err := newChangeFromJson(ChangeOpUpdate, coll, v)
-		if err != nil {
-			return err
-		}
-		r.changes <- *change
+		r.changes <- *newChange(coll, []byte(v))
 		return nil
 	})
 	if err == buntdb.ErrNotFound {
@@ -223,14 +219,14 @@ func (r *buntRepo) delete(coll Collection, id string, at int64) error {
 		if v, err = sjson.Set(v, "deleted_at", at); err != nil {
 			return err
 		}
+		version := gjson.Get(v, "version").Uint()
+		if v, err = sjson.Set(v, "version", version + 1); err != nil {
+			return err
+		}
 		if _, _, err := tx.Set(k, v, nil); err != nil {
 			return err
 		}
-		change, err := newChangeFromJson(ChangeOpUpdate, coll, v)
-		if err != nil {
-			return err
-		}
-		r.changes <- *change
+		r.changes <- *newChange(coll, []byte(v))
 		return nil
 	})
 	if err == buntdb.ErrNotFound {
@@ -259,14 +255,14 @@ func (r *buntRepo) deleteAll(coll Collection, index string, at int64) ([]string,
 			if v, err = sjson.Set(v, "deleted_at", at); err != nil {
 				return err
 			}
+			version := gjson.Get(v, "version").Uint()
+			if v, err = sjson.Set(v, "version", version + 1); err != nil {
+				return err
+			}
 			if _, _, err := tx.Set(k, v, nil); err != nil {
 				return err
 			}
-			change, err := newChangeFromJson(ChangeOpUpdate, coll, v)
-			if err != nil {
-				return err
-			}
-			r.changes <- *change
+			r.changes <- *newChange(coll, []byte(v))
 		}
 		return nil
 	})

@@ -25,14 +25,12 @@ func TestRepo(t *testing.T) {
 			t.Run("Save_Find", countChangesTest(
 				repos.Changes(),
 				attachmentsSaveFind(repos.Attachments()),
-				repo.ChangeOpInsert,
-				repo.AttachmentColl,
+				repo.ChangeTypeAttachment,
 				len(testAttachments)))
 			t.Run("Find*_Delete*", countChangesTest(
 				repos.Changes(),
 				attachmentsFindDelete(repos.Attachments()),
-				repo.ChangeOpUpdate,
-				repo.AttachmentColl,
+				repo.ChangeTypeAttachment,
 				3))
 			t.Run("FindAll", attachmentsFindAll(repos.Attachments()))
 		})
@@ -49,7 +47,7 @@ func TestRepo(t *testing.T) {
 	})
 }
 
-func countChangesTest(changeCh <-chan repo.Change, test func(t *testing.T), op repo.ChangeOp, coll repo.Collection, n int) func(t *testing.T) {
+func countChangesTest(changeCh <-chan repo.Change, test func(t *testing.T), changeType repo.ChangeType, n int) func(t *testing.T) {
 	return func(t *testing.T) {
 		t.Helper()
 		var changes []repo.Change
@@ -84,12 +82,12 @@ func countChangesTest(changeCh <-chan repo.Change, test func(t *testing.T), op r
 		wg.Wait()
 		count := 0
 		for _, c := range changes {
-			if c.Op == op && c.Coll == coll {
+			if c.Type == changeType {
 				count++
 			}
 		}
 		if count != n {
-			t.Errorf("want %d '%s %s' changes, got %d", n, op, coll, count)
+			t.Errorf("want %d %s changes, got %d", n, changeType, count)
 		}
 	}
 }

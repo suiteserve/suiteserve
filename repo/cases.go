@@ -50,8 +50,9 @@ func (c UnsavedCase) Finished() bool {
 }
 
 type Case struct {
-	SavedEntity `bson:",inline"`
-	UnsavedCase `bson:",inline"`
+	SavedEntity     `bson:",inline"`
+	VersionedEntity `bson:",inline"`
+	UnsavedCase     `bson:",inline"`
 }
 
 type CaseRepoSaveStatusOptions struct {

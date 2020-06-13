@@ -39,8 +39,9 @@ type UnsavedSuite struct {
 }
 
 type Suite struct {
-	SavedEntity  `bson:",inline"`
-	UnsavedSuite `bson:",inline"`
+	SavedEntity     `bson:",inline"`
+	VersionedEntity `bson:",inline"`
+	UnsavedSuite    `bson:",inline"`
 }
 
 type SuitePage struct {
