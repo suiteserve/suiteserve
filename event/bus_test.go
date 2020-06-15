@@ -1,6 +1,7 @@
 package event
 
 import (
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -16,6 +17,7 @@ func TestBus_Publish(t *testing.T) {
 		defer wg.Done()
 		bus.Publish("event")
 	}()
+	runtime.Gosched()
 	if e := <-sub.Ch(); e != "event" {
 		t.Errorf("got %q, want %q", e, "event")
 	}
