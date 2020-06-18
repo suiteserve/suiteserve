@@ -15,7 +15,11 @@ func (b *Bus) Subscribe() *Subscriber {
 	return sub
 }
 
-func (b *Bus) Publish(e Event) {
+type Publisher struct {
+	Bus
+}
+
+func (b *Publisher) Publish(e Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

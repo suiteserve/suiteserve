@@ -60,7 +60,7 @@ func New(filename string) (*Config, error) {
 	}
 	var c Config
 	if err := json.Unmarshal(b, &c); err != nil {
-		return nil, fmt.Errorf("decode config: %v", err)
+		return nil, fmt.Errorf("unmarshal config: %v", err)
 	}
 	if err := validate.Struct(&c); err != nil {
 		return nil, err
@@ -72,16 +72,7 @@ func New(filename string) (*Config, error) {
 	return &c, err
 }
 
-func ReadFile(filename, defVal string) string {
-	b, err := ioutil.ReadFile(filename)
-	if err != nil {
-		log.Printf("read file from config: %v\n", err)
-		return defVal
-	}
-	return strings.TrimRight(string(b), "\r\n")
-}
-
-func MustReadFile(filename string) string {
+func ReadFile(filename string) string {
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatalf("read file from config: %v\n", err)

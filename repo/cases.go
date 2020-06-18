@@ -1,7 +1,5 @@
 package repo
 
-import "context"
-
 type (
 	CaseLinkType string
 	CaseStatus   string
@@ -17,6 +15,7 @@ const (
 	CaseStatusPassed   CaseStatus = "passed"
 	CaseStatusFailed   CaseStatus = "failed"
 	CaseStatusErrored  CaseStatus = "errored"
+	CaseStatusAborted  CaseStatus = "aborted"
 )
 
 type CaseLink struct {
@@ -45,7 +44,7 @@ type UnsavedCase struct {
 	FinishedAt  int64      `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
 }
 
-func (c UnsavedCase) Finished() bool {
+func (c *UnsavedCase) Finished() bool {
 	return c.Status != CaseStatusCreated && c.Status != CaseStatusRunning
 }
 
@@ -53,31 +52,4 @@ type Case struct {
 	SavedEntity     `bson:",inline"`
 	VersionedEntity `bson:",inline"`
 	UnsavedCase     `bson:",inline"`
-}
-
-type CaseRepoSaveStatusOptions struct {
-	startedAt  *int64
-	finishedAt *int64
-}
-
-func NewCaseRepoSaveStatusOptions() *CaseRepoSaveStatusOptions {
-	return &CaseRepoSaveStatusOptions{}
-}
-
-func (o *CaseRepoSaveStatusOptions) StartedAt(startedAt int64) *CaseRepoSaveStatusOptions {
-	o.startedAt = &startedAt
-	return o
-}
-
-func (o *CaseRepoSaveStatusOptions) FinishedAt(finishedAt int64) *CaseRepoSaveStatusOptions {
-	o.finishedAt = &finishedAt
-	return o
-}
-
-type CaseRepo interface {
-	Save(ctx context.Context, c UnsavedCase) (string, error)
-	SaveAttachment(ctx context.Context, id string, attachmentId string) error
-	SaveStatus(ctx context.Context, id string, status CaseStatus, opts *CaseRepoSaveStatusOptions) error
-	Find(ctx context.Context, id string) (*Case, error)
-	FindAllBySuite(ctx context.Context, suiteId string, num *int64) ([]Case, error)
 }

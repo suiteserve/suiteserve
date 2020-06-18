@@ -3,28 +3,48 @@ package seed
 import (
 	"context"
 	"github.com/tmazeika/testpass/repo"
+	"io"
 )
 
 const attachmentCount = 30
-const suiteCount = 28
+const suiteCount = 29
 
-func Seed(repos repo.Repos) error {
-	go func() {
-		for {
-			if _, ok := <-repos.Changes(); !ok {
-				break
-			}
-			// ignore changes
-		}
-	}()
+type Repo interface {
+	attachmentInserter
+	attachmentUpdater
+	suiteInserter
+	caseInserter
+	logInserter
+}
 
-	seededAttachments := make([]*repo.AttachmentInfo, 0)
+type attachmentInserter interface {
+	InsertAttachment(ctx context.Context, a *repo.UnsavedAttachment, src io.Reader) (repo.AttachmentFile, error)
+}
+
+type attachmentUpdater interface {
+	DeleteAttachment(ctx context.Context, id string, at int64) error
+}
+
+type suiteInserter interface {
+	InsertSuite(ctx context.Context, s *repo.UnsavedSuite) (string, error)
+}
+
+type caseInserter interface {
+	InsertCase(ctx context.Context, c *repo.UnsavedCase) (string, error)
+}
+
+type logInserter interface {
+	InsertLogLine(ctx context.Context, l *repo.UnsavedLogLine) (string, error)
+}
+
+func Seed(r Repo) error {
+	seededAttachments := make([]*repo.Attachment, 0)
 	for i := 0; i < attachmentCount; i++ {
 		seed := attachments[i%len(attachments)]
 		a := seed.a
 		src := seed.srcFn()
 
-		file, err := repos.Attachments().Save(context.Background(), a, src)
+		file, err := r.InsertAttachment(context.Background(), &a, src)
 		if err != nil {
 			return err
 		}
@@ -32,8 +52,7 @@ func Seed(repos repo.Repos) error {
 
 		if i%20 == 0 {
 			deletedAt := 1590625822618 + int64(i) * 105000
-			err := repos.Attachments().Delete(context.Background(),
-				file.Info().Id, deletedAt)
+			err := r.DeleteAttachment(context.Background(), file.Info().Id, deletedAt)
 			if err != nil {
 				return err
 			}
@@ -59,7 +78,7 @@ func Seed(repos repo.Repos) error {
 				seededAttachments[(i*2)%len(seededAttachments)].Id)
 		}
 
-		suiteId, err := repos.Suites().Save(context.Background(), seedSuite)
+		suiteId, err := r.InsertSuite(context.Background(), &seedSuite)
 		if err != nil {
 			return err
 		}
@@ -87,19 +106,19 @@ func Seed(repos repo.Repos) error {
 				seedCase.FinishedAt = 1590628243183 + int64(j) * 2133000
 			}
 
-			caseId, err := repos.Cases().Save(context.Background(), seedCase)
+			caseId, err := r.InsertCase(context.Background(), &seedCase)
 			if err != nil {
 				return err
 			}
 
 			for k := 0; k < j; k++ {
-				seedLogEntry := logEntries[k%len(logEntries)]
+				seedLogEntry := logLines[k%len(logLines)]
 
 				seedLogEntry.Case = caseId
 				seedLogEntry.Index = int64(k)
 				seedLogEntry.Timestamp = 1590629158629 + int64(k) * 1511300
 
-				_, err := repos.Logs().Save(context.Background(), seedLogEntry)
+				_, err := r.InsertLogLine(context.Background(), &seedLogEntry)
 				if err != nil {
 					return err
 				}

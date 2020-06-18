@@ -3,9 +3,11 @@ package suitesrv
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	util "github.com/tmazeika/testpass/internal"
 	"github.com/tmazeika/testpass/repo"
 	"net"
+	"time"
 )
 
 type idStore []string
@@ -38,7 +40,7 @@ type session struct {
 	*Server
 	ctx     context.Context
 	enc     *json.Encoder
-	suiteId string
+	id      string
 	caseIds idStore
 }
 
@@ -50,18 +52,38 @@ func (s *Server) newSession(ctx context.Context, conn net.Conn) *session {
 	}
 }
 
+type suiteInserter interface {
+	InsertSuite(ctx context.Context, s *repo.UnsavedSuite) (string, error)
+}
+
+type suiteUpdater interface {
+	UpdateSuiteStatus(ctx context.Context, id string, status repo.SuiteStatus, at int64) error
+	ReconnectSuite(ctx context.Context, id string, at int64, expiry time.Duration) error
+}
+
+type caseInserter interface {
+	InsertCase(ctx context.Context, c *repo.UnsavedCase) (string, error)
+}
+
+type caseFinder interface {
+	CasesBySuite(ctx context.Context, suiteId string) ([]repo.Case, error)
+}
+
+type caseUpdater interface {
+	UpdateCaseStatus(ctx context.Context, id string, status repo.CaseStatus, at int64) error
+}
+
+type logInserter interface {
+	InsertLogLine(ctx context.Context, l *repo.UnsavedLogLine) (string, error)
+}
+
 func (s *session) disconnect() error {
-	if s.suiteId == "" {
+	if s.id == "" {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
-	opts := repo.NewSuiteRepoSaveStatusOptions().DisconnectedAt(util.NowTimeMillis())
-	err := s.repos.Suites().SaveStatus(ctx, s.suiteId, repo.SuiteStatusDisconnected, opts)
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.repo.UpdateSuiteStatus(ctx, s.id, repo.SuiteStatusDisconnected, util.NowTimeMillis())
 }
 
 func (s *session) hello(r *request) (handler, error) {
@@ -77,7 +99,7 @@ func (s *session) hello(r *request) (handler, error) {
 	}
 
 	if payload.Version != 1 {
-		return nil, errBadVersion(r.Seq, payload.Version, "unsupported")
+		return nil, errBadVersion(r.Seq, payload.Version, "unsupported", []string{"1"})
 	}
 	if err := s.enc.Encode(newHelloResponse(r.Seq)); err != nil {
 		return nil, err
@@ -121,11 +143,11 @@ func (s *session) newSuite(r *request) (handler, error) {
 	}
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
 	defer cancel()
-	id, err := s.repos.Suites().Save(ctx, unsavedSuite)
+	id, err := s.repo.InsertSuite(ctx, &unsavedSuite)
 	if err != nil {
 		return nil, errOther(r.Seq, err)
 	}
-	s.suiteId = id
+	s.id = id
 	if err := s.enc.Encode(newCreatedResponse(r.Seq, id)); err != nil {
 		return nil, err
 	}
@@ -133,7 +155,6 @@ func (s *session) newSuite(r *request) (handler, error) {
 }
 
 func (s *session) reconnect(r *request) (handler, error) {
-	now := util.NowTimeMillis()
 	var payload struct {
 		Id string `json:"id"`
 	}
@@ -142,14 +163,14 @@ func (s *session) reconnect(r *request) (handler, error) {
 	}
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
 	defer cancel()
-	err := s.repos.Suites().Reconnect(ctx, payload.Id, now, s.reconnectPeriod)
-	if err == repo.ErrNotFound || err == repo.ErrNotReconnectable || err == repo.ErrExpired {
+	err := s.repo.ReconnectSuite(ctx, payload.Id, util.NowTimeMillis(), s.reconnectPeriod)
+	if isSuiteNotReconnectable(err) {
 		return nil, errSuiteNotReconnectable(r.Seq, payload.Id, err)
 	} else if err != nil {
 		return nil, errOther(r.Seq, err)
 	}
 
-	cases, err := s.repos.Cases().FindAllBySuite(ctx, payload.Id, nil)
+	cases, err := s.repo.CasesBySuite(ctx, payload.Id)
 	if err != nil {
 		return nil, errOther(r.Seq, err)
 	}
@@ -157,7 +178,7 @@ func (s *session) reconnect(r *request) (handler, error) {
 		s.caseIds = append(s.caseIds, c.Id)
 	}
 
-	s.suiteId = payload.Id
+	s.id = payload.Id
 	if err := s.enc.Encode(newCreatedResponse(r.Seq, payload.Id)); err != nil {
 		return nil, err
 	}
@@ -196,7 +217,7 @@ func (s *session) newCase(r *request) (handler, error) {
 	}
 
 	unsavedCase := repo.UnsavedCase{
-		Suite:       s.suiteId,
+		Suite:       s.id,
 		Name:        payload.Name,
 		Description: payload.Description,
 		Tags:        payload.Tags,
@@ -213,7 +234,7 @@ func (s *session) newCase(r *request) (handler, error) {
 	}
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
 	defer cancel()
-	id, err := s.repos.Cases().Save(ctx, unsavedCase)
+	id, err := s.repo.InsertCase(ctx, &unsavedCase)
 	if err != nil {
 		return nil, errOther(r.Seq, err)
 	}
@@ -247,15 +268,10 @@ func (s *session) setCaseStatus(r *request) (handler, error) {
 
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
 	defer cancel()
-	opts := repo.NewCaseRepoSaveStatusOptions()
-	if payload.Status == repo.CaseStatusRunning || payload.Status == repo.CaseStatusDisabled {
-		opts.StartedAt(payload.At)
-	}
-	if payload.Status != repo.CaseStatusRunning {
-		opts.FinishedAt(payload.At)
-	}
-	err := s.repos.Cases().SaveStatus(ctx, payload.Id, payload.Status, opts)
-	if err != nil {
+	err := s.repo.UpdateCaseStatus(ctx, payload.Id, payload.Status, payload.At)
+	if errors.Is(err, repo.ErrNotFound) {
+		return nil, errCaseNotFound(r.Seq, payload.Id)
+	} else if err != nil {
 		return nil, errOther(r.Seq, err)
 	}
 
@@ -269,7 +285,7 @@ func (s *session) setCaseStatus(r *request) (handler, error) {
 }
 
 func (s *session) newLogEntry(r *request) (handler, error) {
-	var payload repo.UnsavedLogEntry
+	var payload repo.UnsavedLogLine
 	if err := json.Unmarshal(r.Payload, &payload); err != nil {
 		return nil, errBadPayload(r.Seq, r.Payload, err)
 	}
@@ -280,7 +296,7 @@ func (s *session) newLogEntry(r *request) (handler, error) {
 
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
 	defer cancel()
-	if _, err := s.repos.Logs().Save(ctx, payload); err != nil {
+	if _, err := s.repo.InsertLogLine(ctx, &payload); err != nil {
 		return nil, errOther(r.Seq, err)
 	}
 
@@ -305,20 +321,18 @@ func (s *session) setSuiteStatus(r *request) (handler, error) {
 
 	ctx, cancel := context.WithTimeout(s.ctx, s.timeout)
 	defer cancel()
-	opts := repo.NewSuiteRepoSaveStatusOptions().FinishedAt(payload.At)
-	err := s.repos.Suites().SaveStatus(ctx, s.suiteId, payload.Status, opts)
+	err := s.repo.UpdateSuiteStatus(ctx, s.id, payload.Status, payload.At)
 	if err != nil {
 		return nil, errOther(r.Seq, err)
 	}
 
-	cases, err := s.repos.Cases().FindAllBySuite(ctx, s.suiteId, nil)
+	cases, err := s.repo.CasesBySuite(ctx, s.id)
 	if err != nil {
 		return nil, errOther(r.Seq, err)
 	}
-	caseOpts := repo.NewCaseRepoSaveStatusOptions().FinishedAt(payload.At)
 	for _, c := range cases {
 		if !c.Finished() {
-			err := s.repos.Cases().SaveStatus(ctx, c.Id, repo.CaseStatusErrored, caseOpts)
+			err := s.repo.UpdateCaseStatus(ctx, c.Id, repo.CaseStatusAborted, payload.At)
 			if err != nil {
 				return nil, errOther(r.Seq, err)
 			}

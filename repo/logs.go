@@ -1,7 +1,5 @@
 package repo
 
-import "context"
-
 type LogLevelType string
 
 const (
@@ -12,7 +10,7 @@ const (
 	LogLevelTypeError LogLevelType = "error"
 )
 
-type UnsavedLogEntry struct {
+type UnsavedLogLine struct {
 	Case      string       `json:"case"`
 	Index     int64        `json:"index"`
 	Level     LogLevelType `json:"level"`
@@ -21,13 +19,12 @@ type UnsavedLogEntry struct {
 	Timestamp int64        `json:"timestamp"`
 }
 
-type LogEntry struct {
-	SavedEntity     `bson:",inline"`
-	UnsavedLogEntry `bson:",inline"`
+type LogLine struct {
+	SavedEntity    `bson:",inline"`
+	UnsavedLogLine `bson:",inline"`
 }
 
-type LogRepo interface {
-	Save(ctx context.Context, e UnsavedLogEntry) (string, error)
-	Find(ctx context.Context, id string) (*LogEntry, error)
-	FindAllByCase(ctx context.Context, caseId string) ([]LogEntry, error)
+type LogPage struct {
+	NextId *string   `json:"next_id" bson:"next_id,omitempty"`
+	Lines  []LogLine `json:"lines" bson:",omitempty"`
 }

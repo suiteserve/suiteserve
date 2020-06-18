@@ -1,5 +1,10 @@
 package suitesrv
 
+import (
+	"errors"
+	"github.com/tmazeika/testpass/repo"
+)
+
 func errTmpIo(reason string) error {
 	return &response{
 		Cmd: "tmp_io",
@@ -40,13 +45,14 @@ func errBadPayload(seq int64, payload interface{}, err error) error {
 	}
 }
 
-func errBadVersion(seq int64, version int, reason string) error {
+func errBadVersion(seq int64, version int, reason string, supported []string) error {
 	return &response{
 		Seq: seq,
 		Cmd: "bad_version",
 		Payload: map[string]interface{}{
-			"version": version,
-			"reason":  reason,
+			"version":   version,
+			"reason":    reason,
+			"supported": supported,
 		},
 	}
 }
@@ -56,10 +62,16 @@ func errSuiteNotReconnectable(seq int64, id string, err error) error {
 		Seq: seq,
 		Cmd: "suite_not_reconnectable",
 		Payload: map[string]interface{}{
-			"id": id,
+			"id":     id,
 			"reason": err.Error(),
 		},
 	}
+}
+
+func isSuiteNotReconnectable(err error) bool {
+	return errors.Is(err, repo.ErrNotFound) ||
+		errors.Is(err, repo.ErrNotReconnectable) ||
+		errors.Is(err, repo.ErrExpired)
 }
 
 func errCaseNotFound(seq int64, id string) error {

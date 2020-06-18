@@ -12,18 +12,14 @@ import (
 // -rw-------
 const filePerm = 0600
 
-type fileRepo struct {
-	pattern string
+type FileRepo struct {
+	Pattern string
 }
 
-func newFileRepo(pattern string) *fileRepo {
-	return &fileRepo{pattern}
-}
-
-func (r *fileRepo) deleteAll() error {
-	filenames, err := filepath.Glob(r.pattern)
+func (r *FileRepo) deleteAll() error {
+	filenames, err := filepath.Glob(r.Pattern)
 	if err != nil {
-		panic(err)
+		log.Panicf("bad glob: %v\n", err)
 	}
 	for _, filename := range filenames {
 		if err := os.Remove(filename); err != nil {
@@ -34,11 +30,11 @@ func (r *fileRepo) deleteAll() error {
 }
 
 type fileAccessor struct {
-	*fileRepo
+	*FileRepo
 	id string
 }
 
-func (r *fileRepo) newFileAccessor(id string) *fileAccessor {
+func (r *FileRepo) newFileAccessor(id string) *fileAccessor {
 	return &fileAccessor{r, id}
 }
 
@@ -48,7 +44,7 @@ func (a *fileAccessor) Open() (io.ReadCloser, error) {
 }
 
 func (a *fileAccessor) filename() string {
-	return strings.Replace(a.pattern, "*", a.id, 1)
+	return strings.Replace(a.Pattern, "*", a.id, 1)
 }
 
 func (a *fileAccessor) save(src io.Reader) (int64, error) {
@@ -80,14 +76,14 @@ func (a *fileAccessor) delete() {
 
 type attachmentFile struct {
 	*fileAccessor
-	info *AttachmentInfo
+	info *Attachment
 }
 
-func (r *fileRepo) newAttachmentFile(info *AttachmentInfo) *attachmentFile {
+func (r *FileRepo) newAttachmentFile(info *Attachment) *attachmentFile {
 	return &attachmentFile{r.newFileAccessor(info.Id), info}
 }
 
-func (f *attachmentFile) Info() *AttachmentInfo {
+func (f *attachmentFile) Info() *Attachment {
 	return f.info
 }
 

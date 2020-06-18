@@ -6,91 +6,79 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/tmazeika/testpass/event"
-	"github.com/tmazeika/testpass/repo"
+	"log"
 	"net/http"
 )
 
-type srv struct {
-	repos  repo.Repos
-	events event.Bus
-	router *mux.Router
+type Repo interface {
+	attachmentFinder
+	attachmentUpdater
+	caseFinder
+	logFinder
+	suiteFinder
+	suiteUpdater
+
+	Changes() *event.Bus
 }
 
-func newSrv(repos repo.Repos) *srv {
-	return &srv{
-		repos: repos,
-		router: mux.NewRouter(),
-	}
-}
-
-func (s *srv) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.router.ServeHTTP(w, r)
-}
-
-func Handler(repos repo.Repos, publicDir string) http.Handler {
-	srv := newSrv(repos)
+func Handler(repo Repo, publicDir string) http.Handler {
+	r := mux.NewRouter()
 
 	// middleware
-	srv.router.Use(methodOverrideMiddleware)
-	srv.router.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
-	srv.router.Use(loggingMiddleware)
-	srv.router.Use(defaultSecureHeadersMiddleware)
+	r.Use(methodOverrideMiddleware)
+	r.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
+	r.Use(loggingMiddleware)
+	r.Use(defaultSecureHeadersMiddleware)
 
-	// API v1
-	apiRouter := srv.router.PathPrefix("/v1/").Subrouter()
+	// api v1
+	api := r.PathPrefix("/v1/").Subrouter()
 	// attachments
-	apiRouter.Path("/attachments/{id}").
-		Handler(srv.getAttachmentHandler()).
+	api.Path("/attachments/{id}").
+		Handler(newGetAttachmentHandler(repo)).
 		Methods(http.MethodGet)
-	apiRouter.Path("/attachments/{id}").
-		Handler(srv.deleteAttachmentHandler()).
+	api.Path("/attachments/{id}").
+		Handler(newDeleteAttachmentHandler(repo)).
 		Methods(http.MethodDelete)
-	apiRouter.Path("/attachments").
-		Handler(srv.getAttachmentCollectionHandler()).
+	api.Path("/attachments").
+		Handler(newGetAttachmentCollectionHandler(repo)).
 		Methods(http.MethodGet)
-	apiRouter.Path("/attachments").
-		Handler(srv.deleteAttachmentCollectionHandler()).
+	api.Path("/attachments").
+		Handler(newDeleteAttachmentCollectionHandler(repo)).
 		Methods(http.MethodDelete)
 	// suites
-	apiRouter.Path("/suites/{id}").
-		Handler(srv.getSuiteHandler()).
+	api.Path("/suites/{id}").
+		Handler(newGetSuiteHandler(repo)).
 		Methods(http.MethodGet)
-	apiRouter.Path("/suites/{id}").
-		Handler(srv.deleteSuiteHandler()).
+	api.Path("/suites/{id}").
+		Handler(newDeleteSuiteHandler(repo)).
 		Methods(http.MethodDelete)
-	apiRouter.Path("/suites").
-		Handler(srv.getSuiteCollectionHandler()).
+	api.Path("/suites").
+		Handler(newGetSuiteCollectionHandler(repo)).
 		Methods(http.MethodGet)
-	apiRouter.Path("/suites").
-		Handler(srv.deleteSuiteCollectionHandler()).
+	api.Path("/suites").
+		Handler(newDeleteSuiteCollectionHandler(repo)).
 		Methods(http.MethodDelete)
 	// cases
-	apiRouter.Path("/cases/{id}").
-		Handler(srv.getCaseHandler()).
+	api.Path("/cases/{id}").
+		Handler(newGetCaseHandler(repo)).
 		Methods(http.MethodGet)
-	apiRouter.Path("/suites/{suite_id}/cases").
-		Handler(srv.getCaseCollectionHandler()).
+	api.Path("/suites/{suite_id}/cases").
+		Handler(newGetCaseCollectionHandler(repo)).
 		Methods(http.MethodGet)
 	// logs
-	apiRouter.Path("/logs/{id}").
-		Handler(srv.getLogHandler()).
+	api.Path("/cases/{case_id}/logs").
+		Handler(newGetLogCollectionHandler(repo)).
 		Methods(http.MethodGet)
-	apiRouter.Path("/cases/{case_id}/logs").
-		Handler(srv.getLogCollectionHandler()).
+	// changes
+	api.Path("/changes").
+		Handler(newChanges(repo).newHandler()).
 		Methods(http.MethodGet)
-	// events
-	apiRouter.Path("/events").
-		HandlerFunc(srv.eventsHandler).
-		Methods(http.MethodGet)
-	go srv.consumeRepoChanges()
 
 	// frontend
-	publicSrv := http.FileServer(http.Dir(publicDir))
-	frontendRouter := srv.router.PathPrefix("/").Subrouter()
-	frontendRouter.Use(frontendSecureHeadersMiddleware)
-	frontendRouter.PathPrefix("/").Handler(publicSrv)
-
-	return srv
+	frontend := r.PathPrefix("/").Subrouter()
+	frontend.Use(frontendSecureHeadersMiddleware)
+	frontend.PathPrefix("/").Handler(newFrontendHandler(publicDir))
+	return r
 }
 
 func writeJson(w http.ResponseWriter, code int, msg interface{}) error {
@@ -98,7 +86,7 @@ func writeJson(w http.ResponseWriter, code int, msg interface{}) error {
 	w.WriteHeader(code)
 	b, err := json.Marshal(&msg)
 	if err != nil {
-		return fmt.Errorf("marshal json: %v", err)
+		log.Panicf("marshal json: %v\n", err)
 	}
 	if _, err := w.Write(b); err != nil {
 		return fmt.Errorf("write json: %v", err)

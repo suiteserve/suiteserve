@@ -12,11 +12,11 @@ import (
 )
 
 var attachments = []struct {
-	a     repo.UnsavedAttachmentInfo
+	a     repo.UnsavedAttachment
 	srcFn func() io.Reader
 }{
 	{
-		a: repo.UnsavedAttachmentInfo{
+		a: repo.UnsavedAttachment{
 			Filename:    "old.xml",
 			ContentType: "application/xml",
 		},
@@ -26,7 +26,7 @@ var attachments = []struct {
 		},
 	},
 	{
-		a: repo.UnsavedAttachmentInfo{
+		a: repo.UnsavedAttachment{
 			Filename:    "plain.txt",
 			ContentType: "text/plain; charset=utf-8",
 		},
@@ -35,7 +35,7 @@ var attachments = []struct {
 		},
 	},
 	{
-		a: repo.UnsavedAttachmentInfo{
+		a: repo.UnsavedAttachment{
 			Filename:    "simple.json",
 			ContentType: "application/json",
 		},
@@ -44,7 +44,7 @@ var attachments = []struct {
 		},
 	},
 	{
-		a: repo.UnsavedAttachmentInfo{
+		a: repo.UnsavedAttachment{
 			Filename:    "color.png",
 			ContentType: "image/png",
 		},

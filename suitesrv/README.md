@@ -2,12 +2,25 @@
 **Request**
 ```
 {
-  "cmd" string: "hello"
+  "cmd" string: "hello",
   "seq" int,
-  "version" string: "1"
+  "version" string: "1",
 }
 ```
-
+**Response (OK)**
+```
+{
+  "cmd" string: "hello",
+  "seq" int,
+}
+```
+**Response (OK)**
+```
+{
+  "cmd" string: "hello",
+  "seq" int,
+}
+```
 # Entry
 **Request**
 ```

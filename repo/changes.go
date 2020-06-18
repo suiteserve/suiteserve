@@ -2,36 +2,48 @@ package repo
 
 import "encoding/json"
 
-type ChangeType string
+type ChangeOp string
 
 const (
-	ChangeTypeAttachment ChangeType = "attachment"
-	ChangeTypeCase       ChangeType = "case"
-	ChangeTypeLog        ChangeType = "log"
-	ChangeTypeSuite      ChangeType = "suite"
+	ChangeOpInsert ChangeOp = "insert"
+	ChangeOpUpdate ChangeOp = "update"
 )
 
 type Change struct {
-	Type    ChangeType      `json:"type"`
-	Payload json.RawMessage `json:"payload"`
+	Op   ChangeOp `json:"op"`
+	Coll Coll     `json:"coll"`
 }
 
-func newChange(coll Collection, payload json.RawMessage) *Change {
-	var t ChangeType
-	switch coll {
-	case AttachmentColl:
-		t = ChangeTypeAttachment
-	case CaseColl:
-		t = ChangeTypeCase
-	case LogColl:
-		t = ChangeTypeLog
-	case SuiteColl:
-		t = ChangeTypeSuite
-	default:
-		panic("unknown coll " + coll)
+type InsertChange struct {
+	Change
+	Doc json.RawMessage `json:"doc"`
+}
+
+func newInsertChange(coll Coll, doc json.RawMessage) *InsertChange {
+	return &InsertChange{
+		Change: Change{
+			Op:   ChangeOpInsert,
+			Coll: coll,
+		},
+		Doc: doc,
 	}
-	return &Change{
-		Type:    t,
-		Payload: payload,
+}
+
+type UpdateChange struct {
+	Change
+	Id      string                 `json:"id"`
+	Updated map[string]interface{} `json:"updated,omitempty"`
+	Deleted []string               `json:"deleted,omitempty"`
+}
+
+func newUpdateChange(coll Coll, id string, updated map[string]interface{}, deleted []string) *UpdateChange {
+	return &UpdateChange{
+		Change: Change{
+			Op:   ChangeOpUpdate,
+			Coll: coll,
+		},
+		Id:      id,
+		Updated: updated,
+		Deleted: deleted,
 	}
 }

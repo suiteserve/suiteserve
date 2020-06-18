@@ -18,11 +18,20 @@ import (
 	"time"
 )
 
+type Repo interface {
+	rest.Repo
+	seed.Repo
+	suitesrv.Repo
+
+	Seedable() bool
+	Close() error
+}
+
 var (
 	configFileFlag = flag.String("config", "config/config.json",
 		"The path to the JSON configuration file")
-	dbFlag = flag.String("db", "bunt",
-		"The database implementation to use: bunt, mongo")
+	dbFlag = flag.String("db", "buntdb",
+		"The database implementation to use: buntdb, mongodb")
 	debugFlag = flag.Bool("debug", false,
 		"Whether to print extra debug information with log messages")
 	helpFlag = flag.Bool("help", false,
@@ -50,31 +59,31 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	var repos repo.Repos
+	fileRepo := repo.FileRepo{Pattern: cfg.Storage.Attachments.FilePattern}
+	var r Repo
 	switch *dbFlag {
-	case "bunt":
+	case "buntdb":
 		log.Println("Using BuntDB")
-		repos, err = repo.OpenBuntRepos(cfg.Storage.BuntDb.File,
-			cfg.Storage.Attachments.FilePattern, nil)
-	case "mongo":
+		r, err = repo.OpenBuntDb(cfg.Storage.BuntDb.File, &fileRepo)
+	case "mongodb":
 		// TODO
 		log.Fatalln("MongoDB not yet implemented")
 	default:
 		log.Fatalf("unknown db %q\n", *dbFlag)
 	}
 	if err != nil {
-		log.Fatalf("open repos: %v\n", err)
+		log.Fatalf("open db: %v\n", err)
 	}
 	defer func() {
-		if err := repos.Close(); err != nil {
-			log.Fatalf("close repos: %v\n", err)
+		if err := r.Close(); err != nil {
+			log.Fatalf("close db: %v\n", err)
 		}
 	}()
 
 	if *seedFlag {
-		if repos.StartedEmpty() {
+		if r.Seedable() {
 			log.Println("Seeding database...")
-			if err := seed.Seed(repos); err != nil {
+			if err := seed.Seed(r); err != nil {
 				log.Fatalln(err)
 			}
 		} else {
@@ -93,16 +102,16 @@ func main() {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	go startHttp(&wg, cfg, repos, done)
-	go startSuiteSrv(&wg, cfg, repos, done)
+	go startHttp(&wg, cfg, r, done)
+	go startSuiteSrv(&wg, cfg, r, done)
 	wg.Wait()
 }
 
-func startHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-chan interface{}) {
+func startHttp(wg *sync.WaitGroup, cfg *config.Config, repo Repo, done <-chan interface{}) {
 	defer wg.Done()
 	srv := http.Server{
 		Addr:    net.JoinHostPort(cfg.Http.Host, strconv.Itoa(int(cfg.Http.Port))),
-		Handler: rest.Handler(repos, cfg.Http.PublicDir),
+		Handler: rest.Handler(repo, cfg.Http.PublicDir),
 	}
 
 	ln, err := net.Listen("tcp", srv.Addr)
@@ -127,10 +136,10 @@ func startHttp(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-
 	}
 }
 
-func startSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, repos repo.Repos, done <-chan interface{}) {
+func startSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, repo Repo, done <-chan interface{}) {
 	defer wg.Done()
 	addr := net.JoinHostPort(cfg.SuiteSrv.Host, strconv.Itoa(int(cfg.SuiteSrv.Port)))
-	srv, err := suitesrv.Serve(addr, repos, &suitesrv.ServerOptions{
+	srv, err := suitesrv.Serve(addr, repo, &suitesrv.ServerOptions{
 		Timeout:         secondsToDuration(cfg.Storage.Timeout),
 		ReconnectPeriod: secondsToDuration(cfg.SuiteSrv.ReconnectPeriod),
 		TlsCertFile:     cfg.SuiteSrv.TlsCertFile,

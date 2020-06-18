@@ -4,7 +4,7 @@ import (
 	"github.com/tmazeika/testpass/repo"
 )
 
-var logEntries = []repo.UnsavedLogEntry{
+var logLines = []repo.UnsavedLogLine{
 	{
 		Level:   "info",
 	},

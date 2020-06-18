@@ -1,22 +1,32 @@
 package rest
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	util "github.com/tmazeika/testpass/internal"
 	"github.com/tmazeika/testpass/repo"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 )
 
-func (s *srv) getAttachmentHandler() http.Handler {
-	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
+type attachmentFinder interface {
+	Attachment(ctx context.Context, id string) (repo.AttachmentFile, error)
+	AllAttachments(ctx context.Context) ([]repo.AttachmentFile, error)
+}
+
+type attachmentUpdater interface {
+	DeleteAttachment(ctx context.Context, id string, at int64) error
+	DeleteAllAttachments(ctx context.Context, at int64) error
+}
+
+func newGetAttachmentHandler(finder attachmentFinder) http.Handler {
+	return errorHandler(func(w http.ResponseWriter, r *http.Request) (err error) {
 		id := mux.Vars(r)["id"]
-		attachment, err := s.repos.Attachments().Find(r.Context(), id)
-		if err == repo.ErrNotFound {
+		attachment, err := finder.Attachment(r.Context(), id)
+		if errors.Is(err, repo.ErrNotFound) {
 			return errNotFound(err)
 		} else if err != nil {
 			return fmt.Errorf("get attachment: %v", err)
@@ -27,7 +37,7 @@ func (s *srv) getAttachmentHandler() http.Handler {
 
 		info := attachment.Info()
 		if info.Deleted {
-			return errNotFound(errors.New(id))
+			return errNotFound(errors.New("deleted"))
 		}
 
 		w.Header().Set("cache-control", "private, max-age=31536000")
@@ -42,8 +52,8 @@ func (s *srv) getAttachmentHandler() http.Handler {
 			return fmt.Errorf("open attachment: %v", err)
 		}
 		defer func() {
-			if err := file.Close(); err != nil {
-				log.Printf("close attachment: %v\n", err)
+			if closeErr := file.Close(); closeErr != nil && err == nil {
+				err = fmt.Errorf("close attachment: %v", err)
 			}
 		}()
 
@@ -54,11 +64,11 @@ func (s *srv) getAttachmentHandler() http.Handler {
 	})
 }
 
-func (s *srv) deleteAttachmentHandler() http.Handler {
+func newDeleteAttachmentHandler(updater attachmentUpdater) http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
 		id := mux.Vars(r)["id"]
-		err := s.repos.Attachments().Delete(r.Context(), id, util.NowTimeMillis())
-		if err == repo.ErrNotFound {
+		err := updater.DeleteAttachment(r.Context(), id, util.NowTimeMillis())
+		if errors.Is(err, repo.ErrNotFound) {
 			return errNotFound(err)
 		} else if err != nil {
 			return fmt.Errorf("delete attachment: %v", err)
@@ -68,9 +78,9 @@ func (s *srv) deleteAttachmentHandler() http.Handler {
 	})
 }
 
-func (s *srv) getAttachmentCollectionHandler() http.Handler {
+func newGetAttachmentCollectionHandler(finder attachmentFinder) http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		attachments, err := s.repos.Attachments().FindAll(r.Context(), false)
+		attachments, err := finder.AllAttachments(r.Context())
 		if err != nil {
 			return fmt.Errorf("get all attachments: %v", err)
 		}
@@ -78,9 +88,9 @@ func (s *srv) getAttachmentCollectionHandler() http.Handler {
 	})
 }
 
-func (s *srv) deleteAttachmentCollectionHandler() http.Handler {
+func newDeleteAttachmentCollectionHandler(updater attachmentUpdater) http.Handler {
 	return errorHandler(func(w http.ResponseWriter, r *http.Request) error {
-		err := s.repos.Attachments().DeleteAll(r.Context(), util.NowTimeMillis())
+		err := updater.DeleteAllAttachments(r.Context(), util.NowTimeMillis())
 		if err != nil {
 			return fmt.Errorf("delete all attachments: %v", err)
 		}
