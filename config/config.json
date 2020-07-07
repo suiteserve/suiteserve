@@ -26,8 +26,8 @@
       "host": "localhost",
       "port": 27017,
       "rs": "rs0",
-      "db": "testpass",
-      "user": "testpass",
+      "db": "suiteserve",
+      "user": "suiteserve",
       "pass_file": "config/passfile"
     }
   }
