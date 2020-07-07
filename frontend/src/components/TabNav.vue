@@ -19,7 +19,7 @@
           <slot name="item" :item="item"></slot>
         </div>
       </router-link>
-      <a class="nav-item" href="#" v-if="isMore" @click="$emit('load-more')">
+      <a class="nav-item" href="#" v-if="haveMore" @click="$emit('load-more')">
         <div class="nav-item-inner">
           <p>Load More</p>
         </div>
@@ -28,23 +28,25 @@
   </nav>
 </template>
 
-<script>
-  export default {
+<script lang="ts">
+  import Vue, {PropType} from 'vue';
+
+  export default Vue.extend({
     name: 'TabNav',
     props: {
       title: {
         type: String,
         required: true,
       },
-      stats: Object,
+      stats: Object as PropType<{[name: string]: any}>,
       linkGen: {
-        type: Function,
+        type: Function as PropType<(itemId: string) => string>,
         required: true,
       },
-      items: Array,
-      isMore: Boolean,
+      items: Array as PropType<Array<any>>,
+      haveMore: Boolean,
     },
-  };
+  });
 </script>
 
 <style scoped>

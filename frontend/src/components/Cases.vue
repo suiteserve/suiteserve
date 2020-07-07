@@ -1,5 +1,5 @@
 <template>
-  <TabNav title="Cases" :link-gen="genLink" :items="cases" :stats="{
+  <TabNav title="Cases" :link-gen="genLink" :items="[]" :stats="{
     'Waiting': waitingCount,
     'Running': runningCount,
     'Finished': finishedCount,
@@ -12,45 +12,37 @@
   </TabNav>
 </template>
 
-<script>
-  import TabNav from './TabNav';
+<script lang="ts">
+  import Vue from 'vue';
+  import {Route} from 'vue-router';
+  import TabNav from '@/components/TabNav.vue';
 
-  export default {
+  export default Vue.extend({
     name: 'Cases',
     props: {
       suiteId: String,
       caseId: String,
     },
-    data() {
-      return {
-        cases: [],
-      };
-    },
-    created() {
-      this.load();
-    },
     watch: {
-      $route: function (to, from) {
+      $route: function (to: Route, from: Route) {
         if (to.params.suiteId !== from.params.suiteId) {
-          this.load();
+          // this.load();
         }
       },
     },
     computed: {
-      waitingCount() {
-        return this.cases.filter(c => c.status === 'created').length;
+      waitingCount(): number {
+        return 3;
       },
-      runningCount() {
-        return this.cases.filter(c => c.status === 'running').length;
+      runningCount(): number {
+        return 5;
       },
-      finishedCount() {
-        return this.cases
-          .filter(c => c.status !== 'created' && c.status !== 'running')
-          .length;
+      finishedCount(): number {
+        return 9;
       },
     },
     methods: {
-      genLink(caseId) {
+      genLink(caseId: string) {
         return {
           name: 'case',
           params: {
@@ -59,26 +51,11 @@
           },
         };
       },
-      async load() {
-        const suiteId = this.suiteId;
-        const url = new URL(`/v1/suites/${suiteId}/cases`, window.location.href);
-        const res = await fetch(url.href);
-        const json = await res.json();
-
-        if (!res.ok) {
-          throw `Error loading cases: ${json.error}`;
-        }
-
-        // this.suiteId could have changed while awaiting
-        if (this.suiteId === suiteId) {
-          this.cases = json;
-        }
-      },
     },
     components: {
       TabNav,
     },
-  };
+  });
 </script>
 
 <style scoped>

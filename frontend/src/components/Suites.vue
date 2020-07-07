@@ -1,8 +1,9 @@
 <template>
-  <TabNav title="Suites" :link-gen="genLink" :items="suites" :is-more="isMore" :stats="{
-    'Running': runningCount,
-    'Finished': finishedCount,
-  }" @load-more="load">
+  <TabNav title="Suites" :link-gen="genLink" :items="suites"
+          :have-more="haveMore" @load-more="loadMore" :stats="{
+    'Running': running,
+    'Finished': finished,
+  }">
     <template #item="{ item }">
       <div>
         <p>{{ item.name }}</p>
@@ -12,74 +13,50 @@
   </TabNav>
 </template>
 
-<script>
-  import TabNav from './TabNav';
+<script lang="ts">
+  import Vue from 'vue';
+  import * as api from '@/api';
+  import TabNav from '@/components/TabNav.vue';
 
-  export default {
+  export default Vue.extend({
     name: 'Suites',
-    data() {
-      return {
-        suites: [],
-        runningCount: 0,
-        finishedCount: 0,
-        nextId: null,
-      };
-    },
-    created() {
-      this.load(true);
-    },
     computed: {
-      isMore() {
-        return this.nextId !== null;
+      suites(): ReadonlyArray<api.Suite> {
+        return this.$store.getters.suites;
+      },
+      running(): number {
+        return this.$store.getters.suiteAggs.running;
+      },
+      finished(): number {
+        return this.$store.getters.suiteAggs.finished;
+      },
+      haveMore() {
+        return this.$store.getters.moreSuites;
       },
     },
     methods: {
-      genLink(suiteId) {
-        return {
-          name: 'suite',
-          params: {
-            suiteId,
-          },
-        };
+      loadMore() {
+        this.$store.dispatch('fetchSuites');
       },
-      formatUnix(millis) {
-        return new Date(millis).toLocaleString(navigator.languages, {
-          weekday: 'short',
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        });
-      },
-      async load(init) {
-        const url = new URL('/v1/suites', window.location.href);
-        if (this.nextId) {
-          url.searchParams.append('from_id', this.nextId);
-        }
-        url.searchParams.append('limit', '10');
-
-        const res = await fetch(url.href);
-        const json = await res.json();
-
-        if (!res.ok) {
-          throw `Error loading suites: ${json.error}`;
-        }
-
-        if (init) {
-          this.suites = json.suites;
-        } else {
-          this.suites.push(...json.suites);
-        }
-
-        this.runningCount = json.running_count;
-        this.finishedCount = json.finished_count;
-        this.nextId = json.next_id;
-      },
+      genLink: (suiteId: string) => ({
+        name: 'suite',
+        params: {
+          suiteId,
+        },
+      }),
+      formatUnix: (millis: number): string =>
+          new Date(millis).toLocaleString([...navigator.languages], {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
     },
     components: {
       TabNav,
     },
-  };
+  });
 </script>
