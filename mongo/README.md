@@ -10,9 +10,9 @@ Created users:
   *Password:* `admin`  
   *Roles:* `root`  
   *Auth DB:* `admin`
-- *User:* `testpass`  
-  *Password:* `testpass`  
-  *Roles:* `readWrite` on DB `testpass`  
+- *User:* `suiteserve`  
+  *Password:* `suiteserve`  
+  *Roles:* `readWrite` on DB `suiteserve`  
   *Auth DB:* `admin`
 
 ⚠️ *Warning:* This configuration of MongoDB must only be used for development purposes. Nothing here is secure or production-ready.

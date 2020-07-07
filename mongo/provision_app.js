@@ -1,8 +1,8 @@
 // noinspection JSUnresolvedVariable,JSUnresolvedFunction
 db.createUser({
-    user: 'testpass',
-    pwd: 'testpass',
-    roles: [
-        {role: 'readWrite', db: 'testpass'},
-    ],
+  user: 'suiteserve',
+  pwd: 'suiteserve',
+  roles: [
+    {role: 'readWrite', db: 'suiteserve'},
+  ],
 })

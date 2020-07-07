@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/tmazeika/testpass/config"
-	"github.com/tmazeika/testpass/repo"
-	"github.com/tmazeika/testpass/rest"
-	"github.com/tmazeika/testpass/seed"
-	"github.com/tmazeika/testpass/suitesrv"
+	"github.com/suiteserve/suiteserve/config"
+	"github.com/suiteserve/suiteserve/repo"
+	"github.com/suiteserve/suiteserve/rest"
+	"github.com/suiteserve/suiteserve/seed"
+	"github.com/suiteserve/suiteserve/suitesrv"
 	"log"
 	"net"
 	"net/http"
@@ -23,7 +23,7 @@ type Repo interface {
 	seed.Repo
 	suitesrv.Repo
 
-	Seedable() bool
+	Seedable() (bool, error)
 	Close() error
 }
 
@@ -81,7 +81,11 @@ func main() {
 	}()
 
 	if *seedFlag {
-		if r.Seedable() {
+		seedable, err := r.Seedable()
+		if err != nil {
+			log.Fatalf("check db seedability: %v\n", err)
+		}
+		if seedable {
 			log.Println("Seeding database...")
 			if err := seed.Seed(r); err != nil {
 				log.Fatalln(err)
