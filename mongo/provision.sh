@@ -11,6 +11,6 @@ echo "Creating admin user..."
 docker-compose exec mongo bash -c "mongo admin /data/provision_admin.js"
 echo "Creating suiteserve user..."
 docker-compose exec mongo bash -c "mongo -u admin -p admin --authenticationDatabase admin admin /data/provision_app.js"
-echo "Done provisioning MongoDb!"
+echo "Done provisioning MongoDB!"
 echo "Bringing up everything..."
 docker-compose up
