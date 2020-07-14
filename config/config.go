@@ -1,75 +1,55 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/go-playground/validator/v10"
 	"io/ioutil"
 	"log"
-	"strings"
-	"time"
 )
 
 type Config struct {
 	Http struct {
-		Host            string        `json:"host" validate:"required"`
-		Port            uint16        `json:"port"`
-		TlsCertFile     string        `json:"tls_cert_file" validate:"required,file"`
-		TlsKeyFile      string        `json:"tls_key_file" validate:"required,file"`
-		PublicDir       string        `json:"public_dir" validate:"required"`
-		ShutdownTimeout time.Duration `json:"-"`
+		Host            string `json:"host"`
+		UserContentHost string `json:"user_content_host"`
+		Port            string `json:"port"`
+		TlsCertFile     string `json:"tls_cert_file"`
+		TlsKeyFile      string `json:"tls_key_file"`
+		FrontendDir     string `json:"frontend_dir"`
 	} `json:"http"`
 
-	SuiteSrv struct {
-		Host            string `json:"host" validate:"required"`
-		Port            uint16 `json:"port"`
-		TlsCertFile     string `json:"tls_cert_file" validate:"required,file"`
-		TlsKeyFile      string `json:"tls_key_file" validate:"required,file"`
-		ReconnectPeriod int    `json:"reconnect_period" validate:"min=0"`
-	} `json:"suite_srv"`
-
 	Storage struct {
-		Timeout int `json:"timeout" validate:"min=1"`
-
-		Attachments struct {
-			FilePattern string `json:"file_pattern" validate:"contains=*"`
-			MaxSizeMb   int    `json:"max_size_mb" validate:"min=-1"`
-		} `json:"attachments"`
+		UserContent struct {
+			Dir       string `json:"dir"`
+			MaxSizeMb int    `json:"max_size_mb"`
+		} `json:"user_content"`
 
 		BuntDb *struct {
-			File string `json:"file" validate:"required"`
-		} `json:"buntdb" validate:"required_without_all=MongoDb"`
+			File string `json:"file"`
+		} `json:"buntdb"`
 
 		MongoDb *struct {
-			Host     string `json:"host" validate:"required"`
+			Host     string `json:"host"`
 			Port     uint16 `json:"port"`
-			Rs       string `json:"rs" validate:"required"`
-			Db       string `json:"db" validate:"required"`
-			User     string `json:"user" validate:"required"`
-			PassFile string `json:"pass_file" validate:"required,file"`
-		} `json:"mongodb" validate:"required_without_all=BuntDb"`
+			Rs       string `json:"rs"`
+			Db       string `json:"db"`
+			User     string `json:"user"`
+			PassFile string `json:"pass_file"`
+		} `json:"mongodb"`
 	} `json:"storage"`
 }
-
-var validate = validator.New()
 
 func New(filename string) (*Config, error) {
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %v", err)
 	}
-	var c Config
-	if err := json.Unmarshal(b, &c); err != nil {
-		return nil, fmt.Errorf("unmarshal config: %v", err)
-	}
-	if err := validate.Struct(&c); err != nil {
-		return nil, err
+	var cfg Config
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return nil, fmt.Errorf("parse config json: %v", err)
 	}
 
-	// hidden constants
-	c.Http.ShutdownTimeout = 10 * time.Second
-
-	return &c, err
+	return &cfg, err
 }
 
 func ReadFile(filename string) string {
@@ -77,5 +57,5 @@ func ReadFile(filename string) string {
 	if err != nil {
 		log.Fatalf("read file from config: %v\n", err)
 	}
-	return strings.TrimRight(string(b), "\r\n")
+	return string(bytes.TrimRight(b, "\r\n"))
 }

@@ -1,22 +1,15 @@
 {
   "http": {
     "host": "localhost",
-    "port": 8080,
+    "user_content_host": "localhostusercontent",
+    "port": "8080",
     "tls_cert_file": "config/cert.pem",
     "tls_key_file": "config/key.pem",
-    "public_dir": "frontend/dist/"
-  },
-  "suite_srv": {
-    "host": "localhost",
-    "port": 8081,
-    "tls_cert_file": "config/cert.pem",
-    "tls_key_file": "config/key.pem",
-    "reconnect_period": 60
+    "frontend_dir": "frontend/dist/"
   },
   "storage": {
-    "timeout": 10,
-    "attachments": {
-      "file_pattern": "data/*.attachment",
+    "user_content": {
+      "dir": "data/usercontent/",
       "max_size_mb": 64
     },
     "buntdb": {
