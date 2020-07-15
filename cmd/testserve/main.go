@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/suiteserve/suiteserve/internal/api"
+	"github.com/suiteserve/suiteserve/internal/rpc"
 	"time"
 )
 
@@ -16,6 +17,7 @@ func main() {
 		UserContentHost:     "localhostusercontent",
 		UserContentDir:      "data/usercontent/",
 		UserContentMetaRepo: repo{},
+		Rpc:                 rpc.New(),
 	})
 	defer srv.Stop()
 	for {

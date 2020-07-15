@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 )
 
 func newLoggingMiddleware(h http.Handler) http.Handler {
@@ -24,20 +23,6 @@ func newGetMiddleware(h http.Handler) http.Handler {
 				http.StatusMethodNotAllowed)
 			return
 		}
-		h.ServeHTTP(w, r)
-	})
-}
-
-func newHijackMiddleware(wg *sync.WaitGroup, h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := w.(http.Hijacker); !ok {
-			log.Printf("cannot hijack resp")
-			http.Error(w, http.StatusText(http.StatusInternalServerError),
-				http.StatusInternalServerError)
-			return
-		}
-		wg.Add(1)
-		defer wg.Done()
 		h.ServeHTTP(w, r)
 	})
 }
