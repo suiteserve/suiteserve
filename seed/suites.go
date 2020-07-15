@@ -1,7 +1,7 @@
 package seed
 
 import (
-	"github.com/tmazeika/testpass/repo"
+	"github.com/suiteserve/suiteserve/repo"
 )
 
 var suites = []repo.UnsavedSuite{
@@ -19,7 +19,7 @@ var suites = []repo.UnsavedSuite{
 		Status:       repo.SuiteStatusRunning,
 	},
 	{
-		Name: "Volutpat Purus",
+		Name:         "Volutpat Purus",
 		PlannedCases: 0,
 		Status:       repo.SuiteStatusRunning,
 	},

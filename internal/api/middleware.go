@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 func newLoggingMiddleware(h http.Handler) http.Handler {
@@ -27,27 +28,16 @@ func newGetMiddleware(h http.Handler) http.Handler {
 	})
 }
 
-func newHijackMiddleware(s *Server, h http.Handler) http.Handler {
+func newHijackMiddleware(wg *sync.WaitGroup, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := w.(http.Hijacker); !ok {
-			log.Printf("cannot upgrade http connection")
+			log.Printf("cannot hijack resp")
 			http.Error(w, http.StatusText(http.StatusInternalServerError),
 				http.StatusInternalServerError)
 			return
 		}
-		s.wg.Add(1)
-		defer s.wg.Done()
-		h.ServeHTTP(w, r)
-	})
-}
-
-func newUpgradeMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.ToLower(r.Header.Get("Connection")) != "upgrade" {
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed),
-				http.StatusMethodNotAllowed)
-			return
-		}
+		wg.Add(1)
+		defer wg.Done()
 		h.ServeHTTP(w, r)
 	})
 }
@@ -97,10 +87,12 @@ func newUserContentMiddleware(repo UserContentMetaRepo, h http.Handler) http.Han
 		id := strings.TrimPrefix(r.URL.Path, "/")
 		meta, err := repo.UserContentMeta(r.Context(), id)
 		if isNotFound(err) {
-			http.Error(w, err.Error(), http.StatusNotFound)
+			http.Error(w, http.StatusText(http.StatusNotFound),
+				http.StatusNotFound)
 			return
 		} else if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError),
+				http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("content-disposition",

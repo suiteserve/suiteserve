@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/suiteserve/suiteserve/api"
+	"github.com/suiteserve/suiteserve/internal/api"
 	"time"
 )
 

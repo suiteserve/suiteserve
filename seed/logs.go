@@ -1,12 +1,12 @@
 package seed
 
 import (
-	"github.com/tmazeika/testpass/repo"
+	"github.com/suiteserve/suiteserve/repo"
 )
 
 var logLines = []repo.UnsavedLogLine{
 	{
-		Level:   "info",
+		Level: "info",
 	},
 	{
 		Level:   "info",

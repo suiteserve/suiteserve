@@ -85,6 +85,7 @@ func consumeList(s []rune, elementFunc func(int, []rune) int) []string {
 
 // consumeLws consumes:
 //   *LWS
+// where:
 //   LWS = [CRLF] 1*( SP | HT )
 func consumeLws(i int, s []rune) int {
 	// base case since this function is recursive: exit when s[i] doesn't start
@@ -114,6 +115,7 @@ func consumeLws(i int, s []rune) int {
 
 // consumeProduct consumes:
 //   product         = token ["/" product-version]
+// where:
 //   product-version = token
 func consumeProduct(i int, s []rune) int {
 	i = consumeToken(i, s)

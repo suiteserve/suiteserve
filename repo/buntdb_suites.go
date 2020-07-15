@@ -23,9 +23,7 @@ func (d *BuntDb) Suite(_ context.Context, id string) (*Suite, error) {
 }
 
 func (d *BuntDb) SuitePage(_ context.Context, fromId string, limit int) (*SuitePage, error) {
-	page := SuitePage{
-		Suites: make([]Suite, 0),
-	}
+	var page SuitePage
 	itr := func(k, v string) bool {
 		if gjson.Get(v, "deleted").Bool() {
 			return false
@@ -62,14 +60,17 @@ func (d *BuntDb) SuitePage(_ context.Context, fromId string, limit int) (*SuiteP
 				return err
 			}
 		}
-		return tx.Ascend("suites_status", func(k, v string) bool {
-			if gjson.Get(v, "status").String() == string(SuiteStatusRunning) {
-				page.RunningCount++
-			} else {
-				page.FinishedCount++
-			}
-			return true
-		})
+		var err error
+		page.Aggs.Version, err = getInt(tx, buntDbKey(CollSuiteAggs, "version"))
+		if err != nil {
+			return err
+		}
+		page.Aggs.Running, err = getInt(tx, buntDbKey(CollSuiteAggs, "running"))
+		if err != nil {
+			return err
+		}
+		page.Aggs.Finished, err = getInt(tx, buntDbKey(CollSuiteAggs, "finished"))
+		return err
 	})
 	if err != nil {
 		return nil, err

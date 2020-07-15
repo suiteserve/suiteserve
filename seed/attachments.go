@@ -2,7 +2,7 @@ package seed
 
 import (
 	"bytes"
-	"github.com/tmazeika/testpass/repo"
+	"github.com/suiteserve/suiteserve/repo"
 	"image"
 	"image/color"
 	"image/png"

@@ -26,5 +26,5 @@ type LogLine struct {
 
 type LogPage struct {
 	NextId *string   `json:"next_id" bson:"next_id,omitempty"`
-	Lines  []LogLine `json:"lines" bson:",omitempty"`
+	Lines  []LogLine `json:"lines,omitempty" bson:",omitempty"`
 }

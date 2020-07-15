@@ -7,10 +7,16 @@ import (
 type Coll string
 
 const (
+	// CollAttachments is the collection of attachments.
 	CollAttachments Coll = "attachments"
-	CollCases       Coll = "cases"
-	CollLogs        Coll = "logs"
-	CollSuites      Coll = "suites"
+	// CollCases is the collection of cases.
+	CollCases Coll = "cases"
+	// CollLogs is the collection of logs.
+	CollLogs Coll = "logs"
+	// CollSuites is the collection of suites.
+	CollSuites Coll = "suites"
+	// CollSuiteAggs is the collection of aggregations of the suite collection.
+	CollSuiteAggs Coll = "suite_aggs"
 )
 
 type SavedEntity struct {

@@ -39,9 +39,14 @@ type Suite struct {
 	UnsavedSuite    `bson:",inline"`
 }
 
+type SuiteAggs struct {
+	VersionedEntity `bson:",inline"`
+	Running         int64 `json:"running"`
+	Finished        int64 `json:"finished"`
+}
+
 type SuitePage struct {
-	RunningCount  int64   `json:"running_count" bson:"running_count"`
-	FinishedCount int64   `json:"finished_count" bson:"finished_count"`
-	NextId        *string `json:"next_id" bson:"next_id,omitempty"`
-	Suites        []Suite `json:"suites" bson:",omitempty"`
+	Aggs   SuiteAggs `json:"aggs" bson:",inline"`
+	NextId *string   `json:"next_id" bson:"next_id,omitempty"`
+	Suites []Suite   `json:"suites,omitempty" bson:",omitempty"`
 }

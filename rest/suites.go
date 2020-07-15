@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
-	util "github.com/tmazeika/testpass/internal"
-	"github.com/tmazeika/testpass/repo"
+	util "github.com/suiteserve/suiteserve/internal"
+	"github.com/suiteserve/suiteserve/repo"
 	"net/http"
 	"strconv"
 )

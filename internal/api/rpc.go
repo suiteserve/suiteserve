@@ -15,7 +15,7 @@ func (s *Server) initRpc() {
 	}
 }
 
-func (s *Server) serveRpc(conn io.ReadWriteCloser) {
+func (s *Server) serveJsonRpc10(conn io.ReadWriteCloser) {
 	s.rpc.ServeCodec(jsonrpc.NewServerCodec(conn))
 }
 

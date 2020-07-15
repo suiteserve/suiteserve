@@ -9,40 +9,59 @@ const (
 	ChangeOpUpdate ChangeOp = "update"
 )
 
-type Change struct {
-	Op   ChangeOp `json:"op"`
-	Coll Coll     `json:"coll"`
+type Change interface {
+	Operation() ChangeOp
+	Collection() Coll
+	DocId() string
 }
 
-type InsertChange struct {
-	Change
+type DocChange struct {
+	Op   ChangeOp `json:"op"`
+	Coll Coll     `json:"coll"`
+	Id   string   `json:"id"`
+}
+
+func (c *DocChange) Operation() ChangeOp {
+	return c.Op
+}
+
+func (c *DocChange) Collection() Coll {
+	return c.Coll
+}
+
+func (c *DocChange) DocId() string {
+	return c.Id
+}
+
+type InsertDocChange struct {
+	DocChange
 	Doc json.RawMessage `json:"doc"`
 }
 
-func newInsertChange(coll Coll, doc json.RawMessage) *InsertChange {
-	return &InsertChange{
-		Change: Change{
+func newInsertDocChange(coll Coll, id string, doc json.RawMessage) *InsertDocChange {
+	return &InsertDocChange{
+		DocChange: DocChange{
 			Op:   ChangeOpInsert,
 			Coll: coll,
+			Id:   id,
 		},
 		Doc: doc,
 	}
 }
 
-type UpdateChange struct {
-	Change
-	Id      string                 `json:"id"`
-	Updated map[string]interface{} `json:"updated,omitempty"`
-	Deleted []string               `json:"deleted,omitempty"`
+type UpdateDocChange struct {
+	DocChange
+	Updated map[string]interface{} `json:"updated"`
+	Deleted []string               `json:"deleted"`
 }
 
-func newUpdateChange(coll Coll, id string, updated map[string]interface{}, deleted []string) *UpdateChange {
-	return &UpdateChange{
-		Change: Change{
+func newUpdateDocChange(coll Coll, id string, updated map[string]interface{}, deleted []string) *UpdateDocChange {
+	return &UpdateDocChange{
+		DocChange: DocChange{
 			Op:   ChangeOpUpdate,
 			Coll: coll,
+			Id:   id,
 		},
-		Id:      id,
 		Updated: updated,
 		Deleted: deleted,
 	}

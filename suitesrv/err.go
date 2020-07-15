@@ -2,7 +2,7 @@ package suitesrv
 
 import (
 	"errors"
-	"github.com/tmazeika/testpass/repo"
+	"github.com/suiteserve/suiteserve/repo"
 )
 
 func errTmpIo(reason string) error {

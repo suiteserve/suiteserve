@@ -5,20 +5,18 @@ import (
 	"fmt"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/tmazeika/testpass/event"
 	"log"
 	"net/http"
 )
 
 type Repo interface {
+	changefeedRepo
 	attachmentFinder
 	attachmentUpdater
-	caseFinder
-	logFinder
 	suiteFinder
 	suiteUpdater
-
-	Changes() *event.Bus
+	caseFinder
+	logFinder
 }
 
 func Handler(repo Repo, publicDir string) http.Handler {
@@ -69,9 +67,9 @@ func Handler(repo Repo, publicDir string) http.Handler {
 	api.Path("/cases/{case_id}/logs").
 		Handler(newGetLogCollectionHandler(repo)).
 		Methods(http.MethodGet)
-	// changes
-	api.Path("/changes").
-		Handler(newChanges(repo).newHandler()).
+	// changefeed
+	api.Path("/changefeed").
+		Handler(newChangefeed(repo).newHandler()).
 		Methods(http.MethodGet)
 
 	// frontend

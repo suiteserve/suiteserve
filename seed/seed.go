@@ -2,7 +2,7 @@ package seed
 
 import (
 	"context"
-	"github.com/tmazeika/testpass/repo"
+	"github.com/suiteserve/suiteserve/repo"
 	"io"
 )
 
@@ -51,7 +51,7 @@ func Seed(r Repo) error {
 		seededAttachments = append(seededAttachments, file.Info())
 
 		if i%20 == 0 {
-			deletedAt := 1590625822618 + int64(i) * 105000
+			deletedAt := 1590625822618 + int64(i)*105000
 			err := r.DeleteAttachment(context.Background(), file.Info().Id, deletedAt)
 			if err != nil {
 				return err
@@ -64,10 +64,10 @@ func Seed(r Repo) error {
 	for i := 0; i < suiteCount; i++ {
 		seedSuite := suites[i%len(suites)]
 
-		seedSuite.StartedAt = 1590627102982 + int64(i) * 100230
+		seedSuite.StartedAt = 1590627102982 + int64(i)*100230
 		if i%26 == 0 {
 			seedSuite.Deleted = true
-			seedSuite.DeletedAt = 1590626812841 + int64(i) * 315300
+			seedSuite.DeletedAt = 1590626812841 + int64(i)*315300
 		}
 		if i%6 > 0 {
 			seedSuite.Attachments = append(seedSuite.Attachments,
@@ -97,13 +97,13 @@ func Seed(r Repo) error {
 					seededAttachments[(i*3)%len(seededAttachments)].Id)
 			}
 
-			seedCase.CreatedAt = 1590628126100 + int64(j) * 307640
+			seedCase.CreatedAt = 1590628126100 + int64(j)*307640
 			if seedCase.Status != repo.CaseStatusCreated {
-				seedCase.StartedAt = 1590628204350 + int64(j) * 1465000
+				seedCase.StartedAt = 1590628204350 + int64(j)*1465000
 			}
 			if seedCase.Status != repo.CaseStatusCreated &&
 				seedCase.Status != repo.CaseStatusRunning {
-				seedCase.FinishedAt = 1590628243183 + int64(j) * 2133000
+				seedCase.FinishedAt = 1590628243183 + int64(j)*2133000
 			}
 
 			caseId, err := r.InsertCase(context.Background(), &seedCase)
@@ -116,7 +116,7 @@ func Seed(r Repo) error {
 
 				seedLogEntry.Case = caseId
 				seedLogEntry.Index = int64(k)
-				seedLogEntry.Timestamp = 1590629158629 + int64(k) * 1511300
+				seedLogEntry.Timestamp = 1590629158629 + int64(k)*1511300
 
 				_, err := r.InsertLogLine(context.Background(), &seedLogEntry)
 				if err != nil {

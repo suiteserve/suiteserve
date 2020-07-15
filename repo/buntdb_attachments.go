@@ -34,7 +34,10 @@ func (d *BuntDb) Attachment(_ context.Context, id string) (AttachmentFile, error
 
 func (d *BuntDb) AllAttachments(_ context.Context) ([]AttachmentFile, error) {
 	var attachments []Attachment
-	if err := d.findAll("attachments_deleted", &attachments); err != nil {
+	err := d.findAllBy("attachments_deleted", map[string]interface{}{
+		"deleted": false,
+	}, &attachments)
+	if err != nil {
 		return nil, err
 	}
 	files := make([]AttachmentFile, len(attachments))

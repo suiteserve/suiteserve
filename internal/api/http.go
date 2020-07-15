@@ -3,20 +3,24 @@ package api
 import (
 	"context"
 	"github.com/gorilla/websocket"
-	"io"
-	"io/ioutil"
+	"github.com/suiteserve/suiteserve/httpheader"
 	"log"
 	"net"
 	"net/http"
 	"net/rpc"
+	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	protoV1         = "suiteserve/1"
+	jsonRpc10       = "json-rpc/1.0"
 	shutdownTimeout = 3 * time.Second
 )
+
+var protos = map[string]bool{
+	jsonRpc10: true,
+}
 
 type Options struct {
 	Host      string
@@ -32,7 +36,8 @@ type Options struct {
 
 type Server struct {
 	cancel   func()
-	opts     Options
+	err      chan error
+	opts     *Options
 	rpc      *rpc.Server
 	srv      http.Server
 	stopping bool
@@ -40,7 +45,7 @@ type Server struct {
 	wg       sync.WaitGroup
 }
 
-func newServer(opts Options) *Server {
+func newServer(opts *Options) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	var s Server
 	s.cancel = cancel
@@ -50,13 +55,13 @@ func newServer(opts Options) *Server {
 	s.srv.BaseContext = func(net.Listener) context.Context {
 		return ctx
 	}
-	s.setHandler()
 	s.initRpc()
+	s.setHandler()
 	return &s
 }
 
 func Serve(opts Options) *Server {
-	s := newServer(opts)
+	s := newServer(&opts)
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
@@ -65,15 +70,21 @@ func Serve(opts Options) *Server {
 	return s
 }
 
+func (s *Server) Err() <-chan error {
+	return s.err
+}
+
 func (s *Server) Stop() {
 	s.stopOnce.Do(s.stop)
 }
 
 func (s *Server) serve() {
 	log.Printf("Binding HTTP to %s", net.JoinHostPort(s.opts.Host, s.opts.Port))
+	s.err = make(chan error)
 	err := s.srv.ListenAndServeTLS(s.opts.CertFile, s.opts.KeyFile)
 	if err != http.ErrServerClosed {
-		log.Fatalf("listen and serve http: %v", err)
+		log.Printf("listen and serve http: %v", err)
+		s.err <- err
 	}
 }
 
@@ -92,10 +103,10 @@ func (s *Server) stop() {
 func (s *Server) setHandler() {
 	var mux http.ServeMux
 	mux.Handle("/changefeed",
-		newHijackMiddleware(s,
+		newHijackMiddleware(&s.wg,
 			s.newWsHandler()))
 	mux.Handle("/instance",
-		newHijackMiddleware(s,
+		newHijackMiddleware(&s.wg,
 			s.newTcpHandler()))
 	mux.Handle("/",
 		newSecurityMiddleware(
@@ -145,7 +156,7 @@ func (c *wsClient) Close() error {
 
 func (s *Server) newWsHandler() http.Handler {
 	upgrader := websocket.Upgrader{
-		Subprotocols: []string{protoV1},
+		Subprotocols: []string{jsonRpc10},
 		CheckOrigin: func(r *http.Request) bool {
 			// TODO: not for production; may want a 'dev' config option
 			return true
@@ -157,27 +168,43 @@ func (s *Server) newWsHandler() http.Handler {
 			log.Printf("upgrade ws: %v", err)
 			return
 		}
+		// use negotiated subprotocol or default to latest
+		proto := conn.Subprotocol()
+		if proto == "" {
+			proto = jsonRpc10
+		}
 		go func() {
 			<-r.Context().Done()
-			if err := conn.Close(); err != nil {
+			if err := conn.Close(); err != nil && !s.stopping {
 				log.Printf("close ws: %v", err)
 			}
 		}()
-		s.serveRpc(&wsClient{conn: conn})
+		s.serveJsonRpc10(&wsClient{conn: conn})
 	})
 }
 
 func (s *Server) newTcpHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: respond
-		conn, rw, err := w.(http.Hijacker).Hijack()
+		// TODO: may want to check origin
+		proto, ok := getUpgradeProto(r)
+		if !ok || !isConnUpgrade(r) {
+			w.Header().Set("connection", "upgrade")
+			w.Header().Set("upgrade", strings.Join([]string{jsonRpc10}, ", "))
+			http.Error(w, http.StatusText(http.StatusUpgradeRequired),
+				http.StatusUpgradeRequired)
+			return
+		}
+		w.Header().Set("connection", "upgrade")
+		w.Header().Set("upgrade", proto)
+		w.WriteHeader(http.StatusSwitchingProtocols)
+		conn, _, err := w.(http.Hijacker).Hijack()
 		if err != nil {
 			log.Printf("upgrade tcp: %v", err)
 			return
 		}
 		go func() {
 			<-r.Context().Done()
-			if err := conn.Close(); err != nil {
+			if err := conn.Close(); err != nil && !s.stopping {
 				log.Printf("close tcp: %v", err)
 			}
 		}()
@@ -185,9 +212,27 @@ func (s *Server) newTcpHandler() http.Handler {
 			log.Printf("set tcp deadline: %v", err)
 			return
 		}
-		if _, err := io.Copy(ioutil.Discard, rw); err != nil {
-			log.Printf("discard tcp rw: %v", err)
-		}
-		s.serveRpc(conn)
+		s.serveJsonRpc10(conn)
 	})
+}
+
+func isConnUpgrade(r *http.Request) bool {
+	tokens := httpheader.ConnectionTokens(r.Header.Values("connection"))
+	for _, t := range tokens {
+		if strings.ToLower(t) == "upgrade" {
+			return true
+		}
+	}
+	return false
+}
+
+func getUpgradeProto(r *http.Request) (string, bool) {
+	tokens := httpheader.UpgradeTokens(r.Header.Values("upgrade"))
+	for _, t := range tokens {
+		p := strings.ToLower(t)
+		if protos[p] {
+			return p, true
+		}
+	}
+	return "", false
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	util "github.com/tmazeika/testpass/internal"
-	"github.com/tmazeika/testpass/repo"
+	util "github.com/suiteserve/suiteserve/internal"
+	"github.com/suiteserve/suiteserve/repo"
 	"net"
 	"time"
 )

@@ -1,14 +1,15 @@
 package repo
 
-type (
-	CaseLinkType string
-	CaseStatus   string
-)
+type CaseLinkType string
 
 const (
 	CaseLinkTypeIssue CaseLinkType = "issue"
 	CaseLinkTypeOther CaseLinkType = "other"
+)
 
+type CaseStatus string
+
+const (
 	CaseStatusCreated  CaseStatus = "created"
 	CaseStatusDisabled CaseStatus = "disabled"
 	CaseStatusRunning  CaseStatus = "running"

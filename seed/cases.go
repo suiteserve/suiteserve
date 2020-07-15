@@ -1,7 +1,7 @@
 package seed
 
 import (
-	"github.com/tmazeika/testpass/repo"
+	"github.com/suiteserve/suiteserve/repo"
 )
 
 var cases = []repo.UnsavedCase{
@@ -73,7 +73,7 @@ var cases = []repo.UnsavedCase{
 				Url:  "https://example.com/sed-pretium-a-enim",
 			},
 		},
-		Status:      repo.CaseStatusFailed,
+		Status: repo.CaseStatusFailed,
 	},
 	{
 		Name:        "Dui Nunc Imperdiet",

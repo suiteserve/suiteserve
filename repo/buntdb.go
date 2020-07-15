@@ -4,12 +4,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/suiteserve/suiteserve/event"
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	"github.com/tmazeika/testpass/event"
 	"log"
 	"reflect"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -25,39 +26,40 @@ func OpenBuntDb(filename string, files *FileRepo) (*BuntDb, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open: %v", err)
 	}
-	if err := createBuntDbIndexes(db); err != nil {
-		return nil, fmt.Errorf("create indexes: %v", err)
-	}
-	return &BuntDb{
+	d := BuntDb{
 		db:    db,
 		files: files,
-	}, nil
+	}
+	if err := d.createIndexes(); err != nil {
+		return nil, fmt.Errorf("create indexes: %v", err)
+	}
+	return &d, nil
 }
 
-func createBuntDbIndexes(db *buntdb.DB) error {
+func (d *BuntDb) createIndexes() error {
 	// attachments
-	err := db.ReplaceIndex("attachments_id", "attachments:*",
+	err := d.db.ReplaceIndex("attachments_id", "attachments:*",
 		buntdb.IndexJSON("id"))
 	if err != nil {
 		return err
 	}
-	err = db.ReplaceIndex("attachments_deleted", "attachments:*",
+	err = d.db.ReplaceIndex("attachments_deleted", "attachments:*",
 		buntdb.IndexJSON("deleted"),
-		buntDbIndexJSONOptional("id"))
+		indexJSONOptional("id"))
 	if err != nil {
 		return err
 	}
 	// cases
-	err = db.ReplaceIndex("cases_suite", "cases:*",
+	err = d.db.ReplaceIndex("cases_suite", "cases:*",
 		buntdb.IndexJSON("suite"),
-		buntDbIndexJSONOptional("num"),
-		buntDbIndexJSONOptional("created_at"),
-		buntDbIndexJSONOptional("id"))
+		indexJSONOptional("num"),
+		indexJSONOptional("created_at"),
+		indexJSONOptional("id"))
 	if err != nil {
 		return err
 	}
 	// logs
-	err = db.ReplaceIndex("logs_case", "logs:*",
+	err = d.db.ReplaceIndex("logs_case", "logs:*",
 		buntdb.IndexJSON("case"),
 		buntdb.IndexJSON("timestamp"),
 		buntdb.IndexJSON("seq"),
@@ -66,22 +68,22 @@ func createBuntDbIndexes(db *buntdb.DB) error {
 		return err
 	}
 	// suites
-	err = db.ReplaceIndex("suites_status", "suites:*",
+	err = d.db.ReplaceIndex("suites_status", "suites:*",
 		buntdb.IndexJSON("status"))
 	if err != nil {
 		return err
 	}
-	err = db.ReplaceIndex("suites_deleted", "suites:*",
+	err = d.db.ReplaceIndex("suites_deleted", "suites:*",
 		buntdb.IndexJSON("deleted"),
-		buntDbIndexJSONOptional("started_at"),
-		buntDbIndexJSONOptional("id"))
+		indexJSONOptional("started_at"),
+		indexJSONOptional("id"))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func buntDbIndexJSONOptional(path string) func(a, b string) bool {
+func indexJSONOptional(path string) func(a, b string) bool {
 	return func(a, b string) bool {
 		aRes := gjson.Get(a, path)
 		bRes := gjson.Get(b, path)
@@ -96,7 +98,7 @@ func (d *BuntDb) Changes() *event.Bus {
 	return &d.changes.Bus
 }
 
-func (d *BuntDb) Seedable() bool {
+func (d *BuntDb) Seedable() (bool, error) {
 	n := 0
 	err := d.db.View(func(tx *buntdb.Tx) error {
 		var err error
@@ -104,15 +106,90 @@ func (d *BuntDb) Seedable() bool {
 		return err
 	})
 	if err != nil {
-		log.Fatalf("check buntdb seedability: %v\n", err)
+		return false, err
 	}
-	return n == 0
+	return n == 0, nil
 }
 
 func (d *BuntDb) Close() error {
 	if err := d.db.Close(); err != nil {
 		return fmt.Errorf("close: %v", err)
 	}
+	return nil
+}
+
+type buntDbUpdate struct {
+	oldV string
+	newV string
+}
+
+func (d *BuntDb) onUpdate(tx *buntdb.Tx, coll Coll, updates []buntDbUpdate) error {
+	switch coll {
+	case CollSuites:
+		return d.onSuiteUpdate(tx, updates)
+	default:
+		return nil
+	}
+}
+
+func (d *BuntDb) onSuiteUpdate(tx *buntdb.Tx, updates []buntDbUpdate) error {
+	runningDelta := int64(0)
+	finishedDelta := int64(0)
+	for _, u := range updates {
+		oldStatus := gjson.Get(u.oldV, "status").String()
+		newStatus := gjson.Get(u.newV, "status").String()
+		runningStr := string(SuiteStatusRunning)
+		if u.oldV == "" {
+			if newStatus == runningStr {
+				runningDelta++
+			} else {
+				finishedDelta++
+			}
+		} else if u.newV == "" {
+			if oldStatus == runningStr {
+				runningDelta--
+			} else {
+				finishedDelta--
+			}
+		} else if oldStatus == runningStr && newStatus != runningStr {
+			runningDelta--
+			finishedDelta++
+		} else if oldStatus != runningStr && newStatus == runningStr {
+			runningDelta++
+			finishedDelta--
+		}
+	}
+	var changed bool
+	m := map[string]interface{}{
+		"version":  0,
+		"running":  0,
+		"finished": 0,
+	}
+	if runningDelta != 0 {
+		n, err := incInt(tx, buntDbKey(CollSuiteAggs, "running"), runningDelta)
+		if err != nil {
+			return err
+		}
+		m["running"] = n
+		changed = true
+	}
+	if finishedDelta != 0 {
+		n, err := incInt(tx, buntDbKey(CollSuiteAggs, "finished"), finishedDelta)
+		if err != nil {
+			return err
+		}
+		m["finished"] = n
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	var err error
+	m["version"], err = incInt(tx, buntDbKey(CollSuiteAggs, "version"), 1)
+	if err != nil {
+		return err
+	}
+	d.changes.Publish(newUpdateDocChange(CollSuiteAggs, "", m, []string{}))
 	return nil
 }
 
@@ -136,13 +213,17 @@ func (d *BuntDb) funcInsert(coll Coll, e interface{}, fn func(id string) error) 
 		log.Panicf("set json: %v\n", err)
 	}
 	err = d.db.Update(func(tx *buntdb.Tx) error {
-		_, _, err = tx.Set(buntDbKey(coll, id), string(v), nil)
+		v := string(v)
+		if err := d.onUpdate(tx, coll, []buntDbUpdate{{"", v}}); err != nil {
+			return err
+		}
+		_, _, err = tx.Set(buntDbKey(coll, id), v, nil)
 		return err
 	})
 	if err != nil {
 		return "", err
 	}
-	d.changes.Publish(newInsertChange(coll, v))
+	d.changes.Publish(newInsertDocChange(coll, id, b))
 	return id, nil
 }
 
@@ -167,16 +248,20 @@ func (d *BuntDb) funcUpdate(coll Coll, id string, fn func(v string) (map[string]
 	k := buntDbKey(coll, id)
 	var updated map[string]interface{}
 	err := d.db.Update(func(tx *buntdb.Tx) error {
-		v, err := tx.Get(k)
+		oldV, err := tx.Get(k)
 		if err != nil {
 			return err
 		}
-		if updated, err = fn(v); err != nil {
+		if updated, err = fn(oldV); err != nil {
 			return err
 		}
-		updated["version"] = gjson.Get(v, "version").Int() + 1
-		v, updated = applyUpdateMap(v, updated)
-		_, _, err = tx.Set(k, v, nil)
+		updated["version"] = gjson.Get(oldV, "version").Int() + 1
+		var newV string
+		newV, updated = applyUpdateMap(oldV, updated)
+		if err := d.onUpdate(tx, coll, []buntDbUpdate{{oldV, newV}}); err != nil {
+			return err
+		}
+		_, _, err = tx.Set(k, newV, nil)
 		return err
 	})
 	if err == buntdb.ErrNotFound {
@@ -184,7 +269,7 @@ func (d *BuntDb) funcUpdate(coll Coll, id string, fn func(v string) (map[string]
 	} else if err != nil {
 		return err
 	}
-	d.changes.Publish(newUpdateChange(coll, id, updated, []string{}))
+	d.changes.Publish(newUpdateDocChange(coll, id, updated, []string{}))
 	return nil
 }
 
@@ -201,24 +286,9 @@ func (d *BuntDb) find(coll Coll, id string, e interface{}) error {
 	} else if err != nil {
 		return err
 	}
-	if err := json.Unmarshal([]byte(v), &e); err != nil {
+	if err := json.Unmarshal([]byte(v), e); err != nil {
 		log.Panicf("unmarshal json: %v\n", err)
 	}
-	return nil
-}
-
-func (d *BuntDb) findAll(index string, entities interface{}) error {
-	var vals []string
-	err := d.db.View(func(tx *buntdb.Tx) error {
-		return tx.AscendEqual(index, `{"deleted":false}`, func(k, v string) bool {
-			vals = append(vals, v)
-			return true
-		})
-	})
-	if err != nil {
-		return err
-	}
-	jsonValsToArr(vals, entities)
 	return nil
 }
 
@@ -245,16 +315,20 @@ func (d *BuntDb) delete(coll Coll, id string, at int64) error {
 	k := buntDbKey(coll, id)
 	var updated map[string]interface{}
 	err := d.db.Update(func(tx *buntdb.Tx) error {
-		v, err := tx.Get(k)
+		oldV, err := tx.Get(k)
 		if err != nil {
 			return err
 		}
-		v, updated = applyUpdateMap(v, map[string]interface{}{
+		var newV string
+		newV, updated = applyUpdateMap(oldV, map[string]interface{}{
 			"deleted":    true,
 			"deleted_at": at,
-			"version":    gjson.Get(v, "version").Int() + 1,
+			"version":    gjson.Get(oldV, "version").Int() + 1,
 		})
-		_, _, err = tx.Set(k, v, nil)
+		if err := d.onUpdate(tx, coll, []buntDbUpdate{{oldV, newV}}); err != nil {
+			return err
+		}
+		_, _, err = tx.Set(k, newV, nil)
 		return err
 	})
 	if err == buntdb.ErrNotFound {
@@ -262,7 +336,7 @@ func (d *BuntDb) delete(coll Coll, id string, at int64) error {
 	} else if err != nil {
 		return err
 	}
-	d.changes.Publish(newUpdateChange(coll, id, updated, []string{}))
+	d.changes.Publish(newUpdateDocChange(coll, id, updated, []string{}))
 	return nil
 }
 
@@ -270,7 +344,9 @@ func (d *BuntDb) deleteAll(coll Coll, index string, at int64) error {
 	var updated map[string]map[string]interface{}
 	var setErr error
 	err := d.db.Update(func(tx *buntdb.Tx) error {
-		return tx.AscendEqual(index, `{"deleted":false}`, func(k, v string) bool {
+		var updates []buntDbUpdate
+		err := tx.AscendEqual(index, `{"deleted":false}`, func(k, v string) bool {
+			updates = append(updates, buntDbUpdate{v, ""})
 			v, innerUpdated := applyUpdateMap(v, map[string]interface{}{
 				"deleted":    true,
 				"deleted_at": at,
@@ -283,6 +359,10 @@ func (d *BuntDb) deleteAll(coll Coll, index string, at int64) error {
 			}
 			return true
 		})
+		if err != nil {
+			return err
+		}
+		return d.onUpdate(tx, coll, updates)
 	})
 	if setErr != nil {
 		return setErr
@@ -290,9 +370,35 @@ func (d *BuntDb) deleteAll(coll Coll, index string, at int64) error {
 		return err
 	}
 	for id, innerUpdated := range updated {
-		d.changes.Publish(newUpdateChange(coll, id, innerUpdated, []string{}))
+		d.changes.Publish(newUpdateDocChange(coll, id, innerUpdated, []string{}))
 	}
 	return nil
+}
+
+func incInt(tx *buntdb.Tx, k string, delta int64) (new int64, err error) {
+	new, err = getInt(tx, k)
+	if err != nil {
+		return 0, err
+	}
+	new += delta
+	if _, _, err := tx.Set(k, strconv.FormatInt(new, 10), nil); err != nil {
+		return 0, err
+	}
+	return new, nil
+}
+
+func getInt(tx *buntdb.Tx, k string) (int64, error) {
+	old, err := tx.Get(k)
+	if err == buntdb.ErrNotFound {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	i, err := strconv.ParseInt(old, 10, 64)
+	if err != nil {
+		log.Panicf("parse value as int at key %q: %v\n", k, err)
+	}
+	return i, err
 }
 
 func applyUpdateMap(s string, m map[string]interface{}) (string, map[string]interface{}) {
@@ -325,5 +431,5 @@ func jsonValsToArr(vals []string, arr interface{}) {
 }
 
 func buntDbKey(coll Coll, id string) string {
-	return fmt.Sprintf("%s:%s", coll, id)
+	return string(coll) + ":" + id
 }
