@@ -12,7 +12,7 @@ func TestRepo_Attachment(t *testing.T) {
 	r := Open(t)
 	_, err := r.Attachment("nonexistent")
 	if !errors.Is(err, repo.ErrNotFound) {
-		t.Errorf("want ErrNotFound, got %v", err)
+		t.Errorf("got %v, want ErrNotFound", err)
 	}
 
 	a := repo.Attachment{
@@ -29,14 +29,14 @@ func TestRepo_Attachment(t *testing.T) {
 		t.Fatalf("insert attachment: %v", err)
 	}
 
-	a.Id = id
-	want := &a
 	got, err := r.Attachment(id)
 	if err != nil {
 		t.Fatalf("get attachment: %v", err)
 	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want %+v, got %+v", want, got)
+	a.Id = id
+	want := &a
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
 
@@ -47,7 +47,7 @@ func TestRepo_SuiteAttachments(t *testing.T) {
 		t.Fatalf("get suite attachments: %v", err)
 	}
 	if len(all) > 0 {
-		t.Errorf("want empty, got %v", all)
+		t.Errorf("got %v, want empty", all)
 	}
 
 	a1 := repo.Attachment{
@@ -75,14 +75,14 @@ func TestRepo_SuiteAttachments(t *testing.T) {
 		t.Fatalf("insert attachment: %v", err)
 	}
 
-	a1.Id, a2.Id = id1, id2
-	want := []*repo.Attachment{&a2, &a1}
 	got, err := r.SuiteAttachments("123")
 	if err != nil {
 		t.Fatalf("get suite attachments: %v", err)
 	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want %+v, got %+v", want, got)
+	a1.Id, a2.Id = id1, id2
+	want := []*repo.Attachment{&a2, &a1}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
 
@@ -93,7 +93,7 @@ func TestRepo_CaseAttachments(t *testing.T) {
 		t.Fatalf("get case attachments: %v", err)
 	}
 	if len(all) > 0 {
-		t.Errorf("want empty, got %v", all)
+		t.Errorf("got %v, want empty", all)
 	}
 
 	a1 := repo.Attachment{
@@ -121,13 +121,13 @@ func TestRepo_CaseAttachments(t *testing.T) {
 		t.Fatalf("insert attachment: %v", err)
 	}
 
-	a1.Id, a2.Id = id1, id2
-	want := []*repo.Attachment{&a2, &a1}
 	got, err := r.CaseAttachments("123")
 	if err != nil {
 		t.Fatalf("get case attachments: %v", err)
 	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want %+v, got %+v", want, got)
+	a1.Id, a2.Id = id1, id2
+	want := []*repo.Attachment{&a2, &a1}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
