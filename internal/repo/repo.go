@@ -15,6 +15,7 @@ import (
 const (
 	attachmentColl       = "attachments"
 	attachmentOwnerIndex = "attachments_owner"
+	suiteColl            = "suites"
 )
 
 var (
@@ -30,8 +31,8 @@ type VersionedEntity struct {
 }
 
 type SoftDeleteEntity struct {
-	Deleted   bool      `json:"deleted"`
-	DeletedAt time.Time `json:"deleted_at"`
+	Deleted   bool  `json:"deleted,omitempty"`
+	DeletedAt int64 `json:"deleted_at,omitempty"`
 }
 
 type Repo struct {

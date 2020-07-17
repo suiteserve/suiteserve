@@ -5,7 +5,6 @@ import (
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"reflect"
 	"testing"
-	"time"
 )
 
 func TestRepo_Attachment(t *testing.T) {
@@ -18,11 +17,11 @@ func TestRepo_Attachment(t *testing.T) {
 	a := repo.Attachment{
 		SoftDeleteEntity: repo.SoftDeleteEntity{
 			Deleted:   true,
-			DeletedAt: time.Unix(1594999447, 324*1e6),
+			DeletedAt: 1594999447324,
 		},
 		SuiteId:   "123",
 		Filename:  "test.txt",
-		Timestamp: time.Unix(1594997447, 324*1e6),
+		Timestamp: 1594997447324,
 	}
 	id, err := r.InsertAttachment(a)
 	if err != nil {
@@ -53,7 +52,7 @@ func TestRepo_SuiteAttachments(t *testing.T) {
 	a1 := repo.Attachment{
 		SuiteId:   "123",
 		Filename:  "test.txt",
-		Timestamp: time.Unix(1594997447, 324*1e6),
+		Timestamp: 1594997447324,
 	}
 	id1, err := r.InsertAttachment(a1)
 	if err != nil {
@@ -99,7 +98,7 @@ func TestRepo_CaseAttachments(t *testing.T) {
 	a1 := repo.Attachment{
 		CaseId:    "123",
 		Filename:  "test.txt",
-		Timestamp: time.Unix(1594997447, 324*1e6),
+		Timestamp: 1594997447324,
 	}
 	id1, err := r.InsertAttachment(a1)
 	if err != nil {

@@ -3,20 +3,19 @@ package repo
 import (
 	"fmt"
 	"github.com/tidwall/buntdb"
-	"time"
 )
 
 type Attachment struct {
 	Entity
 	VersionedEntity
 	SoftDeleteEntity
-	SuiteId     string    `json:"suite_id"`
-	CaseId      string    `json:"case_id"`
-	Filename    string    `json:"filename"`
-	Url         string    `json:"url"`
-	ContentType string    `json:"content_type"`
-	Size        int64     `json:"size"`
-	Timestamp   time.Time `json:"timestamp"`
+	SuiteId     string `json:"suite_id"`
+	CaseId      string `json:"case_id"`
+	Filename    string `json:"filename"`
+	Url         string `json:"url"`
+	ContentType string `json:"content_type"`
+	Size        int64  `json:"size"`
+	Timestamp   int64  `json:"timestamp,omitempty"`
 }
 
 func (r *Repo) InsertAttachment(a Attachment) (id string, err error) {

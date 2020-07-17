@@ -7,13 +7,15 @@ import (
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"google.golang.org/grpc"
 	"net/http"
-	"time"
 )
 
 type Repo interface {
+	InsertAttachment(repo.Attachment) (id string, err error)
 	Attachment(id string) (*repo.Attachment, error)
 	SuiteAttachments(suiteId string) ([]*repo.Attachment, error)
 	CaseAttachments(caseId string) ([]*repo.Attachment, error)
+	InsertSuite(repo.Suite) (id string, err error)
+	Suite(id string) (*repo.Suite, error)
 }
 
 type Service struct {
@@ -51,9 +53,11 @@ func (s *Service) Stop() {
 	s.srv.GracefulStop()
 }
 
-func timeToPb(t time.Time) *timestamp.Timestamp {
+// millisToPb converts the given number of milliseconds since the Unix epoch
+// into the well-known Protobuf Timestamp type.
+func millisToPb(t int64) *timestamp.Timestamp {
 	return &timestamp.Timestamp{
-		Seconds: t.Unix(),
-		Nanos:   int32(t.Nanosecond()),
+		Seconds: t / 1e3,
+		Nanos:   int32((t % 1e3) * 1e6),
 	}
 }

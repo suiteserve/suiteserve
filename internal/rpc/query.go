@@ -58,12 +58,12 @@ func (s *query) GetAttachments(ctx context.Context, r *pb.GetAttachmentsRequest)
 			Id:          a.Id,
 			Version:     a.Version,
 			Deleted:     a.Deleted,
-			DeletedAt:   timeToPb(a.DeletedAt),
+			DeletedAt:   millisToPb(a.DeletedAt),
 			Filename:    a.Filename,
 			Url:         a.Url,
 			ContentType: a.ContentType,
 			Size:        a.Size,
-			Timestamp:   timeToPb(a.Timestamp),
+			Timestamp:   millisToPb(a.Timestamp),
 		}
 		setOwner(reply.Attachments[i])
 	}
