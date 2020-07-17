@@ -23,10 +23,7 @@ func Handler(repo Repo, publicDir string) http.Handler {
 	r := mux.NewRouter()
 
 	// middleware
-	r.Use(methodOverrideMiddleware)
 	r.Use(handlers.CORS(handlers.AllowedOrigins([]string{"*"})))
-	r.Use(loggingMiddleware)
-	r.Use(defaultSecureHeadersMiddleware)
 
 	// api v1
 	api := r.PathPrefix("/v1/").Subrouter()
@@ -74,7 +71,6 @@ func Handler(repo Repo, publicDir string) http.Handler {
 
 	// frontend
 	frontend := r.PathPrefix("/").Subrouter()
-	frontend.Use(frontendSecureHeadersMiddleware)
 	frontend.PathPrefix("/").Handler(newFrontendHandler(publicDir))
 	return r
 }

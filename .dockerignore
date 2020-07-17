@@ -1,4 +1,4 @@
 /data/
-/frontend/dist/
-/frontend/node_modules/
+/ui/dist/
+/ui/node_modules/
 /vendor/

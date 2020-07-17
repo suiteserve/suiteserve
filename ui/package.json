@@ -1,6 +1,6 @@
 {
-  "name": "suiteserve-frontend",
-  "version": "0.0.0",
+  "name": "suiteserve-ui",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "serve": "npx vue-cli-service serve",

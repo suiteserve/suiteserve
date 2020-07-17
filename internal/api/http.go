@@ -11,28 +11,23 @@ import (
 
 const shutdownTimeout = 3 * time.Second
 
-type Service interface {
-	http.Handler
-	Stop()
-}
-
 type Options struct {
-	Host      string
-	Port      string
-	CertFile  string
-	KeyFile   string
-	PublicDir string
+	Host        string
+	Port        string
+	TlsCertFile string
+	TlsKeyFile  string
+	PublicDir   string
 
 	UserContentHost     string
 	UserContentDir      string
 	UserContentMetaRepo UserContentMetaRepo
 
-	Rpc Service
+	Rpc http.Handler
 }
 
 type Server struct {
 	srv http.Server
-	rpc Service
+	rpc http.Handler
 
 	err  chan error
 	wg   sync.WaitGroup
@@ -50,13 +45,13 @@ func Serve(opts Options) *Server {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		defer close(s.err)
-		log.Printf("Binding HTTP to %s", net.JoinHostPort(opts.Host, opts.Port))
-		err := s.srv.ListenAndServeTLS(opts.CertFile, opts.KeyFile)
+		log.Printf("Starting HTTP @ %s", net.JoinHostPort(opts.Host, opts.Port))
+		err := s.srv.ListenAndServeTLS(opts.TlsCertFile, opts.TlsKeyFile)
 		if err != http.ErrServerClosed {
 			log.Printf("listen and serve http: %v", err)
 			s.err <- err
 		}
+		close(s.err)
 	}()
 	return &s
 }
@@ -82,18 +77,12 @@ func (s *Server) Err() <-chan error {
 
 func (s *Server) Stop() {
 	s.once.Do(func() {
-		log.Print("Shutting down HTTP...")
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(),
-				shutdownTimeout)
-			defer cancel()
-			if err := s.srv.Shutdown(ctx); err != nil {
-				log.Printf("close http: %v", err)
-			}
-		}()
-		s.rpc.Stop()
+		ctx, cancel := context.WithTimeout(context.Background(),
+			shutdownTimeout)
+		defer cancel()
+		if err := s.srv.Shutdown(ctx); err != nil {
+			log.Printf("stop http: %v", err)
+		}
 		s.wg.Wait()
 	})
 }

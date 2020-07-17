@@ -5,23 +5,13 @@
     "port": "8080",
     "tls_cert_file": "config/cert.pem",
     "tls_key_file": "config/key.pem",
-    "frontend_dir": "frontend/dist/"
+    "public_dir": "ui/dist/"
   },
   "storage": {
+    "db": "data/db",
     "user_content": {
       "dir": "data/usercontent/",
       "max_size_mb": 64
-    },
-    "buntdb": {
-      "file": "data/bunt.db"
-    },
-    "mongodb": {
-      "host": "localhost",
-      "port": 27017,
-      "rs": "rs0",
-      "db": "suiteserve",
-      "user": "suiteserve",
-      "pass_file": "config/passfile"
     }
   }
 }

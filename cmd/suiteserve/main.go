@@ -1,37 +1,19 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"github.com/suiteserve/suiteserve/config"
-	"github.com/suiteserve/suiteserve/repo"
-	"github.com/suiteserve/suiteserve/rest"
-	"github.com/suiteserve/suiteserve/seed"
-	"github.com/suiteserve/suiteserve/suitesrv"
+	"github.com/suiteserve/suiteserve/internal/api"
+	"github.com/suiteserve/suiteserve/internal/repo"
+	"github.com/suiteserve/suiteserve/internal/rpc"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
-	"sync"
-	"time"
 )
-
-type Repo interface {
-	rest.Repo
-	seed.Repo
-	suitesrv.Repo
-
-	Seedable() (bool, error)
-	Close() error
-}
 
 var (
 	configFileFlag = flag.String("config", "config/config.json",
 		"The path to the JSON configuration file")
-	dbFlag = flag.String("db", "buntdb",
-		"The database implementation to use: buntdb, mongodb")
 	debugFlag = flag.Bool("debug", false,
 		"Whether to print extra debug information with log messages")
 	helpFlag = flag.Bool("help", false,
@@ -43,121 +25,53 @@ var (
 func main() {
 	flag.Parse()
 
-	if *debugFlag {
-		log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Llongfile)
-		log.Println("Debug mode enabled")
-	}
-
 	if *helpFlag {
 		flag.PrintDefaults()
 		return
 	}
+	if *debugFlag {
+		log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+		log.Print("Debug mode enabled")
+	}
 
 	log.Printf("Using config at %q", *configFileFlag)
-	cfg, err := config.New(*configFileFlag)
+	cfg, err := config.Load(*configFileFlag)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("load config: %v", err)
 	}
 
-	fileRepo := repo.FileRepo{Pattern: cfg.Storage.Attachments.FilePattern}
-	var r Repo
-	switch *dbFlag {
-	case "buntdb":
-		log.Println("Using BuntDB")
-		r, err = repo.OpenBuntDb(cfg.Storage.BuntDb.File, &fileRepo)
-	case "mongodb":
-		// TODO
-		log.Fatalln("MongoDB not yet implemented")
-	default:
-		log.Fatalf("unknown db %q\n", *dbFlag)
-	}
+	r, err := repo.Open(cfg.Storage.Db)
 	if err != nil {
-		log.Fatalf("open db: %v\n", err)
+		log.Fatalf("open repo: %v", err)
 	}
 	defer func() {
 		if err := r.Close(); err != nil {
-			log.Fatalf("close db: %v\n", err)
+			log.Printf("close repo: %v", err)
 		}
 	}()
 
-	if *seedFlag {
-		seedable, err := r.Seedable()
-		if err != nil {
-			log.Fatalf("check db seedability: %v\n", err)
-		}
-		if seedable {
-			log.Println("Seeding database...")
-			if err := seed.Seed(r); err != nil {
-				log.Fatalln(err)
-			}
-		} else {
-			log.Println("Not seeding non-empty database")
-		}
-	}
+	rpcService := rpc.New(cfg.Storage.UserContent.MaxSizeMb, r)
+	defer rpcService.Stop()
 
-	done := make(chan interface{})
-	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt)
-		<-sigint
-		log.Println("Shutting down...")
-		close(done)
-	}()
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go startHttp(&wg, cfg, r, done)
-	go startSuiteSrv(&wg, cfg, r, done)
-	wg.Wait()
-}
-
-func startHttp(wg *sync.WaitGroup, cfg *config.Config, repo Repo, done <-chan interface{}) {
-	defer wg.Done()
-	srv := http.Server{
-		Addr:    net.JoinHostPort(cfg.Http.Host, strconv.Itoa(int(cfg.Http.Port))),
-		Handler: rest.Handler(repo, cfg.Http.PublicDir),
-	}
-
-	ln, err := net.Listen("tcp", srv.Addr)
-	if err != nil {
-		log.Fatalf("listen http: %v\n", err)
-	}
-	defer ln.Close()
-	log.Println("Bound HTTP server to", ln.Addr())
-
-	go func() {
-		<-done
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.Http.ShutdownTimeout)
-		defer cancel()
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("shutdown http: %v\n", err)
-		}
-	}()
-
-	err = srv.ServeTLS(ln, cfg.Http.TlsCertFile, cfg.Http.TlsKeyFile)
-	if err != http.ErrServerClosed {
-		log.Fatalf("serve http: %v\n", err)
-	}
-}
-
-func startSuiteSrv(wg *sync.WaitGroup, cfg *config.Config, repo Repo, done <-chan interface{}) {
-	defer wg.Done()
-	addr := net.JoinHostPort(cfg.SuiteSrv.Host, strconv.Itoa(int(cfg.SuiteSrv.Port)))
-	srv, err := suitesrv.Serve(addr, repo, &suitesrv.ServerOptions{
-		Timeout:         secondsToDuration(cfg.Storage.Timeout),
-		ReconnectPeriod: secondsToDuration(cfg.SuiteSrv.ReconnectPeriod),
-		TlsCertFile:     cfg.SuiteSrv.TlsCertFile,
-		TlsKeyFile:      cfg.SuiteSrv.TlsKeyFile,
+	srv := api.Serve(api.Options{
+		Host:                cfg.Http.Host,
+		Port:                cfg.Http.Port,
+		TlsCertFile:         cfg.Http.TlsCertFile,
+		TlsKeyFile:          cfg.Http.TlsKeyFile,
+		PublicDir:           cfg.Http.PublicDir,
+		UserContentHost:     cfg.Http.UserContentHost,
+		UserContentDir:      cfg.Storage.UserContent.Dir,
+		UserContentMetaRepo: nil, // TODO
+		Rpc:                 rpcService,
 	})
-	if err != nil {
-		log.Fatalf("start suite srv: %v\n", err)
-	}
-	<-done
-	if err := srv.Close(); err != nil {
-		log.Printf("close suite srv: %v\n", err)
-	}
-}
 
-func secondsToDuration(seconds int) time.Duration {
-	return time.Duration(int64(seconds) * time.Second.Nanoseconds())
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)
+	select {
+	case <-sigint:
+		log.Print("Stopping...")
+	case err := <-srv.Err():
+		log.Printf("serve http: %v", err)
+	}
+	srv.Stop()
 }

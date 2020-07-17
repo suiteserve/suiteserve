@@ -188,7 +188,6 @@ func (s *changefeedSession) onChange(c repo.Change) {
 	if ok {
 		s.writer <- &ChangefeedMsg{
 			Cmd:     "change",
-			Payload: c,
 		}
 	}
 }
