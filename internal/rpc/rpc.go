@@ -29,34 +29,41 @@ type Repo interface {
 }
 
 type Service struct {
-	srv         *grpc.Server
-	proxy       *grpcweb.WrappedGrpcServer
-	maxUploadMb int
-	repo        Repo
+	srv   *grpc.Server
+	proxy *grpcweb.WrappedGrpcServer
+	repo  Repo
 }
 
 func New(maxUploadMb int, repo Repo) *Service {
 	s := Service{
-		srv:         grpc.NewServer(),
-		maxUploadMb: maxUploadMb,
-		repo:        repo,
+		srv:  grpc.NewServer(),
+		repo: repo,
 	}
 	s.proxy = grpcweb.WrapServer(s.srv, grpcweb.WithWebsockets(true),
 		grpcweb.WithWebsocketOriginFunc(func(*http.Request) bool {
 			// TODO: not for production
 			return true
 		}))
-	pb.RegisterSuiteServiceServer(s.srv, &suite{Service: &s})
-	pb.RegisterQueryServiceServer(s.srv, &query{Service: &s})
+	pb.RegisterQueryServiceServer(s.srv, &query{
+		Repo: repo,
+	})
+	pb.RegisterSuiteServiceServer(s.srv, &suite{
+		Repo:        repo,
+		maxUploadMb: maxUploadMb,
+	})
 	return &s
 }
 
-func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if s.proxy.IsGrpcWebSocketRequest(r) {
-		s.proxy.HandleGrpcWebsocketRequest(w, r)
-	} else {
-		s.srv.ServeHTTP(w, r)
-	}
+func (s *Service) NewMiddleware(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.proxy.IsGrpcWebSocketRequest(r) {
+			s.proxy.HandleGrpcWebsocketRequest(w, r)
+		} else if s.proxy.IsGrpcWebRequest(r) {
+			s.srv.ServeHTTP(w, r)
+		} else {
+			h.ServeHTTP(w, r)
+		}
+	})
 }
 
 func (s *Service) Stop() {

@@ -1,6 +1,7 @@
 package event
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -13,15 +14,9 @@ func TestPublisher_Publish(t *testing.T) {
 	pub.Publish(3)
 	pub.Publish("world")
 
-	if e := <-sub.Ch(); e != "hello" {
-		t.Errorf("got %q, want %q", e, "hello")
-	}
-	if e := <-sub.Ch(); e != nil {
-		t.Errorf("got %q, want %v", e, nil)
-	}
-	if e := <-sub.Ch(); e != 3 {
-		t.Errorf("got %q, want %q", e, 3)
-	}
+	assert.Equal(t, "hello", <-sub.Ch())
+	assert.Equal(t, nil, <-sub.Ch())
+	assert.Equal(t, 3, <-sub.Ch())
 
 	sub.Unsubscribe()
 	<-sub.Ch()
@@ -32,9 +27,7 @@ func TestBus_Subscribe(t *testing.T) {
 	pub.Publish("one")
 	sub := pub.Subscribe()
 	pub.Publish(2)
-	if e := <-sub.Ch(); e != 2 {
-		t.Errorf("got %q, want %q", e, 2)
-	}
+	assert.Equal(t, 2, <-sub.Ch())
 	sub.Unsubscribe()
 	<-sub.Ch()
 }

@@ -7,7 +7,9 @@ import (
 
 type suite struct {
 	pb.UnimplementedSuiteServiceServer
-	*Service
+	Repo
+
+	maxUploadMb int
 }
 
 func (s *suite) CreateSuite(ctx context.Context, r *pb.CreateSuiteRequest) (*pb.CreateSuiteReply, error) {

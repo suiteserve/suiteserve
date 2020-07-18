@@ -2,17 +2,16 @@ package repotest
 
 import (
 	"errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/suiteserve/suiteserve/internal/repo"
-	"reflect"
 	"testing"
 )
 
 func TestRepo_Attachment(t *testing.T) {
 	r := Open(t)
 	_, err := r.Attachment("nonexistent")
-	if !errors.Is(err, repo.ErrNotFound) {
-		t.Errorf("got %v, want ErrNotFound", err)
-	}
+	assert.True(t, errors.Is(err, repo.ErrNotFound), "want ErrNotFound")
 
 	a := repo.Attachment{
 		SoftDeleteEntity: repo.SoftDeleteEntity{
@@ -24,30 +23,19 @@ func TestRepo_Attachment(t *testing.T) {
 		Timestamp: 1594997447324,
 	}
 	id, err := r.InsertAttachment(a)
-	if err != nil {
-		t.Fatalf("insert attachment: %v", err)
-	}
+	require.Nil(t, err)
+	a.Id = id
 
 	got, err := r.Attachment(id)
-	if err != nil {
-		t.Fatalf("get attachment: %v", err)
-	}
-	a.Id = id
-	want := &a
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v, want %+v", got, want)
-	}
+	require.Nil(t, err)
+	assert.Equal(t, &a, got)
 }
 
 func TestRepo_SuiteAttachments(t *testing.T) {
 	r := Open(t)
 	all, err := r.SuiteAttachments("123")
-	if err != nil {
-		t.Fatalf("get suite attachments: %v", err)
-	}
-	if len(all) > 0 {
-		t.Errorf("got %v, want empty", all)
-	}
+	require.Nil(t, err)
+	assert.Empty(t, all)
 
 	a1 := repo.Attachment{
 		SuiteId:   "123",
@@ -55,45 +43,31 @@ func TestRepo_SuiteAttachments(t *testing.T) {
 		Timestamp: 1594997447324,
 	}
 	id1, err := r.InsertAttachment(a1)
-	if err != nil {
-		t.Fatalf("insert attachment: %v", err)
-	}
+	require.Nil(t, err)
+	a1.Id = id1
 
 	a2 := repo.Attachment{
 		SuiteId: "123",
 	}
 	id2, err := r.InsertAttachment(a2)
-	if err != nil {
-		t.Fatalf("insert attachment: %v", err)
-	}
+	require.Nil(t, err)
+	a2.Id = id2
 
 	_, err = r.InsertAttachment(repo.Attachment{
 		CaseId: "123",
 	})
-	if err != nil {
-		t.Fatalf("insert attachment: %v", err)
-	}
+	require.Nil(t, err)
 
 	got, err := r.SuiteAttachments("123")
-	if err != nil {
-		t.Fatalf("get suite attachments: %v", err)
-	}
-	a1.Id, a2.Id = id1, id2
-	want := []*repo.Attachment{&a2, &a1}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v, want %+v", got, want)
-	}
+	require.Nil(t, err)
+	assert.Equal(t, []*repo.Attachment{&a2, &a1}, got)
 }
 
 func TestRepo_CaseAttachments(t *testing.T) {
 	r := Open(t)
 	all, err := r.CaseAttachments("123")
-	if err != nil {
-		t.Fatalf("get case attachments: %v", err)
-	}
-	if len(all) > 0 {
-		t.Errorf("got %v, want empty", all)
-	}
+	require.Nil(t, err)
+	assert.Empty(t, all)
 
 	a1 := repo.Attachment{
 		CaseId:    "123",
@@ -101,32 +75,22 @@ func TestRepo_CaseAttachments(t *testing.T) {
 		Timestamp: 1594997447324,
 	}
 	id1, err := r.InsertAttachment(a1)
-	if err != nil {
-		t.Fatalf("insert attachment: %v", err)
-	}
+	require.Nil(t, err)
+	a1.Id = id1
 
 	a2 := repo.Attachment{
 		CaseId: "123",
 	}
 	id2, err := r.InsertAttachment(a2)
-	if err != nil {
-		t.Fatalf("insert attachment: %v", err)
-	}
+	require.Nil(t, err)
+	a2.Id = id2
 
 	_, err = r.InsertAttachment(repo.Attachment{
 		SuiteId: "123",
 	})
-	if err != nil {
-		t.Fatalf("insert attachment: %v", err)
-	}
+	require.Nil(t, err)
 
 	got, err := r.CaseAttachments("123")
-	if err != nil {
-		t.Fatalf("get case attachments: %v", err)
-	}
-	a1.Id, a2.Id = id1, id2
-	want := []*repo.Attachment{&a2, &a1}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v, want %+v", got, want)
-	}
+	require.Nil(t, err)
+	assert.Equal(t, []*repo.Attachment{&a2, &a1}, got)
 }

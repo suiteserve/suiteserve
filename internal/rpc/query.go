@@ -2,13 +2,14 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	pb "github.com/suiteserve/protocol/go/protocol"
 	"github.com/suiteserve/suiteserve/internal/repo"
 )
 
 type query struct {
 	pb.UnimplementedQueryServiceServer
-	*Service
+	Repo
 }
 
 func (s *query) GetAttachments(_ context.Context, r *pb.GetAttachmentsRequest) (*pb.GetAttachmentsReply, error) {
@@ -18,16 +19,20 @@ func (s *query) GetAttachments(_ context.Context, r *pb.GetAttachmentsRequest) (
 
 	switch r.Filter.(type) {
 	case *pb.GetAttachmentsRequest_Id:
-		a, err := s.repo.Attachment(r.GetId())
-		if err != nil {
+		a, err := s.Attachment(r.GetId())
+		if errors.Is(err, repo.ErrNotFound) {
+			a, err = nil, nil
+		} else if err != nil {
 			return nil, err
 		}
-		all = []*repo.Attachment{a}
+		if a != nil {
+			all = []*repo.Attachment{a}
+		}
 		setOwner = func(a *pb.Attachment) {
 			a.Owner = nil
 		}
 	case *pb.GetAttachmentsRequest_SuiteId:
-		all, err = s.repo.SuiteAttachments(r.GetSuiteId())
+		all, err = s.SuiteAttachments(r.GetSuiteId())
 		if err != nil {
 			return nil, err
 		}
@@ -37,7 +42,7 @@ func (s *query) GetAttachments(_ context.Context, r *pb.GetAttachmentsRequest) (
 			}
 		}
 	case *pb.GetAttachmentsRequest_CaseId:
-		all, err = s.repo.CaseAttachments(r.GetCaseId())
+		all, err = s.CaseAttachments(r.GetCaseId())
 		if err != nil {
 			return nil, err
 		}

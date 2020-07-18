@@ -2,33 +2,25 @@ package repotest
 
 import (
 	"errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/suiteserve/suiteserve/internal/repo"
-	"reflect"
 	"testing"
 )
 
 func TestRepo_LogLine(t *testing.T) {
 	r := Open(t)
 	_, err := r.LogLine("nonexistent")
-	if !errors.Is(err, repo.ErrNotFound) {
-		t.Errorf("got %v, want ErrNotFound", err)
-	}
+	assert.True(t, errors.Is(err, repo.ErrNotFound), "want ErrNotFound")
 
 	l := repo.LogLine{
 		Message: "Hello, world!",
 	}
 	id, err := r.InsertLogLine(l)
-	if err != nil {
-		t.Fatalf("insert log line: %v", err)
-	}
+	require.Nil(t, err)
+	l.Id = id
 
 	got, err := r.LogLine(id)
-	if err != nil {
-		t.Fatalf("get log line: %v", err)
-	}
-	l.Id = id
-	want := &l
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v, want %+v", got, want)
-	}
+	require.Nil(t, err)
+	assert.Equal(t, &l, got)
 }

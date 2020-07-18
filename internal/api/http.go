@@ -22,19 +22,20 @@ type Options struct {
 	UserContentDir      string
 	UserContentMetaRepo UserContentMetaRepo
 
-	Rpc http.Handler
+	Rpc Middleware
 }
 
 type Server struct {
-	srv http.Server
-	rpc http.Handler
+	addr string
+	srv  http.Server
+	rpc  Middleware
 
 	err  chan error
 	wg   sync.WaitGroup
 	once sync.Once
 }
 
-func Serve(opts Options) *Server {
+func Serve(opts Options) (*Server, error) {
 	s := Server{
 		rpc: opts.Rpc,
 		err: make(chan error),
@@ -42,33 +43,44 @@ func Serve(opts Options) *Server {
 	s.srv.Addr = net.JoinHostPort(opts.Host, opts.Port)
 	s.setSrvHandler(&opts)
 
+	ln, err := net.Listen("tcp", s.srv.Addr)
+	if err != nil {
+		return nil, err
+	}
+	s.addr = ln.Addr().String()
+
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		log.Printf("Starting HTTP @ %s", net.JoinHostPort(opts.Host, opts.Port))
-		err := s.srv.ListenAndServeTLS(opts.TlsCertFile, opts.TlsKeyFile)
+		log.Printf("Starting HTTP @ %s", s.addr)
+		err := s.srv.ServeTLS(ln, opts.TlsCertFile, opts.TlsKeyFile)
 		if err != http.ErrServerClosed {
-			log.Printf("listen and serve http: %v", err)
+			log.Printf("serve http: %v", err)
 			s.err <- err
+		}
+		if err := ln.Close(); err != nil {
+			log.Printf("close http: %v", err)
 		}
 		close(s.err)
 	}()
-	return &s
+	return &s, nil
 }
 
 func (s *Server) setSrvHandler(opts *Options) {
 	var mux http.ServeMux
-	mux.Handle("/rpc", s.rpc)
 	mux.Handle("/",
-		newSecurityMiddleware(
-			newFrontendSecurityMiddleware(
-				http.FileServer(http.Dir(opts.PublicDir)))))
+		s.rpc.NewMiddleware(
+			newGetMiddleware(
+				newSecurityMiddleware(
+					newFrontendSecurityMiddleware(
+						http.FileServer(http.Dir(opts.PublicDir)))))))
 	mux.Handle(opts.UserContentHost+"/",
-		newSecurityMiddleware(
-			newUserContentSecurityMiddleware(
-				newUserContentMiddleware(opts.UserContentMetaRepo,
-					http.FileServer(http.Dir(opts.UserContentDir))))))
-	s.srv.Handler = newLoggingMiddleware(newGetMiddleware(&mux))
+		newGetMiddleware(
+			newSecurityMiddleware(
+				newUserContentSecurityMiddleware(
+					newUserContentMiddleware(opts.UserContentMetaRepo,
+						http.FileServer(http.Dir(opts.UserContentDir)))))))
+	s.srv.Handler = newLoggingMiddleware(&mux)
 }
 
 func (s *Server) Err() <-chan error {

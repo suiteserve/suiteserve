@@ -1,6 +1,7 @@
 package repotest
 
 import (
+	"github.com/stretchr/testify/require"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"io/ioutil"
 	"os"
@@ -9,26 +10,16 @@ import (
 
 func Open(t *testing.T) *repo.Repo {
 	f, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	filename := f.Name()
 	t.Cleanup(func() {
-		if err := os.Remove(filename); err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, os.Remove(filename))
 	})
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, f.Close())
 	r, err := repo.Open(filename)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, err)
 	t.Cleanup(func() {
-		if err := r.Close(); err != nil {
-			t.Fatal(err)
-		}
+		require.Nil(t, r.Close())
 	})
 	return r
 }

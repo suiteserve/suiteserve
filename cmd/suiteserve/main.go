@@ -53,7 +53,7 @@ func main() {
 	rpcService := rpc.New(cfg.Storage.UserContent.MaxSizeMb, r)
 	defer rpcService.Stop()
 
-	srv := api.Serve(api.Options{
+	srv, err := api.Serve(api.Options{
 		Host:                cfg.Http.Host,
 		Port:                cfg.Http.Port,
 		TlsCertFile:         cfg.Http.TlsCertFile,
@@ -64,6 +64,9 @@ func main() {
 		UserContentMetaRepo: nil, // TODO
 		Rpc:                 rpcService,
 	})
+	if err != nil {
+		log.Fatalf("start http: %v", err)
+	}
 
 	sigint := make(chan os.Signal, 1)
 	signal.Notify(sigint, os.Interrupt)
