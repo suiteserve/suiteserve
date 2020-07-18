@@ -1,25 +1,20 @@
 package event
 
 import (
-	"sync"
 	"testing"
-	"time"
 )
 
 func TestPublisher_Publish(t *testing.T) {
-	wg := &sync.WaitGroup{}
 	var pub Publisher
 	sub := pub.Subscribe()
-	defer sub.Unsubscribe()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		pub.Publish("event")
-		pub.Publish(nil)
-		pub.Publish(3)
-	}()
-	if e := <-sub.Ch(); e != "event" {
-		t.Errorf("got %q, want %q", e, "event")
+
+	pub.Publish("hello")
+	pub.Publish(nil)
+	pub.Publish(3)
+	pub.Publish("world")
+
+	if e := <-sub.Ch(); e != "hello" {
+		t.Errorf("got %q, want %q", e, "hello")
 	}
 	if e := <-sub.Ch(); e != nil {
 		t.Errorf("got %q, want %v", e, nil)
@@ -27,47 +22,28 @@ func TestPublisher_Publish(t *testing.T) {
 	if e := <-sub.Ch(); e != 3 {
 		t.Errorf("got %q, want %q", e, 3)
 	}
-	wg.Wait()
+
+	sub.Unsubscribe()
+	<-sub.Ch()
 }
 
 func TestBus_Subscribe(t *testing.T) {
-	wg := &sync.WaitGroup{}
 	var pub Publisher
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		pub.Publish("event")
-		wg.Add(1)
-		time.AfterFunc(2 * time.Millisecond, func() {
-			defer wg.Done()
-			pub.Publish(3)
-		})
-	}()
-	wg.Add(1)
-	time.AfterFunc(1 * time.Millisecond, func() {
-		defer wg.Done()
-		sub := pub.Subscribe()
-		defer sub.Unsubscribe()
-		if e := <-sub.Ch(); e != 3 {
-			t.Errorf("got %q, want %q", e, 3)
-		}
-	})
-	wg.Wait()
+	pub.Publish("one")
+	sub := pub.Subscribe()
+	pub.Publish(2)
+	if e := <-sub.Ch(); e != 2 {
+		t.Errorf("got %q, want %q", e, 2)
+	}
+	sub.Unsubscribe()
+	<-sub.Ch()
 }
 
 func TestSubscriber_Unsubscribe(t *testing.T) {
-	wg := &sync.WaitGroup{}
 	var pub Publisher
 	sub := pub.Subscribe()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		pub.Publish("event")
-	}()
-	wg.Add(1)
-	time.AfterFunc(1 * time.Millisecond, func() {
-		defer wg.Done()
-		sub.Unsubscribe()
-	})
-	wg.Wait()
+	pub.Publish("one")
+	sub.Unsubscribe()
+	pub.Publish("two")
+	<-sub.Ch()
 }
