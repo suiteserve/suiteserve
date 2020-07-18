@@ -16,12 +16,11 @@ const (
 	attachmentColl       = "attachments"
 	attachmentOwnerIndex = "attachments_owner"
 	caseColl             = "cases"
+	logColl              = "logs"
 	suiteColl            = "suites"
 )
 
-var (
-	ErrNotFound = errors.New("not found")
-)
+var ErrNotFound = errors.New("not found")
 
 type Entity struct {
 	Id string `json:"id"`
