@@ -222,12 +222,12 @@ func getInt(tx *buntdb.Tx, k string) (int64, error) {
 var idInc uint32
 
 func genId() string {
-	b := make([]byte, 3)
+	b := make([]byte, 1)
 	if _, err := rand.Read(b); err != nil {
 		log.Panicf("read rand: %v", err)
 	}
 	now := time.Now()
-	return fmt.Sprintf("%012x%04x%06x",
+	return fmt.Sprintf("%011x%02x%02x",
 		now.Unix()*1e3+int64(now.Nanosecond())/1e6,
-		atomic.AddUint32(&idInc, 1)%(1<<16), b)
+		atomic.AddUint32(&idInc, 1)&0xff, b)
 }
