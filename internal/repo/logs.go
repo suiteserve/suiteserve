@@ -22,10 +22,10 @@ type LogLine struct {
 }
 
 func (r *Repo) InsertLogLine(l LogLine) (id string, err error) {
-	return r.insert(logColl, &l)
+	return r.insert(LogColl, &l)
 }
 
 func (r *Repo) LogLine(id string) (*LogLine, error) {
 	var l LogLine
-	return &l, r.getById(logColl, id, &l)
+	return &l, r.getById(LogColl, id, &l)
 }

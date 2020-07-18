@@ -39,10 +39,10 @@ type Case struct {
 }
 
 func (r *Repo) InsertCase(c Case) (id string, err error) {
-	return r.insert(caseColl, &c)
+	return r.insert(CaseColl, &c)
 }
 
 func (r *Repo) Case(id string) (*Case, error) {
 	var c Case
-	return &c, r.getById(caseColl, id, &c)
+	return &c, r.getById(CaseColl, id, &c)
 }

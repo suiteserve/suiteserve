@@ -11,7 +11,7 @@ type query struct {
 	*Service
 }
 
-func (s *query) GetAttachments(ctx context.Context, r *pb.GetAttachmentsRequest) (*pb.GetAttachmentsReply, error) {
+func (s *query) GetAttachments(_ context.Context, r *pb.GetAttachmentsRequest) (*pb.GetAttachmentsReply, error) {
 	var err error
 	var all []*repo.Attachment
 	var setOwner func(*pb.Attachment)

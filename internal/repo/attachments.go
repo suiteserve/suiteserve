@@ -19,12 +19,12 @@ type Attachment struct {
 }
 
 func (r *Repo) InsertAttachment(a Attachment) (id string, err error) {
-	return r.insert(attachmentColl, &a)
+	return r.insert(AttachmentColl, &a)
 }
 
 func (r *Repo) Attachment(id string) (*Attachment, error) {
 	var a Attachment
-	return &a, r.getById(attachmentColl, id, &a)
+	return &a, r.getById(AttachmentColl, id, &a)
 }
 
 func (r *Repo) SuiteAttachments(suiteId string) ([]*Attachment, error) {
@@ -39,7 +39,7 @@ func (r *Repo) attachmentsByOwner(suiteId, caseId string) ([]*Attachment, error)
 	pivot := fmt.Sprintf(`{"suite_id": %q, "case_id": %q}`, suiteId, caseId)
 	var vals []string
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		return tx.DescendEqual(attachmentOwnerIndex, pivot, func(k, v string) bool {
+		return tx.DescendEqual(attachmentIndexOwner, pivot, func(k, v string) bool {
 			vals = append(vals, v)
 			return true
 		})

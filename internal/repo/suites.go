@@ -32,10 +32,10 @@ type Suite struct {
 }
 
 func (r *Repo) InsertSuite(s Suite) (id string, err error) {
-	return r.insert(suiteColl, &s)
+	return r.insert(SuiteColl, &s)
 }
 
 func (r *Repo) Suite(id string) (*Suite, error) {
 	var s Suite
-	return &s, r.getById(suiteColl, id, &s)
+	return &s, r.getById(SuiteColl, id, &s)
 }

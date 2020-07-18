@@ -4,18 +4,28 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	pb "github.com/suiteserve/protocol/go/protocol"
+	"github.com/suiteserve/suiteserve/event"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"google.golang.org/grpc"
 	"net/http"
 )
 
 type Repo interface {
+	Changefeed() *event.Bus
+
 	InsertAttachment(repo.Attachment) (id string, err error)
 	Attachment(id string) (*repo.Attachment, error)
 	SuiteAttachments(suiteId string) ([]*repo.Attachment, error)
 	CaseAttachments(caseId string) ([]*repo.Attachment, error)
+
 	InsertSuite(repo.Suite) (id string, err error)
 	Suite(id string) (*repo.Suite, error)
+
+	InsertCase(repo.Case) (id string, err error)
+	Case(id string) (*repo.Case, error)
+
+	InsertLogLine(repo.LogLine) (id string, err error)
+	LogLine(id string) (*repo.LogLine, error)
 }
 
 type Service struct {
