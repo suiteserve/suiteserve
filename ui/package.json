@@ -10,14 +10,14 @@
     "@suiteserve/protocol-web": "^0.1.2",
     "vue": "^2.6.11",
     "vue-router": "^3.3.4",
-    "vuex": "^3.4.0"
+    "vuex": "^3.5.1"
   },
   "devDependencies": {
-    "@vue/cli-plugin-router": "^4.4.5",
-    "@vue/cli-plugin-typescript": "^4.4.5",
-    "@vue/cli-plugin-vuex": "^4.4.5",
-    "@vue/cli-service": "^4.4.5",
-    "typescript": "^3.9.5",
+    "@vue/cli-plugin-router": "^4.4.6",
+    "@vue/cli-plugin-typescript": "^4.4.6",
+    "@vue/cli-plugin-vuex": "^4.4.6",
+    "@vue/cli-service": "^4.4.6",
+    "typescript": "^3.9.7",
     "vue-template-compiler": "^2.6.11"
   }
 }

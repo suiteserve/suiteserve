@@ -6,11 +6,13 @@ COPY . .
 WORKDIR /app/cmd/suiteserve
 RUN CGO_ENABLED=0 go install
 
-FROM node:14-alpine AS frontend-builder
+FROM node:14-alpine AS ui-builder
 WORKDIR /app/
-COPY frontend/package*.json ./
+# TODO: currently getting integrity check error
+# COPY ui/package*.json ./
+COPY ui/package.json ./
 RUN npm i
-COPY frontend/ ./
+COPY ui/ ./
 RUN npm run build
 
 FROM scratch
@@ -18,7 +20,7 @@ ARG CONFIG_FILE=config/config.json
 WORKDIR /app/
 COPY --from=api-builder /go/bin/suiteserve ./
 COPY $CONFIG_FILE config/
-COPY --from=frontend-builder /app/dist/ frontend/dist/
+COPY --from=ui-builder /app/dist/ ui/dist/
 EXPOSE 8080
 VOLUME /app/data/
 ENTRYPOINT ["./suiteserve"]
