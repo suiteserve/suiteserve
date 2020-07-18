@@ -15,6 +15,7 @@ import (
 const (
 	attachmentColl       = "attachments"
 	attachmentOwnerIndex = "attachments_owner"
+	caseColl             = "cases"
 	suiteColl            = "suites"
 )
 

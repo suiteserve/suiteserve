@@ -15,7 +15,7 @@ require (
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/stretchr/testify v1.5.1 // indirect
-	github.com/suiteserve/protocol/go v0.0.0-20200717175656-a29c81f62991
+	github.com/suiteserve/protocol/go v0.0.0-20200717205956-68c4ce79890b
 	github.com/tidwall/buntdb v1.1.2
 	github.com/tidwall/gjson v1.6.0
 	github.com/tidwall/sjson v1.1.1
