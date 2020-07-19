@@ -24,6 +24,7 @@ const (
 	LogColl        Coll = "logs"
 
 	attachmentIndexOwner = "attachments/owner"
+	suiteIndexTimestamp  = "suites/page"
 	suiteKeyVersion      = "suites_version"
 	suiteKeyRunning      = "suites_running"
 	suiteKeyTotal        = "suites_total"
@@ -45,8 +46,9 @@ type SoftDeleteEntity struct {
 }
 
 type Repo struct {
-	db  *buntdb.DB
-	pub event.Publisher
+	db    *buntdb.DB
+	pub   event.Publisher
+	idInc uint32
 }
 
 func Open(filename string) (*Repo, error) {
@@ -72,11 +74,13 @@ func (r *Repo) Close() error {
 }
 
 func (r *Repo) setIndexes() error {
-	err := r.db.ReplaceIndex(attachmentIndexOwner, string(AttachmentColl)+":*",
+	err := r.db.ReplaceIndex(attachmentIndexOwner, key(AttachmentColl, "*"),
 		buntdb.IndexJSON("suite_id"), buntdb.IndexJSON("case_id"))
 	if err != nil {
 		return err
 	}
+	err = r.db.ReplaceIndex(suiteIndexTimestamp, key(SuiteColl, "*"),
+		buntdb.IndexJSON("started_at"))
 	return nil
 }
 
@@ -144,12 +148,12 @@ func (r *Repo) insert(coll Coll, x interface{}) (id string, err error) {
 	if err != nil {
 		log.Panicf("marshal json: %v", err)
 	}
-	id = genId()
+	id = r.genId()
 	if b, err = sjson.SetBytes(b, "id", id); err != nil {
 		log.Panicf("set json: %v", err)
 	}
 	return id, r.db.Update(func(tx *buntdb.Tx) error {
-		_, _, err := tx.Set(string(coll)+":"+id, string(b), nil)
+		_, _, err := tx.Set(key(coll, id), string(b), nil)
 		if err != nil {
 			return err
 		}
@@ -168,7 +172,7 @@ func (r *Repo) getById(coll Coll, id string, x interface{}) error {
 	var v string
 	err := r.db.View(func(tx *buntdb.Tx) error {
 		var err error
-		v, err = tx.Get(string(coll) + ":" + id)
+		v, err = tx.Get(key(coll, id))
 		return err
 	})
 	if err == buntdb.ErrNotFound {
@@ -180,6 +184,17 @@ func (r *Repo) getById(coll Coll, id string, x interface{}) error {
 		log.Panicf("unmarshal json: %v", err)
 	}
 	return nil
+}
+
+func (r *Repo) genId() string {
+	b := make([]byte, 1)
+	if _, err := rand.Read(b); err != nil {
+		log.Panicf("read rand: %v", err)
+	}
+	now := time.Now()
+	return fmt.Sprintf("%011x%02x%02x",
+		now.Unix()*1e3+int64(now.Nanosecond())/1e6,
+		atomic.AddUint32(&r.idInc, 1)&0xff, b)
 }
 
 func unmarshalJsonVals(vals []string, f func(i int) interface{}) {
@@ -219,15 +234,33 @@ func getInt(tx *buntdb.Tx, k string) (int64, error) {
 	return i, err
 }
 
-var idInc uint32
-
-func genId() string {
-	b := make([]byte, 1)
-	if _, err := rand.Read(b); err != nil {
-		log.Panicf("read rand: %v", err)
+func getJsonInt(tx *buntdb.Tx, coll Coll, id, path string) (int64, error) {
+	v, err := tx.Get(key(coll, id))
+	if err != nil {
+		return 0, err
 	}
-	now := time.Now()
-	return fmt.Sprintf("%011x%02x%02x",
-		now.Unix()*1e3+int64(now.Nanosecond())/1e6,
-		atomic.AddUint32(&idInc, 1)&0xff, b)
+	return gjson.Get(v, path).Int(), nil
+}
+
+type itr func(k, v string) bool
+
+type lessFunc func(v string) bool
+
+func newPageItr(limit int, vals *[]string, hasMore *bool, less lessFunc) itr {
+	var n int
+	return func(k, v string) bool {
+		if less(v) {
+			if n == limit {
+				*hasMore = true
+				return false
+			}
+			n++
+		}
+		*vals = append(*vals, v)
+		return true
+	}
+}
+
+func key(coll Coll, id string) string {
+	return string(coll) + ":" + id
 }

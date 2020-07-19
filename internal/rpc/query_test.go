@@ -14,7 +14,7 @@ import (
 var getAttachmentsTests = []struct {
 	attachments []*repo.Attachment
 	setFilter   func(ids []string, r *pb.GetAttachmentsRequest)
-	size        int
+	wantCount   int
 	want        func(ids []string) []*pb.Attachment
 }{
 	{
@@ -22,7 +22,7 @@ var getAttachmentsTests = []struct {
 		setFilter: func(ids []string, r *pb.GetAttachmentsRequest) {
 			r.Filter = &pb.GetAttachmentsRequest_Id{Id: ids[0]}
 		},
-		size: 1,
+		wantCount: 1,
 		want: func(ids []string) []*pb.Attachment {
 			return []*pb.Attachment{{
 				Id:        ids[0],
@@ -40,7 +40,7 @@ var getAttachmentsTests = []struct {
 		setFilter: func(ids []string, r *pb.GetAttachmentsRequest) {
 			r.Filter = &pb.GetAttachmentsRequest_Id{Id: ids[1]}
 		},
-		size: 1,
+		wantCount: 1,
 		want: func(ids []string) []*pb.Attachment {
 			return []*pb.Attachment{{
 				Id:        ids[1],
@@ -68,7 +68,7 @@ var getAttachmentsTests = []struct {
 		setFilter: func(_ []string, r *pb.GetAttachmentsRequest) {
 			r.Filter = &pb.GetAttachmentsRequest_SuiteId{SuiteId: "123"}
 		},
-		size: 2,
+		wantCount: 2,
 		want: func(ids []string) []*pb.Attachment {
 			return []*pb.Attachment{
 				{
@@ -104,7 +104,7 @@ var getAttachmentsTests = []struct {
 		setFilter: func(_ []string, r *pb.GetAttachmentsRequest) {
 			r.Filter = &pb.GetAttachmentsRequest_CaseId{CaseId: "123"}
 		},
-		size: 2,
+		wantCount: 2,
 		want: func(ids []string) []*pb.Attachment {
 			return []*pb.Attachment{
 				{
@@ -125,7 +125,6 @@ var getAttachmentsTests = []struct {
 }
 
 func TestQuery_GetAttachments(t *testing.T) {
-
 	for i, test := range getAttachmentsTests {
 		t.Run("test_"+strconv.Itoa(i), func(t *testing.T) {
 			r := repotest.Open(t)
@@ -142,7 +141,7 @@ func TestQuery_GetAttachments(t *testing.T) {
 			test.setFilter(ids, in)
 			got, err := client.GetAttachments(context.Background(), in)
 			require.Nil(t, err)
-			if assert.Len(t, got.Attachments, test.size) {
+			if assert.Len(t, got.Attachments, test.wantCount) {
 				want := test.want(ids)
 				assert.Equal(t, want, got.Attachments)
 			}
