@@ -27,26 +27,51 @@ type Suite struct {
 	Entity
 	VersionedEntity
 	SoftDeleteEntity
-	Name           string      `json:"name,omitempty"`
-	Tags           []string    `json:"tags,omitempty"`
-	PlannedCases   int64       `json:"planned_cases,omitempty"`
+	Name           string      `json:"name"`
+	Tags           []string    `json:"tags"`
+	PlannedCases   int64       `json:"planned_cases"`
 	Status         SuiteStatus `json:"status"`
 	Result         SuiteResult `json:"result"`
-	DisconnectedAt int64       `json:"disconnected_at,omitempty"`
+	DisconnectedAt int64       `json:"disconnected_at"`
 	StartedAt      int64       `json:"started_at"`
-	FinishedAt     int64       `json:"finished_at,omitempty"`
+	FinishedAt     int64       `json:"finished_at"`
+}
+
+func (s *Suite) setId(id string) {
+	s.Id = id
+}
+
+type SuiteAgg struct {
+	VersionedEntity
+	TotalCount   int64 `json:"total_count"`
+	StartedCount int64 `json:"started_count"`
 }
 
 type SuitePage struct {
-	CountVersion int64    `json:"count_version"`
-	TotalCount   int64    `json:"total_count"`
-	RunningCount int64    `json:"running_count"`
-	HasMore      bool     `json:"has_more"`
-	Suites       []*Suite `json:"suites"`
+	SuiteAgg
+	HasMore bool     `json:"has_more"`
+	Suites  []*Suite `json:"suites"`
 }
 
 func (r *Repo) InsertSuite(s Suite) (id string, err error) {
-	return r.insert(SuiteColl, &s)
+	return r.insertFunc(SuiteColl, &s, func(tx *buntdb.Tx) error {
+		var agg SuiteAgg
+		err := r.update(tx, SuiteAggColl, "", &agg, func() {
+			agg.Version++
+			agg.TotalCount++
+			if s.Status == SuiteStatusStarted {
+				agg.StartedCount++
+			}
+		})
+		if err != nil {
+			return err
+		}
+		r.pub.Publish(Changefeed{SuiteInsert{
+			Suite: s,
+			Agg:   agg,
+		}})
+		return nil
+	})
 }
 
 func (r *Repo) Suite(id string) (*Suite, error) {
@@ -54,22 +79,55 @@ func (r *Repo) Suite(id string) (*Suite, error) {
 	return &s, r.getById(SuiteColl, id, &s)
 }
 
-func (r *Repo) SuitePage(fromId string, limit int) (*SuitePage, error) {
-	var vals []string
-	var page SuitePage
+func (r *Repo) SuiteInRange(minId, maxId, id string) (int, error) {
+	var less func(a, b string) bool
+	var minVal, maxVal, v string
 	err := r.db.View(func(tx *buntdb.Tx) error {
 		var err error
-		vals, page.HasMore, err = getSuites(tx, fromId, limit)
+		less, err = tx.GetLess(suiteIndexStartedAt)
 		if err != nil {
 			return err
 		}
-		if page.CountVersion, err = getInt(tx, suiteKeyVersion); err != nil {
+		maxVal, err = tx.Get(key(SuiteColl, maxId))
+		if err != nil {
 			return err
 		}
-		if page.TotalCount, err = getInt(tx, suiteKeyTotal); err != nil {
+		minVal, err = tx.Get(key(SuiteColl, minId))
+		if err != nil {
 			return err
 		}
-		page.RunningCount, err = getInt(tx, suiteKeyRunning)
+		v, err = tx.Get(key(SuiteColl, id))
+		return err
+	})
+	if err == buntdb.ErrNotFound {
+		return 0, ErrNotFound
+	} else if err != nil {
+		return 0, err
+	}
+
+	max := fmt.Sprintf(`{"started_at": %d}`, gjson.Get(maxVal, "started_at").Int())
+	min := fmt.Sprintf(`{"started_at": %d}`, gjson.Get(minVal, "started_at").Int())
+	target := fmt.Sprintf(`{"started_at": %d}`, gjson.Get(v, "started_at").Int())
+
+	if less(target, min) {
+		return -1, nil
+	} else if less(target, max) {
+		return 0, nil
+	}
+	return 1, nil
+}
+
+func (r *Repo) SuitePage(fromId string, limit int) (*SuitePage, error) {
+	var page SuitePage
+	var vals []string
+	err := r.db.View(func(tx *buntdb.Tx) error {
+		var err error
+		if vals, page.HasMore, err = getSuites(tx, fromId, limit); err != nil {
+			return err
+		}
+		if err = r.getById(SuiteAggColl, "", &page.SuiteAgg); err == ErrNotFound {
+			err = nil
+		}
 		return err
 	})
 	if err == buntdb.ErrNotFound {
@@ -91,10 +149,11 @@ func getSuites(tx *buntdb.Tx, fromId string, limit int) (vals []string, hasMore 
 	}
 	if fromId != "" {
 		var err error
-		startedAt, err = getJsonInt(tx, SuiteColl, fromId, "started_at")
+		v, err := tx.Get(key(SuiteColl, fromId))
 		if err != nil {
 			return nil, false, err
 		}
+		startedAt = gjson.Get(v, "started_at").Int()
 		less = func(v string) bool {
 			return gjson.Get(v, "started_at").Int() < startedAt
 		}
@@ -106,8 +165,8 @@ func getSuites(tx *buntdb.Tx, fromId string, limit int) (vals []string, hasMore 
 
 func descendSuites(tx *buntdb.Tx, fromId string, startedAt int64, itr itr) error {
 	if fromId == "" {
-		return tx.Descend(suiteIndexTimestamp, itr)
+		return tx.Descend(suiteIndexStartedAt, itr)
 	}
 	pivot := fmt.Sprintf(`{"started_at": %d}`, startedAt)
-	return tx.DescendLessOrEqual(suiteIndexTimestamp, pivot, itr)
+	return tx.DescendLessOrEqual(suiteIndexStartedAt, pivot, itr)
 }

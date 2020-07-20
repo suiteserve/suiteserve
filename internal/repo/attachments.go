@@ -15,7 +15,11 @@ type Attachment struct {
 	Url         string `json:"url"`
 	ContentType string `json:"content_type"`
 	Size        int64  `json:"size"`
-	Timestamp   int64  `json:"timestamp,omitempty"`
+	Timestamp   int64  `json:"timestamp"`
+}
+
+func (a *Attachment) setId(id string) {
+	a.Id = id
 }
 
 func (r *Repo) InsertAttachment(a Attachment) (id string, err error) {
@@ -36,8 +40,8 @@ func (r *Repo) CaseAttachments(caseId string) ([]*Attachment, error) {
 }
 
 func (r *Repo) attachmentsByOwner(suiteId, caseId string) ([]*Attachment, error) {
-	pivot := fmt.Sprintf(`{"suite_id": %q, "case_id": %q}`, suiteId, caseId)
 	var vals []string
+	pivot := fmt.Sprintf(`{"suite_id": %q, "case_id": %q}`, suiteId, caseId)
 	err := r.db.View(func(tx *buntdb.Tx) error {
 		return tx.DescendEqual(attachmentIndexOwner, pivot, func(k, v string) bool {
 			vals = append(vals, v)

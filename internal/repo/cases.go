@@ -26,16 +26,20 @@ type Case struct {
 	Entity
 	VersionedEntity
 	SuiteId     string                     `json:"suite_id"`
-	Name        string                     `json:"name,omitempty"`
-	Description string                     `json:"description,omitempty"`
-	Tags        []string                   `json:"tags,omitempty"`
+	Name        string                     `json:"name"`
+	Description string                     `json:"description"`
+	Tags        []string                   `json:"tags"`
 	Idx         int64                      `json:"idx"`
-	Args        map[string]json.RawMessage `json:"args,omitempty"`
+	Args        map[string]json.RawMessage `json:"args"`
 	Status      CaseStatus                 `json:"status"`
 	Result      CaseResult                 `json:"result"`
 	CreatedAt   int64                      `json:"created_at"`
-	StartedAt   int64                      `json:"started_at,omitempty"`
-	FinishedAt  int64                      `json:"finished_at,omitempty"`
+	StartedAt   int64                      `json:"started_at"`
+	FinishedAt  int64                      `json:"finished_at"`
+}
+
+func (c *Case) setId(id string) {
+	c.Id = id
 }
 
 func (r *Repo) InsertCase(c Case) (id string, err error) {

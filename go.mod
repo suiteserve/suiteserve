@@ -15,7 +15,7 @@ require (
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/rs/cors v1.7.0 // indirect
 	github.com/stretchr/testify v1.5.1
-	github.com/suiteserve/protocol/go v0.0.0-20200717205956-68c4ce79890b
+	github.com/suiteserve/protocol/go v0.0.0-20200720022605-eec6d0100868
 	github.com/tidwall/buntdb v1.1.2
 	github.com/tidwall/gjson v1.6.0
 	github.com/tidwall/sjson v1.1.1
@@ -23,5 +23,6 @@ require (
 	golang.org/x/text v0.3.2 // indirect
 	google.golang.org/grpc v1.30.0
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
+	gopkg.in/rethinkdb/rethinkdb-go.v6 v6.2.1 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )

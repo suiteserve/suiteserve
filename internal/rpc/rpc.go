@@ -20,6 +20,7 @@ type Repo interface {
 
 	InsertSuite(repo.Suite) (id string, err error)
 	Suite(id string) (*repo.Suite, error)
+	SuiteInRange(minId, maxId, id string) (int, error)
 
 	InsertCase(repo.Case) (id string, err error)
 	Case(id string) (*repo.Case, error)

@@ -35,6 +35,7 @@ func TestRepo_SuiteAttachments(t *testing.T) {
 	r := Open(t)
 	all, err := r.SuiteAttachments("123")
 	require.Nil(t, err)
+	assert.NotNil(t, all)
 	assert.Empty(t, all)
 
 	a1 := repo.Attachment{
@@ -67,6 +68,7 @@ func TestRepo_CaseAttachments(t *testing.T) {
 	r := Open(t)
 	all, err := r.CaseAttachments("123")
 	require.Nil(t, err)
+	assert.NotNil(t, all)
 	assert.Empty(t, all)
 
 	a1 := repo.Attachment{

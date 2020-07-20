@@ -1,17 +1,21 @@
 package repo
 
-type Changefeed []*Change
+type Mask []string
 
-type ChangeOp string
+type Changefeed []Change
 
-const (
-	ChangeOpInsert ChangeOp = "insert"
-	ChangeOpUpdate ChangeOp = "update"
-)
+type Change interface {
+	isChange()
+}
 
-type Change struct {
-	Id      string      `json:"id"`
-	Op      ChangeOp    `json:"op"`
-	Updated interface{} `json:"updated,omitempty"`
-	Deleted interface{} `json:"deleted,omitempty"`
+type SuiteInsert struct {
+	Suite Suite
+	Agg   SuiteAgg
+}
+
+func (SuiteInsert) isChange() {}
+
+type SuiteUpdate struct {
+	SuiteInsert
+	Mask
 }

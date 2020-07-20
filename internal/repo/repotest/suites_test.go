@@ -58,10 +58,12 @@ var suitePageTests = []struct {
 		wantCount: 1,
 		want: func(ids []string) *repo.SuitePage {
 			return &repo.SuitePage{
-				CountVersion: 1,
-				TotalCount:   1,
-				RunningCount: 0,
-				HasMore:      false,
+				SuiteAgg: repo.SuiteAgg{
+					VersionedEntity: repo.VersionedEntity{Version: 1},
+					TotalCount:      1,
+					StartedCount:    0,
+				},
+				HasMore: false,
 				Suites: []*repo.Suite{{
 					Entity: repo.Entity{Id: ids[0]},
 					Name:   "test1",
@@ -86,10 +88,12 @@ var suitePageTests = []struct {
 		wantCount: 3,
 		want: func(ids []string) *repo.SuitePage {
 			return &repo.SuitePage{
-				CountVersion: 4,
-				TotalCount:   4,
-				RunningCount: 1,
-				HasMore:      true,
+				SuiteAgg: repo.SuiteAgg{
+					VersionedEntity: repo.VersionedEntity{Version: 4},
+					TotalCount:      4,
+					StartedCount:    1,
+				},
+				HasMore: true,
 				Suites: []*repo.Suite{
 					{
 						Entity:    repo.Entity{Id: ids[0]},
@@ -125,10 +129,12 @@ var suitePageTests = []struct {
 		wantCount: 4,
 		want: func(ids []string) *repo.SuitePage {
 			return &repo.SuitePage{
-				CountVersion: 4,
-				TotalCount:   4,
-				RunningCount: 1,
-				HasMore:      false,
+				SuiteAgg: repo.SuiteAgg{
+					VersionedEntity: repo.VersionedEntity{Version: 4},
+					TotalCount:      4,
+					StartedCount:    1,
+				},
+				HasMore: false,
 				Suites: []*repo.Suite{
 					{
 						Entity:    repo.Entity{Id: ids[0]},
@@ -172,9 +178,145 @@ func TestRepo_SuitePage(t *testing.T) {
 			}
 			require.Nil(t, err)
 			if assert.Len(t, got.Suites, test.wantCount) {
-				want := test.want(ids)
-				assert.Equal(t, want, got)
+				assert.Equal(t, test.want(ids), got)
 			}
+		})
+	}
+}
+
+var suiteInRangeTests = []struct {
+	suites []*repo.Suite
+	minId  func(ids []string) string
+	maxId  func(ids []string) string
+	id     func(ids []string) string
+	want   int
+}{
+	{
+		suites: []*repo.Suite{},
+		minId: func(ids []string) string {
+			return "123"
+		},
+		maxId: func(ids []string) string {
+			return "789"
+		},
+		id: func(ids []string) string {
+			return "456"
+		},
+		want: -2,
+	},
+	{
+		suites: []*repo.Suite{
+			{StartedAt: 100},
+			{StartedAt: 400},
+			{StartedAt: 200},
+			{StartedAt: 300},
+		},
+		minId: func(ids []string) string {
+			return ids[2]
+		},
+		maxId: func(ids []string) string {
+			return ids[3]
+		},
+		id: func(ids []string) string {
+			return ids[0]
+		},
+		want: -1,
+	},
+	{
+		suites: []*repo.Suite{
+			{StartedAt: 100},
+			{StartedAt: 400},
+			{StartedAt: 200},
+			{StartedAt: 300},
+		},
+		minId: func(ids []string) string {
+			return ids[2]
+		},
+		maxId: func(ids []string) string {
+			return ids[3]
+		},
+		id: func(ids []string) string {
+			return ids[2]
+		},
+		want: 0,
+	},
+	{
+		suites: []*repo.Suite{
+			{StartedAt: 100},
+			{StartedAt: 400},
+			{StartedAt: 200},
+			{StartedAt: 300},
+		},
+		minId: func(ids []string) string {
+			return ids[2]
+		},
+		maxId: func(ids []string) string {
+			return ids[3]
+		},
+		id: func(ids []string) string {
+			return ids[3]
+		},
+		want: 1,
+	},
+	{
+		suites: []*repo.Suite{
+			{StartedAt: 500},
+			{StartedAt: 100},
+			{StartedAt: 400},
+			{StartedAt: 200},
+			{StartedAt: 300},
+		},
+		minId: func(ids []string) string {
+			return ids[3]
+		},
+		maxId: func(ids []string) string {
+			return ids[2]
+		},
+		id: func(ids []string) string {
+			return ids[4]
+		},
+		want: 0,
+	},
+	{
+		suites: []*repo.Suite{
+			{StartedAt: 500},
+			{StartedAt: 100},
+			{StartedAt: 400},
+			{StartedAt: 200},
+			{StartedAt: 300},
+		},
+		minId: func(ids []string) string {
+			return ids[3]
+		},
+		maxId: func(ids []string) string {
+			return ids[2]
+		},
+		id: func(ids []string) string {
+			return ids[0]
+		},
+		want: 1,
+	},
+}
+
+func TestRepo_SuiteInRange(t *testing.T) {
+	for i, test := range suiteInRangeTests {
+		t.Run("test_"+strconv.Itoa(i), func(t *testing.T) {
+			r := Open(t)
+
+			var ids []string
+			for _, s := range test.suites {
+				id, err := r.InsertSuite(*s)
+				require.Nil(t, err)
+				ids = append(ids, id)
+			}
+
+			got, err := r.SuiteInRange(test.minId(ids), test.maxId(ids), test.id(ids))
+			if test.want == -2 {
+				assert.True(t, errors.Is(err, repo.ErrNotFound), "want ErrNotFound")
+				return
+			}
+			require.Nil(t, err)
+			assert.Equal(t, test.want, got)
 		})
 	}
 }

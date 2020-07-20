@@ -7,10 +7,7 @@ import (
 	"fmt"
 	"github.com/suiteserve/suiteserve/event"
 	"github.com/tidwall/buntdb"
-	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 	"log"
-	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -20,14 +17,12 @@ type Coll string
 const (
 	AttachmentColl Coll = "attachments"
 	SuiteColl      Coll = "suites"
+	SuiteAggColl   Coll = "suite_agg"
 	CaseColl       Coll = "cases"
 	LogColl        Coll = "logs"
 
 	attachmentIndexOwner = "attachments/owner"
-	suiteIndexTimestamp  = "suites/page"
-	suiteKeyVersion      = "suites_version"
-	suiteKeyRunning      = "suites_running"
-	suiteKeyTotal        = "suites_total"
+	suiteIndexStartedAt  = "suites/started_at"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -42,7 +37,7 @@ type VersionedEntity struct {
 
 type SoftDeleteEntity struct {
 	Deleted   bool  `json:"deleted"`
-	DeletedAt int64 `json:"deleted_at,omitempty"`
+	DeletedAt int64 `json:"deleted_at"`
 }
 
 type Repo struct {
@@ -56,13 +51,8 @@ func Open(filename string) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	repo := &Repo{
-		db: db,
-	}
-	if err := repo.setIndexes(); err != nil {
-		return nil, err
-	}
-	return repo, nil
+	repo := &Repo{db: db}
+	return repo, repo.setIndexes()
 }
 
 func (r *Repo) Changefeed() *event.Bus {
@@ -79,93 +69,57 @@ func (r *Repo) setIndexes() error {
 	if err != nil {
 		return err
 	}
-	err = r.db.ReplaceIndex(suiteIndexTimestamp, key(SuiteColl, "*"),
+	return r.db.ReplaceIndex(suiteIndexStartedAt, key(SuiteColl, "*"),
 		buntdb.IndexJSON("started_at"))
-	return nil
 }
 
-type diff struct {
-	old    []byte
-	new    []byte
-	change *Change
+type insertable interface {
+	setId(id string)
 }
 
-func (r *Repo) onUpdate(tx *buntdb.Tx, coll Coll, diffs ...*diff) error {
-	var err error
-	var changefeed Changefeed
-	if coll == SuiteColl {
-		changefeed, err = r.onSuitesUpdate(tx, diffs)
-	}
-	if err != nil {
-		return err
-	}
-	if len(changefeed) > 0 {
-		r.pub.Publish(changefeed)
-	}
-	return nil
-}
-
-func (r *Repo) onSuitesUpdate(tx *buntdb.Tx, diffs []*diff) (changefeed Changefeed, err error) {
-	var runningDelta, totalDelta int64
-	for _, d := range diffs {
-		if len(d.old) == 0 {
-			// entity was inserted
-			totalDelta++
-		} else if gjson.GetBytes(d.old, "status").String() == string(SuiteStatusStarted) {
-			// entity was updated or deleted; old status was `started`
-			runningDelta--
-		}
-		if len(d.new) == 0 {
-			// entity was deleted
-			totalDelta--
-		} else if gjson.GetBytes(d.new, "status").String() == string(SuiteStatusStarted) {
-			// entity was inserted or updated; new status is `started`
-			runningDelta++
-		}
-		changefeed = append(changefeed, d.change)
-	}
-
-	agg := make(map[string]int64)
-	if agg["version"], err = incInt(tx, suiteKeyVersion, 1); err != nil {
-		return nil, err
-	}
-	if agg["running"], err = incInt(tx, suiteKeyRunning, runningDelta); err != nil {
-		return nil, err
-	}
-	if agg["total"], err = incInt(tx, suiteKeyTotal, totalDelta); err != nil {
-		return nil, err
-	}
-	changefeed = append(changefeed, &Change{
-		Id:      string(SuiteColl),
-		Op:      ChangeOpUpdate,
-		Updated: agg,
+func (r *Repo) insert(coll Coll, x insertable) (id string, err error) {
+	return r.insertFunc(coll, x, func(tx *buntdb.Tx) error {
+		return nil
 	})
-	return changefeed, nil
 }
 
-func (r *Repo) insert(coll Coll, x interface{}) (id string, err error) {
+func (r *Repo) insertFunc(coll Coll, x insertable, after func(tx *buntdb.Tx) error) (id string, err error) {
+	id = r.genId()
+	x.setId(id)
+	return id, r.setFunc(coll, id, x, after)
+}
+
+func (r *Repo) setFunc(coll Coll, id string, x interface{}, after func(tx *buntdb.Tx) error) error {
 	b, err := json.Marshal(x)
 	if err != nil {
 		log.Panicf("marshal json: %v", err)
 	}
-	id = r.genId()
-	if b, err = sjson.SetBytes(b, "id", id); err != nil {
-		log.Panicf("set json: %v", err)
-	}
-	return id, r.db.Update(func(tx *buntdb.Tx) error {
+	return r.db.Update(func(tx *buntdb.Tx) error {
 		_, _, err := tx.Set(key(coll, id), string(b), nil)
 		if err != nil {
 			return err
 		}
-		return r.onUpdate(tx, coll, &diff{
-			new: b,
-			change: &Change{
-				Id:      id,
-				Op:      ChangeOpInsert,
-				Updated: json.RawMessage(b),
-			},
-		})
+		return after(tx)
 	})
+}
+
+func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{}, updateX func()) error {
+	k := key(coll, id)
+	v, err := tx.Get(k)
+	if err == nil {
+		if err := json.Unmarshal([]byte(v), x); err != nil {
+			log.Panicf("unmarshal json: %v", err)
+		}
+	} else if err != buntdb.ErrNotFound {
+		return err
+	}
+	updateX()
+	b, err := json.Marshal(x)
+	if err != nil {
+		log.Panicf("marshal json: %v", err)
+	}
+	_, _, err = tx.Set(k, string(b), nil)
+	return err
 }
 
 func (r *Repo) getById(coll Coll, id string, x interface{}) error {
@@ -205,48 +159,10 @@ func unmarshalJsonVals(vals []string, f func(i int) interface{}) {
 	}
 }
 
-func incInt(tx *buntdb.Tx, k string, delta int64) (new int64, err error) {
-	new, err = getInt(tx, k)
-	if err != nil {
-		return 0, err
-	}
-	if delta == 0 {
-		return new, nil
-	}
-	new += delta
-	if _, _, err := tx.Set(k, strconv.FormatInt(new, 10), nil); err != nil {
-		return 0, err
-	}
-	return new, nil
-}
-
-func getInt(tx *buntdb.Tx, k string) (int64, error) {
-	v, err := tx.Get(k)
-	if err == buntdb.ErrNotFound {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
-	}
-	i, err := strconv.ParseInt(v, 10, 64)
-	if err != nil {
-		log.Panicf("parse int: %v", err)
-	}
-	return i, err
-}
-
-func getJsonInt(tx *buntdb.Tx, coll Coll, id, path string) (int64, error) {
-	v, err := tx.Get(key(coll, id))
-	if err != nil {
-		return 0, err
-	}
-	return gjson.Get(v, path).Int(), nil
-}
-
+type less func(v string) bool
 type itr func(k, v string) bool
 
-type lessFunc func(v string) bool
-
-func newPageItr(limit int, vals *[]string, hasMore *bool, less lessFunc) itr {
+func newPageItr(limit int, vals *[]string, hasMore *bool, less less) itr {
 	var n int
 	return func(k, v string) bool {
 		if less(v) {
