@@ -235,13 +235,13 @@ type watchWindow struct {
 	window   []watchHandle
 }
 
-// insert inserts h into the sorted window if any of:
-//   len(window) < minSize
-//   !h.less(window[0])
+// insert inserts h into the sorted window. If the length of the window is less
+// than minSize, then h is always inserted. Otherwise, h is not inserted iff it
+// comes strictly before the first element of the window.
 //
-// If the insertion is not made, removed will be empty and ok will be false.
-// Otherwise, the window is shrunk after the insertion and the removed
-// watchHandles due to the shrinkage are returned along with ok being true.
+// If h is inserted, then the window is shrunk according to the shrink function
+// and removed contains the watchHandles that were removed from the window due
+// to the shrinkage. Ok is true if h was inserted, else false.
 func (w *watchWindow) insert(h watchHandle) (removed []watchHandle, ok bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -268,9 +268,10 @@ func (w *watchWindow) insertHelper(h watchHandle) (removed []watchHandle, ok boo
 	return removed, true
 }
 
-// update immediately removes h from the window if possible and then reinserts
-// it according to insert. h will still have been removed even when ok is false
-// and h will never show up in removed.
+// update immediately removes h from the window if it exists and then reinserts
+// it according to insert, returning the result of insert. h will still have
+// been removed from the window even when ok is false. h will never show up in
+// removed.
 func (w *watchWindow) update(h watchHandle) (removed []watchHandle, ok bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -283,15 +284,19 @@ func (w *watchWindow) update(h watchHandle) (removed []watchHandle, ok bool) {
 	return w.insertHelper(h)
 }
 
-// shrink returns the largest left bound i of the window such that:
-//   if len(window) >= minSize, then len(window[i:]) >= minSize
-//   if required is non-nil, then window[i:] contains required
-//   if i > 0, then window[i-1].less(window[i])
-// Preconditions:
-//   window is in ascending order
-//   if required is non-nil, then window contains required
-// If minSize is non-positive, or if len(window) <= minSize, shrink returns
-// 0 to indicate that the window should not be shrunk.
+// shrink returns the largest left bound of the window so that its length will
+// still be at least minSize and it will still contain the required watchHandle
+// if there is one. In addition, consecutive window elements will not be split.
+// That is, when:
+//   required = nil
+//   minSize = 2
+//   window = [3, 4, 4, 5]
+// shrink will return index 1, not index 2, because window[2:] would split the
+// block of consecutive 4's.
+//
+// If minSize is non-positive, or if the length of the window is not already at
+// least minSize, then shrink returns 0 to indicate that the window should not
+// be shrunk.
 func (w *watchWindow) shrink() int {
 	if w.minSize < 1 || len(w.window) <= w.minSize {
 		// don't shrink

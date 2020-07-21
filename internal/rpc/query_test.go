@@ -161,7 +161,9 @@ var insertTests = []struct {
 	want insertOutput
 }{
 	{
-		w:  &watchWindow{},
+		w:  &watchWindow{
+			minSize: -3,
+		},
 		in: watchHandle{id: "1", val: 1},
 		want: insertOutput{
 			ok:     true,
