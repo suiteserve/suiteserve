@@ -79,44 +79,6 @@ func (r *Repo) Suite(id string) (*Suite, error) {
 	return &s, r.getById(SuiteColl, id, &s)
 }
 
-func (r *Repo) SuiteInRange(minId, maxId, id string) (int, error) {
-	var less func(a, b string) bool
-	var minVal, maxVal, v string
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		var err error
-		less, err = tx.GetLess(suiteIndexStartedAt)
-		if err != nil {
-			return err
-		}
-		maxVal, err = tx.Get(key(SuiteColl, maxId))
-		if err != nil {
-			return err
-		}
-		minVal, err = tx.Get(key(SuiteColl, minId))
-		if err != nil {
-			return err
-		}
-		v, err = tx.Get(key(SuiteColl, id))
-		return err
-	})
-	if err == buntdb.ErrNotFound {
-		return 0, ErrNotFound
-	} else if err != nil {
-		return 0, err
-	}
-
-	max := fmt.Sprintf(`{"started_at": %d}`, gjson.Get(maxVal, "started_at").Int())
-	min := fmt.Sprintf(`{"started_at": %d}`, gjson.Get(minVal, "started_at").Int())
-	target := fmt.Sprintf(`{"started_at": %d}`, gjson.Get(v, "started_at").Int())
-
-	if less(target, min) {
-		return -1, nil
-	} else if less(target, max) {
-		return 0, nil
-	}
-	return 1, nil
-}
-
 func (r *Repo) SuitePage(fromId string, limit int) (*SuitePage, error) {
 	var page SuitePage
 	var vals []string

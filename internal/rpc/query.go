@@ -6,6 +6,7 @@ import (
 	pb "github.com/suiteserve/protocol/go/protocol"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"io"
+	"sort"
 	"sync"
 )
 
@@ -77,14 +78,18 @@ func (s *query) GetAttachments(_ context.Context, r *pb.GetAttachmentsRequest) (
 	return &reply, nil
 }
 
+type suiteHandle struct {
+	startedAt int64
+	id        string
+}
+
 type suitesWatch struct {
 	mu   sync.Mutex
 	repo Repo
-	size int64
 	id   string
-	max  string
-	min  string
-	agg  repo.SuiteAgg
+
+	minSize int
+	window  []suiteHandle
 }
 
 func (w *suitesWatch) process(r *pb.WatchSuitesRequest) ([]*pb.WatchSuitesReply, error) {
@@ -94,10 +99,63 @@ func (w *suitesWatch) process(r *pb.WatchSuitesRequest) ([]*pb.WatchSuitesReply,
 	return replies, nil
 }
 
-func (w *suitesWatch) onInsert(u repo.SuiteInsert) *pb.WatchSuitesReply {
+func (w *suitesWatch) onInsert(u repo.SuiteInsert) (*pb.WatchSuitesReply, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return nil
+	handle := suiteHandle{
+		startedAt: u.Suite.StartedAt,
+		id:        u.Suite.Id,
+	}
+	if len(w.window) == 0 {
+		// expand window
+		w.window = []suiteHandle{handle}
+	} else if u.Suite.StartedAt >= w.window[0].startedAt {
+		// expand window
+		var ok bool
+		for i, h := range w.window {
+			if u.Suite.StartedAt <= h.startedAt {
+				w.window = append(w.window, suiteHandle{})
+				copy(w.window[i+1:], w.window[i:])
+				w.window[i] = handle
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			w.window = append(w.window, handle)
+		}
+		// shrink window if possible
+		left := w.findBestLeft()
+		if len(w.window)-left >= w.minSize {
+			w.window = w.window[left:]
+		}
+	} else {
+		// out of range
+		return nil, nil
+	}
+	return &pb.WatchSuitesReply{
+		Operation: &pb.WatchSuitesReply_Update_{
+			Update: &pb.WatchSuitesReply_Update{
+				Suite: suiteToPb(u.Suite),
+			},
+		},
+		TotalCount:   u.Agg.TotalCount,
+		StartedCount: u.Agg.StartedCount,
+		HasMore:      false,
+	}, nil
+}
+
+func (w *suitesWatch) findBestLeft() int {
+	var v int64
+	for i, h := range w.window {
+		// TODO: search through
+		if i == 0 {
+			v = h.startedAt
+		} else if h.startedAt != v {
+			return i
+		}
+	}
+	return len(w.window)
 }
 
 func (w *suitesWatch) onUpdate(u repo.SuiteUpdate) *pb.WatchSuitesReply {
@@ -158,4 +216,93 @@ func (s *query) WatchCases(stream pb.QueryService_WatchCasesServer) error {
 
 func (s *query) WatchLog(stream pb.QueryService_WatchLogServer) error {
 	panic("implement me")
+}
+
+type watchHandle struct {
+	id  string
+	val int64
+}
+
+// less returns whether h is less than that for sorting and searching purposes.
+func (h watchHandle) less(that watchHandle) bool {
+	return h.val < that.val
+}
+
+type watchWindow struct {
+	mu       sync.Mutex
+	required *watchHandle
+	minSize  int
+	window   []watchHandle
+}
+
+// insert inserts h into the sorted window if any of:
+//   len(window) < minSize
+//   !h.less(window[0])
+//
+// If the insertion is not made, removed will be empty and ok will be false.
+// Otherwise, the window is shrunk after the insertion and the removed
+// watchHandles due to the shrinkage are returned along with ok being true.
+func (w *watchWindow) insert(h watchHandle) (removed []watchHandle, ok bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.insertHelper(h)
+}
+
+func (w *watchWindow) insertHelper(h watchHandle) (removed []watchHandle, ok bool) {
+	i := sort.Search(len(w.window), func(i int) bool {
+		return !w.window[i].less(h)
+	})
+	// check
+	if i == 0 && len(w.window) >= w.minSize && len(w.window) > 0 && h.less(w.window[0]) {
+		return nil, false
+	}
+	// insert
+	w.window = append(w.window, watchHandle{})
+	copy(w.window[i+1:], w.window[i:])
+	w.window[i] = h
+	// shrink
+	i = w.shrink()
+	removed = make([]watchHandle, i)
+	copy(removed, w.window[:i])
+	w.window = w.window[i:]
+	return removed, true
+}
+
+// update immediately removes h from the window if possible and then reinserts
+// it according to insert. h will still have been removed even when ok is false
+// and h will never show up in removed.
+func (w *watchWindow) update(h watchHandle) (removed []watchHandle, ok bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for i, that := range w.window {
+		if that.id == h.id {
+			w.window = append(w.window[:i], w.window[i+1:]...)
+			break
+		}
+	}
+	return w.insertHelper(h)
+}
+
+// shrink returns the largest left bound i of the window such that:
+//   if len(window) >= minSize, then len(window[i:]) >= minSize
+//   if required is non-nil, then window[i:] contains required
+//   if i > 0, then window[i-1].less(window[i])
+// Preconditions:
+//   window is in ascending order
+//   if required is non-nil, then window contains required
+// If minSize is non-positive, or if len(window) <= minSize, shrink returns
+// 0 to indicate that the window should not be shrunk.
+func (w *watchWindow) shrink() int {
+	if w.minSize < 1 || len(w.window) <= w.minSize {
+		// don't shrink
+		return 0
+	}
+	j := len(w.window) - w.minSize
+	target := w.window[j]
+	if w.required != nil && w.required.less(target) {
+		target = *w.required
+	}
+	return sort.Search(j, func(i int) bool {
+		return !w.window[i].less(target)
+	})
 }

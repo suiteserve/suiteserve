@@ -20,7 +20,6 @@ type Repo interface {
 
 	InsertSuite(repo.Suite) (id string, err error)
 	Suite(id string) (*repo.Suite, error)
-	SuiteInRange(minId, maxId, id string) (int, error)
 
 	InsertCase(repo.Case) (id string, err error)
 	Case(id string) (*repo.Case, error)
@@ -77,5 +76,48 @@ func millisToPb(t int64) *timestamp.Timestamp {
 	return &timestamp.Timestamp{
 		Seconds: t / 1e3,
 		Nanos:   int32((t % 1e3) * 1e6),
+	}
+}
+
+func suiteToPb(s repo.Suite) *pb.Suite {
+	var status pb.SuiteStatus
+	switch s.Status {
+	case repo.SuiteStatusUnknown:
+		status = pb.SuiteStatus_SUITE_STATUS_UNSPECIFIED
+	case repo.SuiteStatusStarted:
+		status = pb.SuiteStatus_SUITE_STATUS_STARTED
+	case repo.SuiteStatusFinished:
+		status = pb.SuiteStatus_SUITE_STATUS_FINISHED
+	case repo.SuiteStatusDisconnected:
+		status = pb.SuiteStatus_SUITE_STATUS_DISCONNECTED
+	default:
+		panic("unknown status")
+	}
+
+	var result pb.SuiteResult
+	switch s.Result {
+	case repo.SuiteResultUnknown:
+		result = pb.SuiteResult_SUITE_RESULT_UNSPECIFIED
+	case repo.SuiteResultPassed:
+		result = pb.SuiteResult_SUITE_RESULT_PASSED
+	case repo.SuiteResultFailed:
+		result = pb.SuiteResult_SUITE_RESULT_FAILED
+	default:
+		panic("unknown result")
+	}
+
+	return &pb.Suite{
+		Id:             s.Id,
+		Version:        s.Version,
+		Deleted:        s.Deleted,
+		DeletedAt:      millisToPb(s.DeletedAt),
+		Name:           s.Name,
+		Tags:           s.Tags,
+		PlannedCases:   s.PlannedCases,
+		Status:         status,
+		Result:         result,
+		DisconnectedAt: millisToPb(s.DisconnectedAt),
+		StartedAt:      millisToPb(s.StartedAt),
+		FinishedAt:     millisToPb(s.FinishedAt),
 	}
 }

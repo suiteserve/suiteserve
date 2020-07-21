@@ -148,3 +148,219 @@ func TestQuery_GetAttachments(t *testing.T) {
 		})
 	}
 }
+
+type insertOutput struct {
+	removed []watchHandle
+	ok      bool
+	window  []watchHandle
+}
+
+var insertTests = []struct {
+	w    *watchWindow
+	in   watchHandle
+	want insertOutput
+}{
+	{
+		w:  &watchWindow{},
+		in: watchHandle{id: "1", val: 1},
+		want: insertOutput{
+			ok:     true,
+			window: []watchHandle{{id: "1", val: 1}},
+		},
+	},
+	{
+		w: &watchWindow{
+			minSize: 2,
+		},
+		in: watchHandle{id: "1", val: 1},
+		want: insertOutput{
+			ok:     true,
+			window: []watchHandle{{id: "1", val: 1}},
+		},
+	},
+	{
+		w: &watchWindow{
+			required: &watchHandle{id: "1", val: 1},
+			minSize:  3,
+		},
+		in: watchHandle{id: "1", val: 1},
+		want: insertOutput{
+			ok:     true,
+			window: []watchHandle{{id: "1", val: 1}},
+		},
+	},
+	{
+		w: &watchWindow{
+			required: &watchHandle{id: "22", val: 2},
+			minSize:  2,
+			window: []watchHandle{
+				{id: "10", val: 1},
+				{id: "20", val: 2},
+				{id: "22", val: 2},
+				{id: "30", val: 3},
+			},
+		},
+		in: watchHandle{id: "21", val: 2},
+		want: insertOutput{
+			removed: []watchHandle{{id: "10", val: 1}},
+			ok:      true,
+			window: []watchHandle{
+				{id: "21", val: 2},
+				{id: "20", val: 2},
+				{id: "22", val: 2},
+				{id: "30", val: 3},
+			},
+		},
+	},
+	{
+		w: &watchWindow{
+			required: &watchHandle{id: "22", val: 2},
+			minSize:  3,
+			window: []watchHandle{
+				{id: "20", val: 2},
+				{id: "22", val: 2},
+				{id: "30", val: 3},
+			},
+		},
+		in: watchHandle{id: "21", val: 2},
+		want: insertOutput{
+			ok: true,
+			window: []watchHandle{
+				{id: "21", val: 2},
+				{id: "20", val: 2},
+				{id: "22", val: 2},
+				{id: "30", val: 3},
+			},
+		},
+	},
+	{
+		w: &watchWindow{
+			required: &watchHandle{id: "22", val: 2},
+			minSize:  3,
+			window: []watchHandle{
+				{id: "20", val: 2},
+				{id: "22", val: 2},
+				{id: "30", val: 3},
+			},
+		},
+		in: watchHandle{id: "10", val: 1},
+		want: insertOutput{
+			ok: false,
+			window: []watchHandle{
+				{id: "20", val: 2},
+				{id: "22", val: 2},
+				{id: "30", val: 3},
+			},
+		},
+	},
+}
+
+func TestWatchWindow_Insert(t *testing.T) {
+	for i, test := range insertTests {
+		t.Run("test_"+strconv.Itoa(i), func(t *testing.T) {
+			removed, ok := test.w.insert(test.in)
+			assert.ElementsMatch(t, test.want.removed, removed)
+			assert.Equal(t, test.want.ok, ok)
+			assert.Equal(t, test.want.window, test.w.window)
+		})
+	}
+}
+
+var shrinkTests = []struct {
+	required int
+	minSize  int
+	window   []int
+	want     int
+}{
+	{
+		minSize: 3,
+		want:    0,
+	},
+	{
+		minSize: 2,
+		window:  []int{},
+		want:    0,
+	},
+	{
+		minSize: 0,
+		window:  []int{1, 2, 3},
+		want:    0,
+	},
+	{
+		minSize: -1,
+		window:  []int{2, 2, 9, 10},
+		want:    0,
+	},
+	{
+		minSize: 2,
+		window:  []int{1, 2, 3, 3, 4},
+		want:    2,
+	},
+	{
+		required: 2,
+		minSize:  2,
+		window:   []int{1, 2, 3, 3, 4},
+		want:     1,
+	},
+	{
+		required: 3,
+		minSize:  4,
+		window:   []int{1, 2, 3, 3, 4},
+		want:     1,
+	},
+	{
+		minSize: 1,
+		window:  []int{1, 1, 1, 1},
+		want:    0,
+	},
+	{
+		minSize: 2,
+		window:  []int{1, 1, 2, 3, 3, 4},
+		want:    3,
+	},
+	{
+		required: 1,
+		minSize:  2,
+		window:   []int{1, 1, 2, 3, 3, 4},
+		want:     0,
+	},
+	{
+		minSize: 1,
+		window:  []int{1, 1, 2, 3, 3, 4},
+		want:    5,
+	},
+	{
+		required: 4,
+		minSize:  1,
+		window:   []int{1, 1, 2, 3, 3, 4},
+		want:     5,
+	},
+	{
+		required: 2,
+		minSize:  5,
+		window:   []int{1, 1, 2, 3, 3, 4},
+		want:     0,
+	},
+	{
+		required: 1,
+		minSize:  2,
+		window:   []int{1, 1, 1},
+		want:     0,
+	},
+}
+
+func TestWatchWindow_Shrink(t *testing.T) {
+	for i, test := range shrinkTests {
+		t.Run("test_"+strconv.Itoa(i), func(t *testing.T) {
+			var w watchWindow
+			if test.required > 0 {
+				w.required = &watchHandle{val: int64(test.required)}
+			}
+			w.minSize = test.minSize
+			for _, i := range test.window {
+				w.window = append(w.window, watchHandle{val: int64(i)})
+			}
+			assert.Equal(t, test.want, w.shrink())
+		})
+	}
+}
