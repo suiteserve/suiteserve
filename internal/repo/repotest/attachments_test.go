@@ -28,7 +28,7 @@ func TestRepo_Attachment(t *testing.T) {
 
 	got, err := r.Attachment(id)
 	require.Nil(t, err)
-	assert.Equal(t, &a, got)
+	assert.Equal(t, a, got)
 }
 
 func TestRepo_SuiteAttachments(t *testing.T) {
@@ -61,7 +61,7 @@ func TestRepo_SuiteAttachments(t *testing.T) {
 
 	got, err := r.SuiteAttachments("123")
 	require.Nil(t, err)
-	assert.Equal(t, []*repo.Attachment{&a2, &a1}, got)
+	assert.Equal(t, []repo.Attachment{a2, a1}, got)
 }
 
 func TestRepo_CaseAttachments(t *testing.T) {
@@ -94,5 +94,5 @@ func TestRepo_CaseAttachments(t *testing.T) {
 
 	got, err := r.CaseAttachments("123")
 	require.Nil(t, err)
-	assert.Equal(t, []*repo.Attachment{&a2, &a1}, got)
+	assert.Equal(t, []repo.Attachment{a2, a1}, got)
 }

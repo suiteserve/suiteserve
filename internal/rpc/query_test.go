@@ -12,13 +12,13 @@ import (
 )
 
 var getAttachmentsTests = []struct {
-	attachments []*repo.Attachment
+	attachments []repo.Attachment
 	setFilter   func(ids []string, r *pb.GetAttachmentsRequest)
 	wantCount   int
 	want        func(ids []string) []*pb.Attachment
 }{
 	{
-		attachments: []*repo.Attachment{{Filename: "test.txt"}},
+		attachments: []repo.Attachment{{Filename: "test.txt"}},
 		setFilter: func(ids []string, r *pb.GetAttachmentsRequest) {
 			r.Filter = &pb.GetAttachmentsRequest_Id{Id: ids[0]}
 		},
@@ -33,7 +33,7 @@ var getAttachmentsTests = []struct {
 		},
 	},
 	{
-		attachments: []*repo.Attachment{
+		attachments: []repo.Attachment{
 			{Filename: "test.txt"},
 			{Url: "https://example.com/test.txt"},
 		},
@@ -51,7 +51,7 @@ var getAttachmentsTests = []struct {
 		},
 	},
 	{
-		attachments: []*repo.Attachment{
+		attachments: []repo.Attachment{
 			{
 				SuiteId:   "123",
 				Timestamp: 100,
@@ -87,7 +87,7 @@ var getAttachmentsTests = []struct {
 		},
 	},
 	{
-		attachments: []*repo.Attachment{
+		attachments: []repo.Attachment{
 			{
 				CaseId:    "123",
 				Timestamp: 100,
@@ -132,14 +132,14 @@ func TestQuery_GetAttachments(t *testing.T) {
 
 			var ids []string
 			for _, a := range test.attachments {
-				id, err := r.InsertAttachment(*a)
+				id, err := r.InsertAttachment(a)
 				require.Nil(t, err)
 				ids = append(ids, id)
 			}
 
-			in := &pb.GetAttachmentsRequest{}
-			test.setFilter(ids, in)
-			got, err := client.GetAttachments(context.Background(), in)
+			var in pb.GetAttachmentsRequest
+			test.setFilter(ids, &in)
+			got, err := client.GetAttachments(context.Background(), &in)
 			require.Nil(t, err)
 			if assert.Len(t, got.Attachments, test.wantCount) {
 				want := test.want(ids)
@@ -150,18 +150,17 @@ func TestQuery_GetAttachments(t *testing.T) {
 }
 
 type insertOutput struct {
-	removed []watchHandle
-	ok      bool
-	window  []watchHandle
+	ok     bool
+	window []watchHandle
 }
 
 var insertTests = []struct {
-	w    *watchWindow
+	w    watchWindow
 	in   watchHandle
 	want insertOutput
 }{
 	{
-		w:  &watchWindow{
+		w: watchWindow{
 			minSize: -3,
 		},
 		in: watchHandle{id: "1", val: 1},
@@ -171,7 +170,7 @@ var insertTests = []struct {
 		},
 	},
 	{
-		w: &watchWindow{
+		w: watchWindow{
 			minSize: 2,
 		},
 		in: watchHandle{id: "1", val: 1},
@@ -181,7 +180,7 @@ var insertTests = []struct {
 		},
 	},
 	{
-		w: &watchWindow{
+		w: watchWindow{
 			required: &watchHandle{id: "1", val: 1},
 			minSize:  3,
 		},
@@ -192,7 +191,7 @@ var insertTests = []struct {
 		},
 	},
 	{
-		w: &watchWindow{
+		w: watchWindow{
 			required: &watchHandle{id: "22", val: 2},
 			minSize:  2,
 			window: []watchHandle{
@@ -204,9 +203,9 @@ var insertTests = []struct {
 		},
 		in: watchHandle{id: "21", val: 2},
 		want: insertOutput{
-			removed: []watchHandle{{id: "10", val: 1}},
-			ok:      true,
+			ok: true,
 			window: []watchHandle{
+				{id: "10", val: 1},
 				{id: "21", val: 2},
 				{id: "20", val: 2},
 				{id: "22", val: 2},
@@ -215,7 +214,7 @@ var insertTests = []struct {
 		},
 	},
 	{
-		w: &watchWindow{
+		w: watchWindow{
 			required: &watchHandle{id: "22", val: 2},
 			minSize:  3,
 			window: []watchHandle{
@@ -236,7 +235,7 @@ var insertTests = []struct {
 		},
 	},
 	{
-		w: &watchWindow{
+		w: watchWindow{
 			required: &watchHandle{id: "22", val: 2},
 			minSize:  3,
 			window: []watchHandle{
@@ -260,8 +259,7 @@ var insertTests = []struct {
 func TestWatchWindow_Insert(t *testing.T) {
 	for i, test := range insertTests {
 		t.Run("test_"+strconv.Itoa(i), func(t *testing.T) {
-			removed, ok := test.w.insert(test.in)
-			assert.ElementsMatch(t, test.want.removed, removed)
+			ok := test.w.insert(test.in)
 			assert.Equal(t, test.want.ok, ok)
 			assert.Equal(t, test.want.window, test.w.window)
 		})
@@ -272,82 +270,82 @@ var shrinkTests = []struct {
 	required int
 	minSize  int
 	window   []int
-	want     int
+	want     []string
 }{
 	{
 		minSize: 3,
-		want:    0,
+		want:    nil,
 	},
 	{
 		minSize: 2,
 		window:  []int{},
-		want:    0,
+		want:    nil,
 	},
 	{
 		minSize: 0,
 		window:  []int{1, 2, 3},
-		want:    0,
+		want:    nil,
 	},
 	{
 		minSize: -1,
 		window:  []int{2, 2, 9, 10},
-		want:    0,
+		want:    nil,
 	},
 	{
 		minSize: 2,
 		window:  []int{1, 2, 3, 3, 4},
-		want:    2,
+		want:    []string{"1", "2"},
 	},
 	{
 		required: 2,
 		minSize:  2,
 		window:   []int{1, 2, 3, 3, 4},
-		want:     1,
+		want:     []string{"1"},
 	},
 	{
 		required: 3,
 		minSize:  4,
 		window:   []int{1, 2, 3, 3, 4},
-		want:     1,
+		want:     []string{"1"},
 	},
 	{
 		minSize: 1,
 		window:  []int{1, 1, 1, 1},
-		want:    0,
+		want:    nil,
 	},
 	{
 		minSize: 2,
 		window:  []int{1, 1, 2, 3, 3, 4},
-		want:    3,
+		want:    []string{"1", "1", "2"},
 	},
 	{
 		required: 1,
 		minSize:  2,
 		window:   []int{1, 1, 2, 3, 3, 4},
-		want:     0,
+		want:     nil,
 	},
 	{
 		minSize: 1,
 		window:  []int{1, 1, 2, 3, 3, 4},
-		want:    5,
+		want:    []string{"1", "1", "2", "3", "3"},
 	},
 	{
 		required: 4,
 		minSize:  1,
 		window:   []int{1, 1, 2, 3, 3, 4},
-		want:     5,
+		want:     []string{"1", "1", "2", "3", "3"},
 	},
 	{
 		required: 2,
 		minSize:  5,
 		window:   []int{1, 1, 2, 3, 3, 4},
-		want:     0,
+		want:     nil,
 	},
 	{
 		required: 1,
 		minSize:  2,
 		window:   []int{1, 1, 1},
-		want:     0,
+		want:     nil,
 	},
 }
 
@@ -356,13 +354,23 @@ func TestWatchWindow_Shrink(t *testing.T) {
 		t.Run("test_"+strconv.Itoa(i), func(t *testing.T) {
 			var w watchWindow
 			if test.required > 0 {
-				w.required = &watchHandle{val: int64(test.required)}
+				w.required = &watchHandle{
+					id:  "required",
+					val: int64(test.required),
+				}
 			}
 			w.minSize = test.minSize
 			for _, i := range test.window {
-				w.window = append(w.window, watchHandle{val: int64(i)})
+				w.window = append(w.window, watchHandle{
+					id:  strconv.Itoa(i),
+					val: int64(i),
+				})
 			}
-			assert.Equal(t, test.want, w.shrink())
+			if len(test.want) == 0 {
+				assert.Empty(t, w.shrink())
+			} else {
+				assert.Equal(t, test.want, w.shrink())
+			}
 		})
 	}
 }

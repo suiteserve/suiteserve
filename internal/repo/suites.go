@@ -49,8 +49,8 @@ type SuiteAgg struct {
 
 type SuitePage struct {
 	SuiteAgg
-	HasMore bool     `json:"has_more"`
-	Suites  []*Suite `json:"suites"`
+	HasMore bool    `json:"has_more"`
+	Suites  []Suite `json:"suites"`
 }
 
 func (r *Repo) InsertSuite(s Suite) (id string, err error) {
@@ -74,12 +74,15 @@ func (r *Repo) InsertSuite(s Suite) (id string, err error) {
 	})
 }
 
-func (r *Repo) Suite(id string) (*Suite, error) {
+func (r *Repo) Suite(id string) (Suite, error) {
 	var s Suite
-	return &s, r.getById(SuiteColl, id, &s)
+	if err := r.getById(SuiteColl, id, &s); err != nil {
+		return Suite{}, err
+	}
+	return s, nil
 }
 
-func (r *Repo) SuitePage(fromId string, limit int) (*SuitePage, error) {
+func (r *Repo) SuitePage(fromId string, limit int) (SuitePage, error) {
 	var page SuitePage
 	var vals []string
 	err := r.db.View(func(tx *buntdb.Tx) error {
@@ -93,15 +96,15 @@ func (r *Repo) SuitePage(fromId string, limit int) (*SuitePage, error) {
 		return err
 	})
 	if err == buntdb.ErrNotFound {
-		return nil, ErrNotFound
+		return SuitePage{}, ErrNotFound
 	} else if err != nil {
-		return nil, err
+		return SuitePage{}, err
 	}
-	page.Suites = make([]*Suite, len(vals))
+	page.Suites = make([]Suite, len(vals))
 	unmarshalJsonVals(vals, func(i int) interface{} {
 		return &page.Suites[i]
 	})
-	return &page, nil
+	return page, nil
 }
 
 func getSuites(tx *buntdb.Tx, fromId string, limit int) (vals []string, hasMore bool, err error) {

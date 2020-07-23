@@ -6,6 +6,7 @@ import (
 	pb "github.com/suiteserve/protocol/go/protocol"
 	"github.com/suiteserve/suiteserve/event"
 	"github.com/suiteserve/suiteserve/internal/repo"
+	"google.golang.org/genproto/protobuf/field_mask"
 	"google.golang.org/grpc"
 	"net/http"
 )
@@ -14,18 +15,19 @@ type Repo interface {
 	Changefeed() *event.Bus
 
 	InsertAttachment(repo.Attachment) (id string, err error)
-	Attachment(id string) (*repo.Attachment, error)
-	SuiteAttachments(suiteId string) ([]*repo.Attachment, error)
-	CaseAttachments(caseId string) ([]*repo.Attachment, error)
+	Attachment(id string) (repo.Attachment, error)
+	SuiteAttachments(suiteId string) ([]repo.Attachment, error)
+	CaseAttachments(caseId string) ([]repo.Attachment, error)
 
 	InsertSuite(repo.Suite) (id string, err error)
-	Suite(id string) (*repo.Suite, error)
+	Suite(id string) (repo.Suite, error)
+	SuitePage(fromId string, limit int) (repo.SuitePage, error)
 
 	InsertCase(repo.Case) (id string, err error)
-	Case(id string) (*repo.Case, error)
+	Case(id string) (repo.Case, error)
 
 	InsertLogLine(repo.LogLine) (id string, err error)
-	LogLine(id string) (*repo.LogLine, error)
+	LogLine(id string) (repo.LogLine, error)
 }
 
 type Service struct {
@@ -79,7 +81,23 @@ func millisToPb(t int64) *timestamp.Timestamp {
 	}
 }
 
-func suiteToPb(s repo.Suite) *pb.Suite {
+func buildPbAttachment(a repo.Attachment, ownerFunc func(*pb.Attachment)) *pb.Attachment {
+	pbA := pb.Attachment{
+		Id:          a.Id,
+		Version:     a.Version,
+		Deleted:     a.Deleted,
+		DeletedAt:   millisToPb(a.DeletedAt),
+		Filename:    a.Filename,
+		Url:         a.Url,
+		ContentType: a.ContentType,
+		Size:        a.Size,
+		Timestamp:   millisToPb(a.Timestamp),
+	}
+	ownerFunc(&pbA)
+	return &pbA
+}
+
+func buildPbSuite(s repo.Suite) *pb.Suite {
 	var status pb.SuiteStatus
 	switch s.Status {
 	case repo.SuiteStatusUnknown:
@@ -119,5 +137,35 @@ func suiteToPb(s repo.Suite) *pb.Suite {
 		DisconnectedAt: millisToPb(s.DisconnectedAt),
 		StartedAt:      millisToPb(s.StartedAt),
 		FinishedAt:     millisToPb(s.FinishedAt),
+	}
+}
+
+func buildPbWatchSuitesReply(s repo.Suite, mask repo.Mask, a repo.SuiteAgg, removed []string) *pb.WatchSuitesReply {
+	var reply pb.WatchSuitesReply
+	update := pb.WatchSuitesReply_Update{
+		Suite: buildPbSuite(s),
+	}
+	if len(mask) > 0 {
+		update.FieldMask = &field_mask.FieldMask{Paths: mask}
+	}
+	reply.Updates = []*pb.WatchSuitesReply_Update{&update}
+	reply.DeletedIds = append(reply.DeletedIds, removed...)
+	addSuiteAgg(a, &reply)
+	return &reply
+}
+
+func addSuiteAgg(a repo.SuiteAgg, p *pb.WatchSuitesReply) {
+	p.Version = a.Version
+	p.TotalCount = a.TotalCount
+	p.StartedCount = a.StartedCount
+}
+
+func mergeWatchSuitesReply(into *pb.WatchSuitesReply, other *pb.WatchSuitesReply) {
+	into.Updates = append(into.Updates, other.Updates...)
+	into.DeletedIds = append(into.DeletedIds, other.DeletedIds...)
+	if other.Version > into.Version {
+		into.Version = other.Version
+		into.TotalCount = other.TotalCount
+		into.StartedCount = other.StartedCount
 	}
 }

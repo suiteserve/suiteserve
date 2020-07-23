@@ -22,5 +22,5 @@ func TestRepo_Case(t *testing.T) {
 
 	got, err := r.Case(id)
 	require.Nil(t, err)
-	assert.Equal(t, &c, got)
+	assert.Equal(t, c, got)
 }

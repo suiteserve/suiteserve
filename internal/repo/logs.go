@@ -29,7 +29,10 @@ func (r *Repo) InsertLogLine(l LogLine) (id string, err error) {
 	return r.insert(LogColl, &l)
 }
 
-func (r *Repo) LogLine(id string) (*LogLine, error) {
+func (r *Repo) LogLine(id string) (LogLine, error) {
 	var l LogLine
-	return &l, r.getById(LogColl, id, &l)
+	if err := r.getById(LogColl, id, &l); err != nil {
+		return LogLine{}, err
+	}
+	return l, nil
 }

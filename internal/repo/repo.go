@@ -20,7 +20,9 @@ const (
 	SuiteAggColl   Coll = "suite_agg"
 	CaseColl       Coll = "cases"
 	LogColl        Coll = "logs"
+)
 
+const (
 	attachmentIndexOwner = "attachments/owner"
 	suiteIndexStartedAt  = "suites/started_at"
 )
@@ -51,8 +53,8 @@ func Open(filename string) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	repo := &Repo{db: db}
-	return repo, repo.setIndexes()
+	repo := Repo{db: db}
+	return &repo, repo.setIndexes()
 }
 
 func (r *Repo) Changefeed() *event.Bus {

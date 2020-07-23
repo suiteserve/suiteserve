@@ -26,20 +26,23 @@ func (r *Repo) InsertAttachment(a Attachment) (id string, err error) {
 	return r.insert(AttachmentColl, &a)
 }
 
-func (r *Repo) Attachment(id string) (*Attachment, error) {
+func (r *Repo) Attachment(id string) (Attachment, error) {
 	var a Attachment
-	return &a, r.getById(AttachmentColl, id, &a)
+	if err := r.getById(AttachmentColl, id, &a); err != nil {
+		return Attachment{}, err
+	}
+	return a, nil
 }
 
-func (r *Repo) SuiteAttachments(suiteId string) ([]*Attachment, error) {
+func (r *Repo) SuiteAttachments(suiteId string) ([]Attachment, error) {
 	return r.attachmentsByOwner(suiteId, "")
 }
 
-func (r *Repo) CaseAttachments(caseId string) ([]*Attachment, error) {
+func (r *Repo) CaseAttachments(caseId string) ([]Attachment, error) {
 	return r.attachmentsByOwner("", caseId)
 }
 
-func (r *Repo) attachmentsByOwner(suiteId, caseId string) ([]*Attachment, error) {
+func (r *Repo) attachmentsByOwner(suiteId, caseId string) ([]Attachment, error) {
 	var vals []string
 	pivot := fmt.Sprintf(`{"suite_id": %q, "case_id": %q}`, suiteId, caseId)
 	err := r.db.View(func(tx *buntdb.Tx) error {
@@ -51,7 +54,7 @@ func (r *Repo) attachmentsByOwner(suiteId, caseId string) ([]*Attachment, error)
 	if err != nil {
 		return nil, err
 	}
-	all := make([]*Attachment, len(vals))
+	all := make([]Attachment, len(vals))
 	unmarshalJsonVals(vals, func(i int) interface{} {
 		return &all[i]
 	})

@@ -23,18 +23,18 @@ func TestRepo_Suite(t *testing.T) {
 
 	got, err := r.Suite(id)
 	require.Nil(t, err)
-	assert.Equal(t, &s, got)
+	assert.Equal(t, s, got)
 }
 
 var suitePageTests = []struct {
-	suites    []*repo.Suite
+	suites    []repo.Suite
 	fromId    func(ids []string) string
 	limit     int
 	wantCount int
-	want      func(ids []string) *repo.SuitePage
+	want      func(ids []string) repo.SuitePage
 }{
 	{
-		suites: []*repo.Suite{},
+		suites: []repo.Suite{},
 		fromId: func(ids []string) string {
 			return "abc"
 		},
@@ -42,7 +42,7 @@ var suitePageTests = []struct {
 		wantCount: 0,
 	},
 	{
-		suites: []*repo.Suite{},
+		suites: []repo.Suite{},
 		fromId: func(ids []string) string {
 			return "abc"
 		},
@@ -50,21 +50,21 @@ var suitePageTests = []struct {
 		wantCount: 0,
 	},
 	{
-		suites: []*repo.Suite{{Name: "test1"}},
+		suites: []repo.Suite{{Name: "test1"}},
 		fromId: func(ids []string) string {
 			return ids[0]
 		},
 		limit:     0,
 		wantCount: 1,
-		want: func(ids []string) *repo.SuitePage {
-			return &repo.SuitePage{
+		want: func(ids []string) repo.SuitePage {
+			return repo.SuitePage{
 				SuiteAgg: repo.SuiteAgg{
 					VersionedEntity: repo.VersionedEntity{Version: 1},
 					TotalCount:      1,
 					StartedCount:    0,
 				},
 				HasMore: false,
-				Suites: []*repo.Suite{{
+				Suites: []repo.Suite{{
 					Entity: repo.Entity{Id: ids[0]},
 					Name:   "test1",
 				}},
@@ -72,7 +72,7 @@ var suitePageTests = []struct {
 		},
 	},
 	{
-		suites: []*repo.Suite{
+		suites: []repo.Suite{
 			{StartedAt: 400},
 			{StartedAt: 200},
 			{
@@ -86,15 +86,15 @@ var suitePageTests = []struct {
 		},
 		limit:     3,
 		wantCount: 3,
-		want: func(ids []string) *repo.SuitePage {
-			return &repo.SuitePage{
+		want: func(ids []string) repo.SuitePage {
+			return repo.SuitePage{
 				SuiteAgg: repo.SuiteAgg{
 					VersionedEntity: repo.VersionedEntity{Version: 4},
 					TotalCount:      4,
 					StartedCount:    1,
 				},
 				HasMore: true,
-				Suites: []*repo.Suite{
+				Suites: []repo.Suite{
 					{
 						Entity:    repo.Entity{Id: ids[0]},
 						StartedAt: 400,
@@ -113,7 +113,7 @@ var suitePageTests = []struct {
 		},
 	},
 	{
-		suites: []*repo.Suite{
+		suites: []repo.Suite{
 			{StartedAt: 400},
 			{StartedAt: 200},
 			{
@@ -127,15 +127,15 @@ var suitePageTests = []struct {
 		},
 		limit:     4,
 		wantCount: 4,
-		want: func(ids []string) *repo.SuitePage {
-			return &repo.SuitePage{
+		want: func(ids []string) repo.SuitePage {
+			return repo.SuitePage{
 				SuiteAgg: repo.SuiteAgg{
 					VersionedEntity: repo.VersionedEntity{Version: 4},
 					TotalCount:      4,
 					StartedCount:    1,
 				},
 				HasMore: false,
-				Suites: []*repo.Suite{
+				Suites: []repo.Suite{
 					{
 						Entity:    repo.Entity{Id: ids[0]},
 						StartedAt: 400,
@@ -166,7 +166,7 @@ func TestRepo_SuitePage(t *testing.T) {
 
 			var ids []string
 			for _, s := range test.suites {
-				id, err := r.InsertSuite(*s)
+				id, err := r.InsertSuite(s)
 				require.Nil(t, err)
 				ids = append(ids, id)
 			}

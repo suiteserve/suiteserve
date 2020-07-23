@@ -68,7 +68,7 @@ type FileMeta struct {
 }
 
 type UserContentMetaRepo interface {
-	UserContentMeta(ctx context.Context, id string) (*FileMeta, error)
+	UserContentMeta(ctx context.Context, id string) (FileMeta, error)
 }
 
 func newUserContentMiddleware(repo UserContentMetaRepo, h http.Handler) http.Handler {

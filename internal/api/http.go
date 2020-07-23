@@ -41,7 +41,7 @@ func Serve(opts Options) (*Server, error) {
 		err: make(chan error),
 	}
 	s.srv.Addr = net.JoinHostPort(opts.Host, opts.Port)
-	s.setSrvHandler(&opts)
+	s.setSrvHandler(opts)
 
 	ln, err := net.Listen("tcp", s.srv.Addr)
 	if err != nil {
@@ -66,7 +66,7 @@ func Serve(opts Options) (*Server, error) {
 	return &s, nil
 }
 
-func (s *Server) setSrvHandler(opts *Options) {
+func (s *Server) setSrvHandler(opts Options) {
 	var mux http.ServeMux
 	mux.Handle("/",
 		s.rpc.NewMiddleware(

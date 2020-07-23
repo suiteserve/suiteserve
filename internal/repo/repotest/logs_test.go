@@ -22,5 +22,5 @@ func TestRepo_LogLine(t *testing.T) {
 
 	got, err := r.LogLine(id)
 	require.Nil(t, err)
-	assert.Equal(t, &l, got)
+	assert.Equal(t, l, got)
 }
