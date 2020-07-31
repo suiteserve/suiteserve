@@ -13,14 +13,14 @@ func TestRepo_Case(t *testing.T) {
 	_, err := r.Case("nonexistent")
 	assert.True(t, errors.Is(err, repo.ErrNotFound), "want ErrNotFound")
 
-	c := repo.Case{
+	want := repo.Case{
 		Name: "test",
 	}
-	id, err := r.InsertCase(c)
+	id, err := r.InsertCase(want)
 	require.Nil(t, err)
-	c.Id = id
+	want.Id = id
 
 	got, err := r.Case(id)
 	require.Nil(t, err)
-	assert.Equal(t, c, got)
+	assert.Equal(t, want, got)
 }

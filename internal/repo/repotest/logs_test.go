@@ -13,14 +13,14 @@ func TestRepo_LogLine(t *testing.T) {
 	_, err := r.LogLine("nonexistent")
 	assert.True(t, errors.Is(err, repo.ErrNotFound), "want ErrNotFound")
 
-	l := repo.LogLine{
+	want := repo.LogLine{
 		Message: "Hello, world!",
 	}
-	id, err := r.InsertLogLine(l)
+	id, err := r.InsertLogLine(want)
 	require.Nil(t, err)
-	l.Id = id
+	want.Id = id
 
 	got, err := r.LogLine(id)
 	require.Nil(t, err)
-	assert.Equal(t, l, got)
+	assert.Equal(t, want, got)
 }

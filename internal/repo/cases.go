@@ -38,18 +38,12 @@ type Case struct {
 	FinishedAt  int64                      `json:"finished_at"`
 }
 
-func (c *Case) setId(id string) {
-	c.Id = id
-}
-
 func (r *Repo) InsertCase(c Case) (id string, err error) {
 	return r.insert(CaseColl, &c)
 }
 
 func (r *Repo) Case(id string) (Case, error) {
 	var c Case
-	if err := r.getById(CaseColl, id, &c); err != nil {
-		return Case{}, err
-	}
-	return c, nil
+	err := r.getById(CaseColl, id, &c)
+	return c, err
 }

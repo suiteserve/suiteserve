@@ -1,9 +1,7 @@
 package repo
 
 import (
-	"fmt"
 	"github.com/tidwall/buntdb"
-	"github.com/tidwall/gjson"
 )
 
 type SuiteStatus string
@@ -37,10 +35,6 @@ type Suite struct {
 	FinishedAt     int64       `json:"finished_at"`
 }
 
-func (s *Suite) setId(id string) {
-	s.Id = id
-}
-
 type SuiteAgg struct {
 	VersionedEntity
 	TotalCount   int64 `json:"total_count"`
@@ -66,72 +60,13 @@ func (r *Repo) InsertSuite(s Suite) (id string, err error) {
 		if err != nil {
 			return err
 		}
-		r.pub.Publish(Changefeed{SuiteInsert{
-			Suite: s,
-			Agg:   agg,
-		}})
+		r.notifyHandlers([]Change{SuiteUpsert{Suite: s}, SuiteAggUpdate{agg}})
 		return nil
 	})
 }
 
 func (r *Repo) Suite(id string) (Suite, error) {
 	var s Suite
-	if err := r.getById(SuiteColl, id, &s); err != nil {
-		return Suite{}, err
-	}
-	return s, nil
-}
-
-func (r *Repo) SuitePage(fromId string, limit int) (SuitePage, error) {
-	var page SuitePage
-	var vals []string
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		var err error
-		if vals, page.HasMore, err = getSuites(tx, fromId, limit); err != nil {
-			return err
-		}
-		if err = r.getById(SuiteAggColl, "", &page.SuiteAgg); err == ErrNotFound {
-			err = nil
-		}
-		return err
-	})
-	if err == buntdb.ErrNotFound {
-		return SuitePage{}, ErrNotFound
-	} else if err != nil {
-		return SuitePage{}, err
-	}
-	page.Suites = make([]Suite, len(vals))
-	unmarshalJsonVals(vals, func(i int) interface{} {
-		return &page.Suites[i]
-	})
-	return page, nil
-}
-
-func getSuites(tx *buntdb.Tx, fromId string, limit int) (vals []string, hasMore bool, err error) {
-	var startedAt int64
-	less := func(string) bool {
-		return true
-	}
-	if fromId != "" {
-		var err error
-		v, err := tx.Get(key(SuiteColl, fromId))
-		if err != nil {
-			return nil, false, err
-		}
-		startedAt = gjson.Get(v, "started_at").Int()
-		less = func(v string) bool {
-			return gjson.Get(v, "started_at").Int() < startedAt
-		}
-	}
-	itr := newPageItr(limit, &vals, &hasMore, less)
-	err = descendSuites(tx, fromId, startedAt, itr)
-	return
-}
-
-func descendSuites(tx *buntdb.Tx, fromId string, startedAt int64, itr itr) error {
-	if fromId == "" {
-		return tx.Descend(suiteIndexStartedAt, itr)
-	}
-	pivot := fmt.Sprintf(`{"started_at": %d}`, startedAt)
-	return tx.DescendLessOrEqual(suiteIndexStartedAt, pivot, itr)
+	err := r.getById(SuiteColl, id, &s)
+	return s, err
 }

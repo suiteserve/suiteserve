@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/suiteserve/suiteserve/event"
 	"github.com/tidwall/buntdb"
-	"log"
+	"github.com/tidwall/gjson"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -27,10 +27,19 @@ const (
 	suiteIndexStartedAt  = "suites/started_at"
 )
 
+func suiteIndexStartedAtPivot(v string) string {
+	return `{"started_at":` + gjson.Get(v, "started_at").String() +
+		`,"id":"` + gjson.Get(v, "id").String() + `"}`
+}
+
 var ErrNotFound = errors.New("not found")
 
 type Entity struct {
 	Id string `json:"id"`
+}
+
+func (e *Entity) setId(id string) {
+	e.Id = id
 }
 
 type VersionedEntity struct {
@@ -44,8 +53,10 @@ type SoftDeleteEntity struct {
 
 type Repo struct {
 	db    *buntdb.DB
-	pub   event.Publisher
 	idInc uint32
+
+	mu       sync.Mutex
+	handlers []changeHandler
 }
 
 func Open(filename string) (*Repo, error) {
@@ -55,10 +66,6 @@ func Open(filename string) (*Repo, error) {
 	}
 	repo := Repo{db: db}
 	return &repo, repo.setIndexes()
-}
-
-func (r *Repo) Changefeed() *event.Bus {
-	return &r.pub.Bus
 }
 
 func (r *Repo) Close() error {
@@ -72,7 +79,32 @@ func (r *Repo) setIndexes() error {
 		return err
 	}
 	return r.db.ReplaceIndex(suiteIndexStartedAt, key(SuiteColl, "*"),
-		buntdb.IndexJSON("started_at"))
+		buntdb.IndexJSON("started_at"), buntdb.IndexJSON("id"))
+}
+
+func (r *Repo) addHandler(h changeHandler) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.handlers = append(r.handlers, h)
+}
+
+func (r *Repo) removeHandler(h changeHandler) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, v := range r.handlers {
+		if v == h {
+			r.handlers = append(r.handlers[:i], r.handlers[i+1:]...)
+			return
+		}
+	}
+}
+
+func (r *Repo) notifyHandlers(changes []Change) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, h := range r.handlers {
+		h.handleChanges(changes)
+	}
 }
 
 type insertable interface {
@@ -94,7 +126,7 @@ func (r *Repo) insertFunc(coll Coll, x insertable, after func(tx *buntdb.Tx) err
 func (r *Repo) setFunc(coll Coll, id string, x interface{}, after func(tx *buntdb.Tx) error) error {
 	b, err := json.Marshal(x)
 	if err != nil {
-		log.Panicf("marshal json: %v", err)
+		panic(err)
 	}
 	return r.db.Update(func(tx *buntdb.Tx) error {
 		_, _, err := tx.Set(key(coll, id), string(b), nil)
@@ -110,7 +142,7 @@ func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{}, update
 	v, err := tx.Get(k)
 	if err == nil {
 		if err := json.Unmarshal([]byte(v), x); err != nil {
-			log.Panicf("unmarshal json: %v", err)
+			panic(err)
 		}
 	} else if err != buntdb.ErrNotFound {
 		return err
@@ -118,26 +150,27 @@ func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{}, update
 	updateX()
 	b, err := json.Marshal(x)
 	if err != nil {
-		log.Panicf("marshal json: %v", err)
+		panic(err)
 	}
 	_, _, err = tx.Set(k, string(b), nil)
 	return err
 }
 
 func (r *Repo) getById(coll Coll, id string, x interface{}) error {
-	var v string
-	err := r.db.View(func(tx *buntdb.Tx) error {
-		var err error
-		v, err = tx.Get(key(coll, id))
-		return err
+	return r.db.View(func(tx *buntdb.Tx) error {
+		return r.getByIdTx(tx, coll, id, x)
 	})
+}
+
+func (r *Repo) getByIdTx(tx *buntdb.Tx, coll Coll, id string, x interface{}) error {
+	v, err := tx.Get(key(coll, id))
 	if err == buntdb.ErrNotFound {
 		return ErrNotFound
 	} else if err != nil {
 		return err
 	}
 	if err := json.Unmarshal([]byte(v), x); err != nil {
-		log.Panicf("unmarshal json: %v", err)
+		panic(err)
 	}
 	return nil
 }
@@ -145,7 +178,7 @@ func (r *Repo) getById(coll Coll, id string, x interface{}) error {
 func (r *Repo) genId() string {
 	b := make([]byte, 1)
 	if _, err := rand.Read(b); err != nil {
-		log.Panicf("read rand: %v", err)
+		panic(err)
 	}
 	now := time.Now()
 	return fmt.Sprintf("%011x%02x%02x",
@@ -156,27 +189,108 @@ func (r *Repo) genId() string {
 func unmarshalJsonVals(vals []string, f func(i int) interface{}) {
 	for i, v := range vals {
 		if err := json.Unmarshal([]byte(v), f(i)); err != nil {
-			log.Panicf("unmarshal json: %v", err)
+			panic(err)
 		}
 	}
 }
 
-type less func(v string) bool
+type entry struct {
+	k string
+	v string
+}
 type itr func(k, v string) bool
+type consumer func(k, v string)
+type less func(a, b string) bool
 
-func newPageItr(limit int, vals *[]string, hasMore *bool, less less) itr {
+// newSkipKeyCond returns a new itr that wraps an inner itr, skipping the first
+// entry iff that first entry's key is equal to the given key. This can turn a
+// DescendLessOrEqual, for example, into a DescendLessThan (which doesn't
+// exist).
+func newSkipKeyCond(key string, inner itr) itr {
+	var fn itr
+	fn = func(k, v string) bool {
+		fn = inner
+		return k == key || inner(k, v)
+	}
+	return func(k, v string) bool {
+		return fn(k, v)
+	}
+}
+
+func newUntilKeyCond(key string) itr {
+	return func(k, v string) bool {
+		return k != key
+	}
+}
+
+func newGreaterOrEqual(pivot string, less less) itr {
+	return func(k, v string) bool {
+		return less(pivot, v)
+	}
+}
+
+func newLimitCond(limit int) itr {
+	if limit < 0 {
+		return func(k, v string) bool {
+			return true
+		}
+	}
 	var n int
 	return func(k, v string) bool {
-		if less(v) {
-			if n == limit {
-				*hasMore = true
-				return false
-			}
-			n++
+		if n == limit {
+			return false
 		}
-		*vals = append(*vals, v)
+		n++
 		return true
 	}
+}
+
+func newFirstCond(first itr) itr {
+	var fn itr
+	rest := func(k, v string) bool {
+		return true
+	}
+	fn = func(k, v string) bool {
+		fn = rest
+		return first(k, v)
+	}
+	return func(k, v string) bool {
+		return fn(k, v)
+	}
+}
+
+func newRestCond(rest itr) itr {
+	var fn itr
+	fn = func(k, v string) bool {
+		fn = rest
+		return true
+	}
+	return func(k, v string) bool {
+		return fn(k, v)
+	}
+}
+
+// newAndCond returns a new itr that calls each given cond, returning true iff
+// all of the given conds return true for that entry. Short-circuits as logical
+// AND would.
+func newAndCond(conds ...itr) itr {
+	return func(k, v string) bool {
+		for _, fn := range conds {
+			if !fn(k, v) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func getId(key string) string {
+	for i, r := range key {
+		if r == ':' {
+			return key[i+1:]
+		}
+	}
+	panic("id not in string")
 }
 
 func key(coll Coll, id string) string {

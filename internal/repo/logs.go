@@ -21,18 +21,12 @@ type LogLine struct {
 	Timestamp int64        `json:"timestamp"`
 }
 
-func (l *LogLine) setId(id string) {
-	l.Id = id
-}
-
 func (r *Repo) InsertLogLine(l LogLine) (id string, err error) {
 	return r.insert(LogColl, &l)
 }
 
 func (r *Repo) LogLine(id string) (LogLine, error) {
 	var l LogLine
-	if err := r.getById(LogColl, id, &l); err != nil {
-		return LogLine{}, err
-	}
-	return l, nil
+	err := r.getById(LogColl, id, &l)
+	return l, err
 }

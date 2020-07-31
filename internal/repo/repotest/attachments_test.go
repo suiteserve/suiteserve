@@ -13,7 +13,7 @@ func TestRepo_Attachment(t *testing.T) {
 	_, err := r.Attachment("nonexistent")
 	assert.True(t, errors.Is(err, repo.ErrNotFound), "want ErrNotFound")
 
-	a := repo.Attachment{
+	want := insertAttachment(t, r, repo.Attachment{
 		SoftDeleteEntity: repo.SoftDeleteEntity{
 			Deleted:   true,
 			DeletedAt: 1594999447324,
@@ -21,14 +21,11 @@ func TestRepo_Attachment(t *testing.T) {
 		SuiteId:   "123",
 		Filename:  "test.txt",
 		Timestamp: 1594997447324,
-	}
-	id, err := r.InsertAttachment(a)
-	require.Nil(t, err)
-	a.Id = id
+	})
 
-	got, err := r.Attachment(id)
+	got, err := r.Attachment(want.Id)
 	require.Nil(t, err)
-	assert.Equal(t, a, got)
+	assert.Equal(t, want, got)
 }
 
 func TestRepo_SuiteAttachments(t *testing.T) {
@@ -38,30 +35,21 @@ func TestRepo_SuiteAttachments(t *testing.T) {
 	assert.NotNil(t, all)
 	assert.Empty(t, all)
 
-	a1 := repo.Attachment{
+	want1 := insertAttachment(t, r, repo.Attachment{
 		SuiteId:   "123",
 		Filename:  "test.txt",
 		Timestamp: 1594997447324,
-	}
-	id1, err := r.InsertAttachment(a1)
-	require.Nil(t, err)
-	a1.Id = id1
-
-	a2 := repo.Attachment{
+	})
+	want2 := insertAttachment(t, r, repo.Attachment{
 		SuiteId: "123",
-	}
-	id2, err := r.InsertAttachment(a2)
-	require.Nil(t, err)
-	a2.Id = id2
-
-	_, err = r.InsertAttachment(repo.Attachment{
+	})
+	_ = insertAttachment(t, r, repo.Attachment{
 		CaseId: "123",
 	})
-	require.Nil(t, err)
 
 	got, err := r.SuiteAttachments("123")
 	require.Nil(t, err)
-	assert.Equal(t, []repo.Attachment{a2, a1}, got)
+	assert.Equal(t, []repo.Attachment{want2, want1}, got)
 }
 
 func TestRepo_CaseAttachments(t *testing.T) {
@@ -71,28 +59,27 @@ func TestRepo_CaseAttachments(t *testing.T) {
 	assert.NotNil(t, all)
 	assert.Empty(t, all)
 
-	a1 := repo.Attachment{
+	want1 := insertAttachment(t, r, repo.Attachment{
 		CaseId:    "123",
 		Filename:  "test.txt",
 		Timestamp: 1594997447324,
-	}
-	id1, err := r.InsertAttachment(a1)
-	require.Nil(t, err)
-	a1.Id = id1
-
-	a2 := repo.Attachment{
+	})
+	want2 := insertAttachment(t, r, repo.Attachment{
 		CaseId: "123",
-	}
-	id2, err := r.InsertAttachment(a2)
-	require.Nil(t, err)
-	a2.Id = id2
-
-	_, err = r.InsertAttachment(repo.Attachment{
+	})
+	_ = insertAttachment(t, r, repo.Attachment{
 		SuiteId: "123",
 	})
-	require.Nil(t, err)
 
 	got, err := r.CaseAttachments("123")
 	require.Nil(t, err)
-	assert.Equal(t, []repo.Attachment{a2, a1}, got)
+	assert.Equal(t, []repo.Attachment{want2, want1}, got)
+}
+
+func insertAttachment(t *testing.T, r *repo.Repo, a repo.Attachment) repo.Attachment {
+	t.Helper()
+	id, err := r.InsertAttachment(a)
+	require.Nil(t, err)
+	a.Id = id
+	return a
 }

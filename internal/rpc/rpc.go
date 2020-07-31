@@ -4,16 +4,12 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	pb "github.com/suiteserve/protocol/go/protocol"
-	"github.com/suiteserve/suiteserve/event"
 	"github.com/suiteserve/suiteserve/internal/repo"
-	"google.golang.org/genproto/protobuf/field_mask"
 	"google.golang.org/grpc"
 	"net/http"
 )
 
 type Repo interface {
-	Changefeed() *event.Bus
-
 	InsertAttachment(repo.Attachment) (id string, err error)
 	Attachment(id string) (repo.Attachment, error)
 	SuiteAttachments(suiteId string) ([]repo.Attachment, error)
@@ -21,7 +17,7 @@ type Repo interface {
 
 	InsertSuite(repo.Suite) (id string, err error)
 	Suite(id string) (repo.Suite, error)
-	SuitePage(fromId string, limit int) (repo.SuitePage, error)
+	WatchSuites() *repo.SuiteWatcher
 
 	InsertCase(repo.Case) (id string, err error)
 	Case(id string) (repo.Case, error)
@@ -137,35 +133,5 @@ func buildPbSuite(s repo.Suite) *pb.Suite {
 		DisconnectedAt: millisToPb(s.DisconnectedAt),
 		StartedAt:      millisToPb(s.StartedAt),
 		FinishedAt:     millisToPb(s.FinishedAt),
-	}
-}
-
-func buildPbWatchSuitesReply(s repo.Suite, mask repo.Mask, a repo.SuiteAgg, removed []string) *pb.WatchSuitesReply {
-	var reply pb.WatchSuitesReply
-	update := pb.WatchSuitesReply_Update{
-		Suite: buildPbSuite(s),
-	}
-	if len(mask) > 0 {
-		update.FieldMask = &field_mask.FieldMask{Paths: mask}
-	}
-	reply.Updates = []*pb.WatchSuitesReply_Update{&update}
-	reply.DeletedIds = append(reply.DeletedIds, removed...)
-	addSuiteAgg(a, &reply)
-	return &reply
-}
-
-func addSuiteAgg(a repo.SuiteAgg, p *pb.WatchSuitesReply) {
-	p.Version = a.Version
-	p.TotalCount = a.TotalCount
-	p.StartedCount = a.StartedCount
-}
-
-func mergeWatchSuitesReply(into *pb.WatchSuitesReply, other *pb.WatchSuitesReply) {
-	into.Updates = append(into.Updates, other.Updates...)
-	into.DeletedIds = append(into.DeletedIds, other.DeletedIds...)
-	if other.Version > into.Version {
-		into.Version = other.Version
-		into.TotalCount = other.TotalCount
-		into.StartedCount = other.StartedCount
 	}
 }

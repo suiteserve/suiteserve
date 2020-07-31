@@ -18,20 +18,14 @@ type Attachment struct {
 	Timestamp   int64  `json:"timestamp"`
 }
 
-func (a *Attachment) setId(id string) {
-	a.Id = id
-}
-
 func (r *Repo) InsertAttachment(a Attachment) (id string, err error) {
 	return r.insert(AttachmentColl, &a)
 }
 
 func (r *Repo) Attachment(id string) (Attachment, error) {
 	var a Attachment
-	if err := r.getById(AttachmentColl, id, &a); err != nil {
-		return Attachment{}, err
-	}
-	return a, nil
+	err := r.getById(AttachmentColl, id, &a)
+	return a, err
 }
 
 func (r *Repo) SuiteAttachments(suiteId string) ([]Attachment, error) {
@@ -44,7 +38,7 @@ func (r *Repo) CaseAttachments(caseId string) ([]Attachment, error) {
 
 func (r *Repo) attachmentsByOwner(suiteId, caseId string) ([]Attachment, error) {
 	var vals []string
-	pivot := fmt.Sprintf(`{"suite_id": %q, "case_id": %q}`, suiteId, caseId)
+	pivot := fmt.Sprintf(`{"suite_id":%q,"case_id":%q}`, suiteId, caseId)
 	err := r.db.View(func(tx *buntdb.Tx) error {
 		return tx.DescendEqual(attachmentIndexOwner, pivot, func(k, v string) bool {
 			vals = append(vals, v)
