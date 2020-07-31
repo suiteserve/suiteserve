@@ -105,7 +105,7 @@ func buildPbSuite(s repo.Suite) *pb.Suite {
 	case repo.SuiteStatusDisconnected:
 		status = pb.SuiteStatus_SUITE_STATUS_DISCONNECTED
 	default:
-		panic("unknown status")
+		panic("unknown suite status")
 	}
 
 	var result pb.SuiteResult
@@ -117,7 +117,7 @@ func buildPbSuite(s repo.Suite) *pb.Suite {
 	case repo.SuiteResultFailed:
 		result = pb.SuiteResult_SUITE_RESULT_FAILED
 	default:
-		panic("unknown result")
+		panic("unknown suite result")
 	}
 
 	return &pb.Suite{

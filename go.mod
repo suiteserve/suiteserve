@@ -3,7 +3,7 @@ module github.com/suiteserve/suiteserve
 go 1.14
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2 // indirect
