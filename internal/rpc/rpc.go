@@ -2,11 +2,9 @@ package rpc
 
 import (
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	pb "github.com/suiteserve/protocol/go/protocol"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"google.golang.org/grpc"
-	"net/http"
 )
 
 type Repo interface {
@@ -17,7 +15,7 @@ type Repo interface {
 
 	InsertSuite(repo.Suite) (id string, err error)
 	Suite(id string) (repo.Suite, error)
-	WatchSuites() *repo.SuiteWatcher
+	WatchSuites(id string, padLt, padGt int) (*repo.SuiteWatcher, error)
 
 	InsertCase(repo.Case) (id string, err error)
 	Case(id string) (repo.Case, error)
@@ -26,46 +24,14 @@ type Repo interface {
 	LogLine(id string) (repo.LogLine, error)
 }
 
-type Service struct {
-	srv   *grpc.Server
-	proxy *grpcweb.WrappedGrpcServer
-	repo  Repo
-}
-
-func New(maxUploadMb int, repo Repo) *Service {
-	s := Service{
-		srv:  grpc.NewServer(),
-		repo: repo,
-	}
-	s.proxy = grpcweb.WrapServer(s.srv, grpcweb.WithWebsockets(true),
-		grpcweb.WithWebsocketOriginFunc(func(*http.Request) bool {
-			// TODO: not for production
-			return true
-		}))
-	pb.RegisterQueryServiceServer(s.srv, &query{
+func RegisterServices(srv *grpc.Server, maxUploadMb int, repo Repo) {
+	pb.RegisterQueryServiceServer(srv, &query{
 		Repo: repo,
 	})
-	pb.RegisterSuiteServiceServer(s.srv, &suite{
+	pb.RegisterSuiteServiceServer(srv, &suite{
 		Repo:        repo,
 		maxUploadMb: maxUploadMb,
 	})
-	return &s
-}
-
-func (s *Service) NewMiddleware(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.proxy.IsGrpcWebSocketRequest(r) {
-			s.proxy.HandleGrpcWebsocketRequest(w, r)
-		} else if s.proxy.IsGrpcWebRequest(r) {
-			s.srv.ServeHTTP(w, r)
-		} else {
-			h.ServeHTTP(w, r)
-		}
-	})
-}
-
-func (s *Service) Stop() {
-	s.srv.GracefulStop()
 }
 
 // millisToPb converts the given number of milliseconds since the Unix epoch
@@ -77,7 +43,8 @@ func millisToPb(t int64) *timestamp.Timestamp {
 	}
 }
 
-func buildPbAttachment(a repo.Attachment, ownerFunc func(*pb.Attachment)) *pb.Attachment {
+func buildPbAttachment(a repo.Attachment,
+	ownerFunc func(*pb.Attachment)) *pb.Attachment {
 	pbA := pb.Attachment{
 		Id:          a.Id,
 		Version:     a.Version,

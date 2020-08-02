@@ -7,17 +7,15 @@
     "build": "npx vue-cli-service build"
   },
   "dependencies": {
-    "@suiteserve/protocol-web": "^0.1.2",
+    "@suiteserve/protocol-web": "0.1.16",
     "vue": "^2.6.11",
     "vue-router": "^3.3.4",
     "vuex": "^3.5.1"
   },
   "devDependencies": {
     "@vue/cli-plugin-router": "^4.4.6",
-    "@vue/cli-plugin-typescript": "^4.4.6",
     "@vue/cli-plugin-vuex": "^4.4.6",
     "@vue/cli-service": "^4.4.6",
-    "typescript": "^3.9.7",
     "vue-template-compiler": "^2.6.11"
   }
 }

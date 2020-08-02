@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"github.com/suiteserve/suiteserve/config"
 	"github.com/suiteserve/suiteserve/internal/api"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"github.com/suiteserve/suiteserve/internal/rpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 )
@@ -50,31 +54,37 @@ func main() {
 		}
 	}()
 
-	rpcService := rpc.New(cfg.Storage.UserContent.MaxSizeMb, r)
-	defer rpcService.Stop()
-
-	srv, err := api.Serve(api.Options{
-		Host:                cfg.Http.Host,
-		Port:                cfg.Http.Port,
+	creds, err := credentials.NewServerTLSFromFile(cfg.Http.TlsCertFile,
+		cfg.Http.TlsKeyFile)
+	if err != nil {
+		log.Fatalf("new grpc server: %v", err)
+	}
+	grpcServer := grpc.NewServer(grpc.Creds(creds))
+	grpcWebServer := grpc.NewServer()
+	rpc.RegisterServices(grpcServer, cfg.Storage.UserContent.MaxSizeMb, r)
+	rpc.RegisterServices(grpcWebServer, cfg.Storage.UserContent.MaxSizeMb, r)
+	grpcService := api.NewGrpcService(grpcServer)
+	httpService := api.NewHttpService(api.HttpOptions{
+		GrpcServer:          grpcWebServer,
 		TlsCertFile:         cfg.Http.TlsCertFile,
 		TlsKeyFile:          cfg.Http.TlsKeyFile,
 		PublicDir:           cfg.Http.PublicDir,
 		UserContentHost:     cfg.Http.UserContentHost,
 		UserContentDir:      cfg.Storage.UserContent.Dir,
 		UserContentMetaRepo: nil, // TODO
-		Rpc:                 rpcService,
 	})
-	if err != nil {
-		log.Fatalf("start http: %v", err)
-	}
 
-	sigint := make(chan os.Signal, 1)
-	signal.Notify(sigint, os.Interrupt)
-	select {
-	case <-sigint:
-		log.Print("Stopping...")
-	case err := <-srv.Err():
-		log.Printf("serve http: %v", err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, os.Interrupt)
+		<-ch
+		cancel()
+	}()
+	err = api.Serve(ctx, net.JoinHostPort(cfg.Http.Host, cfg.Http.Port),
+		grpcService, httpService)
+	if err != nil {
+		log.Fatal(err)
 	}
-	srv.Stop()
 }

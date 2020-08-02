@@ -1,6 +1,6 @@
 import Vue from 'vue';
 import VueRouter from 'vue-router';
-import Cases from '@/components/Cases.vue';
+import Cases from '@/components/Cases';
 
 Vue.use(VueRouter);
 
@@ -24,4 +24,4 @@ export default new VueRouter({
       ],
     },
   ],
-});
+})

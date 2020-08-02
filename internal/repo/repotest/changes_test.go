@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-type setQueryCall struct {
+type setQueryInputWant struct {
 	id    string
 	padLt int
 	padGt int
@@ -16,32 +16,28 @@ type setQueryCall struct {
 }
 
 var setQueryTests = []struct {
-	suites        []repo.Suite
-	setQueryCalls func(ids []string) []setQueryCall
+	suites []repo.Suite
+	iw     func(ids []string) setQueryInputWant
 }{
 	{
-		setQueryCalls: func(ids []string) []setQueryCall {
-			return []setQueryCall{
-				{
-					want: []repo.Change{
-						repo.SuiteAggUpdate{
-							SuiteAgg: repo.SuiteAgg{},
-						},
+		iw: func(ids []string) setQueryInputWant {
+			return setQueryInputWant{
+				want: []repo.Change{
+					repo.SuiteAggUpdate{
+						SuiteAgg: repo.SuiteAgg{},
 					},
 				},
 			}
 		},
 	},
 	{
-		setQueryCalls: func(ids []string) []setQueryCall {
-			return []setQueryCall{
-				{
-					padLt: 2,
-					padGt: 4,
-					want: []repo.Change{
-						repo.SuiteAggUpdate{
-							SuiteAgg: repo.SuiteAgg{},
-						},
+		iw: func(ids []string) setQueryInputWant {
+			return setQueryInputWant{
+				padLt: 2,
+				padGt: 4,
+				want: []repo.Change{
+					repo.SuiteAggUpdate{
+						SuiteAgg: repo.SuiteAgg{},
 					},
 				},
 			}
@@ -49,22 +45,20 @@ var setQueryTests = []struct {
 	},
 	{
 		suites: []repo.Suite{{}},
-		setQueryCalls: func(ids []string) []setQueryCall {
-			return []setQueryCall{
-				{
-					id: ids[0],
-					want: []repo.Change{
-						repo.SuiteUpsert{
-							Suite: repo.Suite{Entity: repo.Entity{Id: ids[0]}},
-						},
-						repo.SuiteAggUpdate{
-							SuiteAgg: repo.SuiteAgg{
-								VersionedEntity: repo.VersionedEntity{
-									Version: 1,
-								},
-								TotalCount:   1,
-								StartedCount: 0,
+		iw: func(ids []string) setQueryInputWant {
+			return setQueryInputWant{
+				id: ids[0],
+				want: []repo.Change{
+					repo.SuiteUpsert{
+						Suite: repo.Suite{Entity: repo.Entity{Id: ids[0]}},
+					},
+					repo.SuiteAggUpdate{
+						SuiteAgg: repo.SuiteAgg{
+							VersionedEntity: repo.VersionedEntity{
+								Version: 1,
 							},
+							TotalCount:   1,
+							StartedCount: 0,
 						},
 					},
 				},
@@ -82,104 +76,43 @@ var setQueryTests = []struct {
 				StartedAt: 500,
 			},
 		},
-		setQueryCalls: func(ids []string) []setQueryCall {
-			return []setQueryCall{
-				{
-					id: ids[2],
-					padGt: 1,
-					padLt: 3,
-					want: []repo.Change{
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[3]},
-								StartedAt: 400,
-							},
-						},
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[2]},
-								StartedAt: 300,
-							},
-						},
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[1]},
-								StartedAt: 200,
-							},
-						},
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[0]},
-								StartedAt: 100,
-							},
-						},
-						repo.SuiteAggUpdate{
-							SuiteAgg: repo.SuiteAgg{
-								VersionedEntity: repo.VersionedEntity{
-									Version: 5,
-								},
-								TotalCount:   5,
-								StartedCount: 1,
-							},
+		iw: func(ids []string) setQueryInputWant {
+			return setQueryInputWant{
+				id:    ids[2],
+				padGt: 1,
+				padLt: 3,
+				want: []repo.Change{
+					repo.SuiteUpsert{
+						Suite: repo.Suite{
+							Entity:    repo.Entity{Id: ids[3]},
+							StartedAt: 400,
 						},
 					},
-				},
-				{
-					id: ids[3],
-					want: []repo.Change{
-						repo.SuiteDelete{Id: ids[3]},
-						repo.SuiteDelete{Id: ids[2]},
-						repo.SuiteDelete{Id: ids[1]},
-						repo.SuiteDelete{Id: ids[0]},
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[3]},
-								StartedAt: 400,
-							},
-						},
-						repo.SuiteAggUpdate{
-							SuiteAgg: repo.SuiteAgg{
-								VersionedEntity: repo.VersionedEntity{
-									Version: 5,
-								},
-								TotalCount:   5,
-								StartedCount: 1,
-							},
+					repo.SuiteUpsert{
+						Suite: repo.Suite{
+							Entity:    repo.Entity{Id: ids[2]},
+							StartedAt: 300,
 						},
 					},
-				},
-				{
-					padLt: 1,
-					padGt: 1,
-					want: []repo.Change{
-						repo.SuiteDelete{Id: ids[3]},
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[4]},
-								Status: repo.SuiteStatusStarted,
-								StartedAt: 500,
-							},
+					repo.SuiteUpsert{
+						Suite: repo.Suite{
+							Entity:    repo.Entity{Id: ids[1]},
+							StartedAt: 200,
 						},
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[3]},
-								StartedAt: 400,
-							},
+					},
+					repo.SuiteUpsert{
+						Suite: repo.Suite{
+							Entity:    repo.Entity{Id: ids[0]},
+							StartedAt: 100,
 						},
-						repo.SuiteUpsert{
-							Suite: repo.Suite{
-								Entity: repo.Entity{Id: ids[2]},
-								StartedAt: 300,
+					},
+					repo.SuiteAggUpdate{
+						SuiteAgg: repo.SuiteAgg{
+							VersionedEntity: repo.VersionedEntity{
+								Version: 5,
 							},
-						},
-						repo.SuiteAggUpdate{
-							SuiteAgg: repo.SuiteAgg{
-								VersionedEntity: repo.VersionedEntity{
-									Version: 5,
-								},
-								TotalCount:   5,
-								StartedCount: 1,
-							},
+							TotalCount:   5,
+							StartedCount: 1,
 						},
 					},
 				},
@@ -200,12 +133,11 @@ func TestWatchSuites_SetQuery(t *testing.T) {
 				ids = append(ids, id)
 			}
 
-			w := r.WatchSuites()
+			iw := test.iw(ids)
+			w, err := r.WatchSuites(iw.id, iw.padLt, iw.padGt)
+			require.Nil(t, err)
 			t.Cleanup(w.Close)
-			for _, call := range test.setQueryCalls(ids) {
-				require.Nil(t, w.SetQuery(call.id, call.padLt, call.padGt))
-				assert.ElementsMatch(t, call.want, <-w.Changes())
-			}
+			assert.ElementsMatch(t, iw.want, <-w.Changes())
 		})
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	pb "github.com/suiteserve/protocol/go/protocol"
 	"github.com/suiteserve/suiteserve/internal/repo"
-	"io"
 	"log"
 )
 
@@ -14,7 +13,8 @@ type query struct {
 	Repo
 }
 
-func (s *query) GetAttachments(_ context.Context, r *pb.GetAttachmentsRequest) (*pb.GetAttachmentsReply, error) {
+func (s *query) GetAttachments(_ context.Context,
+	r *pb.GetAttachmentsRequest) (*pb.GetAttachmentsReply, error) {
 	var err error
 	var all []repo.Attachment
 	var setOwner func(*pb.Attachment)
@@ -63,12 +63,16 @@ func (s *query) GetAttachments(_ context.Context, r *pb.GetAttachmentsRequest) (
 	return &reply, nil
 }
 
-func (s *query) WatchSuites(stream pb.QueryService_WatchSuitesServer) error {
-	w := s.Repo.WatchSuites()
+func (s *query) WatchSuites(r *pb.WatchSuitesRequest,
+	stream pb.QueryService_WatchSuitesServer) error {
+	w, err := s.Repo.WatchSuites(r.Id, int(r.PadOlder), int(r.PadNewer))
+	if err != nil {
+		return err
+	}
 	defer w.Close()
-
-	go func() {
-		for changefeed := range w.Changes() {
+	for {
+		select {
+		case changefeed := <-w.Changes():
 			var reply pb.WatchSuitesReply
 			for _, c := range changefeed {
 				switch change := c.(type) {
@@ -80,8 +84,6 @@ func (s *query) WatchSuites(stream pb.QueryService_WatchSuitesServer) error {
 						&pb.WatchSuitesReply_Upsert{
 							Suite: buildPbSuite(change.Suite),
 						})
-				case repo.SuiteDelete:
-					reply.DeletedIds = append(reply.DeletedIds, change.Id)
 				default:
 					panic("unknown change type")
 				}
@@ -89,27 +91,18 @@ func (s *query) WatchSuites(stream pb.QueryService_WatchSuitesServer) error {
 			if err := stream.Send(&reply); err != nil {
 				log.Printf("send WatchSuitesReply: %v", err)
 			}
-		}
-	}()
-
-	for {
-		r, err := stream.Recv()
-		if err == io.EOF {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		err = w.SetQuery(r.Id, int(r.PadOlder), int(r.PadNewer))
-		if err != nil {
-			return err
+		case <-stream.Context().Done():
+			return stream.Context().Err()
 		}
 	}
 }
 
-func (s *query) WatchCases(stream pb.QueryService_WatchCasesServer) error {
-	panic("implement me")
+func (s *query) WatchCases(r *pb.WatchCasesRequest,
+	stream pb.QueryService_WatchCasesServer) error {
+	panic("NYI")
 }
 
-func (s *query) WatchLog(stream pb.QueryService_WatchLogServer) error {
-	panic("implement me")
+func (s *query) WatchLog(r *pb.WatchLogRequest,
+	stream pb.QueryService_WatchLogServer) error {
+	panic("NYI")
 }

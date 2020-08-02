@@ -1,9 +1,8 @@
 <template>
-  <TabNav title="Suites" :link-gen="genLink" :items="suites"
-          :have-more="haveMore" @load-more="loadMore" :stats="{
+  <TabNav :items="suites" :link-gen="genLink" :stats="{
     'Running': running,
     'Finished': finished,
-  }">
+  }" title="Suites">
     <template #item="{ item }">
       <div>
         <p>{{ item.name }}</p>
@@ -13,50 +12,63 @@
   </TabNav>
 </template>
 
-<script lang="ts">
-  import Vue from 'vue';
-  import * as api from '@/api';
-  import TabNav from '@/components/TabNav.vue';
+<script>
+import TabNav from '@/components/TabNav';
 
-  export default Vue.extend({
-    name: 'Suites',
-    computed: {
-      suites(): ReadonlyArray<api.Suite> {
-        return this.$store.getters.suites;
-      },
-      running(): number {
-        return this.$store.getters.suiteAggs.running;
-      },
-      finished(): number {
-        return this.$store.getters.suiteAggs.finished;
-      },
-      haveMore() {
-        return this.$store.getters.moreSuites;
-      },
+export default {
+  name: 'Suites',
+  computed: {
+    suites() {
+      return [
+        {
+          id: "132",
+          status: 'running',
+          name: "Hello Hi there",
+          started_at: 0,
+        }
+      ];
     },
-    methods: {
-      loadMore() {
-        this.$store.dispatch('fetchSuites');
-      },
-      genLink: (suiteId: string) => ({
+    running() {
+      return 5;
+    },
+    finished() {
+      return 9;
+    },
+  },
+  methods: {
+    loadMore() {
+
+    },
+    /**
+     * @param {string} suiteId
+     * @return {Object}
+     */
+    genLink(suiteId) {
+      return {
         name: 'suite',
         params: {
           suiteId,
         },
-      }),
-      formatUnix: (millis: number): string =>
-          new Date(millis).toLocaleString([...navigator.languages], {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
+      };
     },
-    components: {
-      TabNav,
+    /**
+     * @param {number} millis
+     * @return {string}
+     */
+    formatUnix(millis) {
+      return new Date(millis).toLocaleString([...navigator.languages], {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
     },
-  });
+  },
+  components: {
+    TabNav,
+  },
+}
 </script>

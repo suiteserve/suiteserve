@@ -2,18 +2,18 @@ package api
 
 import (
 	"context"
-	"log"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 )
 
 const shutdownTimeout = 3 * time.Second
 
-type Options struct {
-	Host        string
-	Port        string
+type HttpOptions struct {
+	GrpcServer *grpc.Server
+
 	TlsCertFile string
 	TlsKeyFile  string
 	PublicDir   string
@@ -21,80 +21,52 @@ type Options struct {
 	UserContentHost     string
 	UserContentDir      string
 	UserContentMetaRepo UserContentMetaRepo
-
-	Rpc Middleware
 }
 
-type Server struct {
-	addr string
-	srv  http.Server
-	rpc  Middleware
-
-	err  chan error
-	wg   sync.WaitGroup
-	once sync.Once
-}
-
-func Serve(opts Options) (*Server, error) {
-	s := Server{
-		rpc: opts.Rpc,
-		err: make(chan error),
-	}
-	s.srv.Addr = net.JoinHostPort(opts.Host, opts.Port)
-	s.setSrvHandler(opts)
-
-	ln, err := net.Listen("tcp", s.srv.Addr)
-	if err != nil {
-		return nil, err
-	}
-	s.addr = ln.Addr().String()
-
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
-		log.Printf("Starting HTTP @ %s", s.addr)
-		err := s.srv.ServeTLS(ln, opts.TlsCertFile, opts.TlsKeyFile)
-		if err != http.ErrServerClosed {
-			log.Printf("serve http: %v", err)
-			s.err <- err
-		}
-		if err := ln.Close(); err != nil {
-			log.Printf("close http: %v", err)
-		}
-		close(s.err)
-	}()
-	return &s, nil
-}
-
-func (s *Server) setSrvHandler(opts Options) {
+func (o HttpOptions) newHandler() http.Handler {
 	var mux http.ServeMux
 	mux.Handle("/",
-		s.rpc.NewMiddleware(
+		newGrpcMiddleware(o.GrpcServer,
 			newGetMiddleware(
-				newSecurityMiddleware(
-					newFrontendSecurityMiddleware(
-						http.FileServer(http.Dir(opts.PublicDir)))))))
-	mux.Handle(opts.UserContentHost+"/",
+				newSecurityMiddleware(newUiSecurityMiddleware(
+					http.FileServer(http.Dir(o.PublicDir)))))))
+	mux.Handle(o.UserContentHost+"/",
 		newGetMiddleware(
-			newSecurityMiddleware(
-				newUserContentSecurityMiddleware(
-					newUserContentMiddleware(opts.UserContentMetaRepo,
-						http.FileServer(http.Dir(opts.UserContentDir)))))))
-	s.srv.Handler = newLoggingMiddleware(&mux)
+			newSecurityMiddleware(newUserContentSecurityMiddleware(
+				newUserContentMiddleware(o.UserContentMetaRepo,
+					http.FileServer(http.Dir(o.UserContentDir)))))))
+	return newLoggingMiddleware(&mux)
 }
 
-func (s *Server) Err() <-chan error {
-	return s.err
+type HttpService struct {
+	opts HttpOptions
+	srv  http.Server
 }
 
-func (s *Server) Stop() {
-	s.once.Do(func() {
+func NewHttpService(opts HttpOptions) *HttpService {
+	s := HttpService{opts: opts}
+	s.srv.Handler = opts.newHandler()
+	return &s
+}
+
+func (s *HttpService) Serve(ctx context.Context, ln net.Listener) error {
+	s.srv.BaseContext = func(net.Listener) context.Context {
+		return ctx
+	}
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		err := s.srv.ServeTLS(ln, s.opts.TlsCertFile, s.opts.TlsKeyFile)
+		if err != http.ErrServerClosed {
+			return err
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		<-ctx.Done()
 		ctx, cancel := context.WithTimeout(context.Background(),
 			shutdownTimeout)
 		defer cancel()
-		if err := s.srv.Shutdown(ctx); err != nil {
-			log.Printf("stop http: %v", err)
-		}
-		s.wg.Wait()
+		return s.srv.Shutdown(ctx)
 	})
+	return eg.Wait()
 }

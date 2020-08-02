@@ -24,12 +24,6 @@ type SuiteUpsert struct {
 
 func (SuiteUpsert) isChange() {}
 
-type SuiteDelete struct {
-	Id string
-}
-
-func (SuiteDelete) isChange() {}
-
 type changeHandler interface {
 	handleChanges(changes []Change)
 }
@@ -88,26 +82,13 @@ type SuiteWatcher struct {
 	max entry
 }
 
-func (r *Repo) WatchSuites() *SuiteWatcher {
+func (r *Repo) WatchSuites(id string, padLt, padGt int) (*SuiteWatcher, error) {
 	w := SuiteWatcher{
 		r:       r,
 		watcher: newWatcher(),
 	}
 	r.addHandler(&w)
-	return &w
-}
-
-func (w *SuiteWatcher) Close() {
-	w.r.removeHandler(w)
-	close(w.in)
-}
-
-func (w *SuiteWatcher) Changes() <-chan []Change {
-	return w.out
-}
-
-func (w *SuiteWatcher) SetQuery(id string, padLt, padGt int) error {
-	return w.r.db.View(func(tx *buntdb.Tx) error {
+	return &w, w.r.db.View(func(tx *buntdb.Tx) error {
 		var changes []Change
 		add := func(k, v string) bool {
 			var upsert SuiteUpsert
@@ -117,21 +98,7 @@ func (w *SuiteWatcher) SetQuery(id string, padLt, padGt int) error {
 			changes = append(changes, upsert)
 			return true
 		}
-		rm := func(k, v string) bool {
-			changes = append(changes, SuiteDelete{Id: getId(k)})
-			return true
-		}
-		// rm old region
-		if w.id != "" || w.padGt > 0 || w.padLt > 0 {
-			err := tx.AscendGreaterOrEqual(suiteIndexStartedAt,
-				suiteIndexStartedAtPivot(w.min.v),
-				newAndCond(rm, newUntilKeyCond(w.max.k)))
-			if err != nil {
-				return err
-			}
-		}
 		var n int
-		// add new region
 		lt := func(k, v string) bool {
 			w.min = entry{k, v}
 			n++
@@ -164,6 +131,15 @@ func (w *SuiteWatcher) SetQuery(id string, padLt, padGt int) error {
 		w.in <- append(changes, SuiteAggUpdate{agg})
 		return nil
 	})
+}
+
+func (w *SuiteWatcher) Close() {
+	w.r.removeHandler(w)
+	close(w.in)
+}
+
+func (w *SuiteWatcher) Changes() <-chan []Change {
+	return w.out
 }
 
 func itrAroundSuite(tx *buntdb.Tx, id string, padLt, padGt int,

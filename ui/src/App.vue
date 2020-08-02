@@ -5,19 +5,19 @@
   </main>
 </template>
 
-<script lang="ts">
-  import Suites from '@/components/Suites.vue';
+<script>
+import Suites from '@/components/Suites';
 
-  export default {
-    name: 'App',
-    components: {
-      Suites,
-    },
-  };
+export default {
+  name: 'App',
+  components: {
+    Suites,
+  },
+}
 </script>
 
 <style>
-  #app {
-    display: flex;
-  }
+#app {
+  display: flex;
+}
 </style>
