@@ -12,8 +12,8 @@ import (
 
 type Event func(io.Writer) (int, error)
 
-// Comment returns an Event that writes comment events to the stream.
-func Comment(s string) Event {
+// WithComment returns an Event that writes comment events to the stream.
+func WithComment(s string) Event {
 	return func(w io.Writer) (int, error) {
 		return forLines(s, func(line string) (int, error) {
 			return w.Write([]byte(":" + line + "\n"))
@@ -21,29 +21,29 @@ func Comment(s string) Event {
 	}
 }
 
-// EventType returns an Event that writes event type events to the stream.
-func EventType(s string) Event {
+// WithEventType returns an Event that writes event type events to the stream.
+func WithEventType(s string) Event {
 	return func(w io.Writer) (int, error) {
 		return sendFields(w, "event", s)
 	}
 }
 
-// Data returns an Event that writes data events to the stream.
-func Data(s string) Event {
+// WithData returns an Event that writes data events to the stream.
+func WithData(s string) Event {
 	return func(w io.Writer) (int, error) {
 		return sendFields(w, "data", s)
 	}
 }
 
-// Id returns an Event that writes ID events to the stream.
-func Id(s string) Event {
+// WithId returns an Event that writes ID events to the stream.
+func WithId(s string) Event {
 	return func(w io.Writer) (int, error) {
 		return sendFields(w, "id", s)
 	}
 }
 
-// Retry returns an Event that writes retry events to the stream.
-func Retry(i uint64) Event {
+// WithRetry returns an Event that writes retry events to the stream.
+func WithRetry(i uint64) Event {
 	return func(w io.Writer) (int, error) {
 		return sendFields(w, "retry", strconv.FormatUint(i, 10))
 	}
