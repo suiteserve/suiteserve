@@ -14,26 +14,34 @@
 
 <script>
 import TabNav from '@/components/TabNav';
+import rpc from '@/api';
 
 export default {
   name: 'Suites',
+  data() {
+    return {
+      suites: [],
+      running: 0,
+      total: 0,
+    };
+  },
   computed: {
-    suites() {
-      return [
-        {
-          id: "132",
-          status: 'running',
-          name: "Hello Hi there",
-          started_at: 0,
-        }
-      ];
-    },
-    running() {
-      return 5;
-    },
     finished() {
-      return 9;
+      return this.total - this.running;
     },
+  },
+  mounted() {
+    const req = new rpc.WatchSuitesRequest();
+    req.setId('');
+    req.setPadOlder(10);
+
+    const stream = rpc.watchSuites(req);
+    stream.on('data', resp => {
+      console.log(resp);
+    });
+    stream.on('end', () => {
+      console.log('end');
+    });
   },
   methods: {
     loadMore() {
@@ -70,5 +78,5 @@ export default {
   components: {
     TabNav,
   },
-}
+};
 </script>

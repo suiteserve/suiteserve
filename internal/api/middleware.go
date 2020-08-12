@@ -4,38 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	"google.golang.org/grpc"
 	"log"
 	"net/http"
 	"strings"
 )
 
-func newLoggingMiddleware(h http.Handler) http.HandlerFunc {
+func newLogMiddleware(h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("<%s> http/%d: %s %s", r.RemoteAddr, r.ProtoMajor, r.Method,
-			r.URL.String())
+		log.Printf("<%s> %s %s", r.RemoteAddr, r.Method, r.URL)
 		h.ServeHTTP(w, r)
 	}
 }
 
-func newGrpcMiddleware(srv *grpc.Server, h http.Handler) http.HandlerFunc {
-	compat := grpcweb.WrapServer(srv, grpcweb.WithOriginFunc(func(string) bool {
-		// TODO: not for production
-		return true
-	}))
+func newGetHeadMiddleware(h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if compat.IsAcceptableGrpcCorsRequest(r) || compat.IsGrpcWebRequest(r) {
-			compat.ServeHTTP(w, r)
-		} else {
-			h.ServeHTTP(w, r)
-		}
-	}
-}
-
-func newGetMiddleware(h http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed),
 				http.StatusMethodNotAllowed)
 			return
@@ -44,14 +27,14 @@ func newGetMiddleware(h http.Handler) http.HandlerFunc {
 	}
 }
 
-func newSecurityMiddleware(h http.Handler) http.HandlerFunc {
+func newSecMiddleware(h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("strict-transport-security", "max-age=31536000")
 		h.ServeHTTP(w, r)
 	}
 }
 
-func newUiSecurityMiddleware(h http.Handler) http.HandlerFunc {
+func newUiSecMiddleware(h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-security-policy", "block-all-mixed-content; "+
 			"default-src 'none'; "+
@@ -67,29 +50,20 @@ func newUiSecurityMiddleware(h http.Handler) http.HandlerFunc {
 	}
 }
 
-func newUserContentSecurityMiddleware(h http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("content-security-policy",
-			"sandbox; default-src 'none';")
-		w.Header().Set("x-content-type-options", "nosniff")
-		h.ServeHTTP(w, r)
-	}
+type FileMeta interface {
+	Name() string
+	ContentType() string
 }
 
-type FileMeta struct {
-	Filename    string
-	ContentType string
+type FileMetaRepo interface {
+	FileMeta(ctx context.Context, id string) (FileMeta, error)
 }
 
-type UserContentMetaRepo interface {
-	UserContentMeta(ctx context.Context, id string) (FileMeta, error)
-}
-
-func newUserContentMiddleware(repo UserContentMetaRepo,
+func newUserContentMiddleware(repo FileMetaRepo,
 	h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/")
-		meta, err := repo.UserContentMeta(r.Context(), id)
+		meta, err := repo.FileMeta(r.Context(), id)
 		if isNotFound(err) {
 			http.Error(w, http.StatusText(http.StatusNotFound),
 				http.StatusNotFound)
@@ -100,8 +74,11 @@ func newUserContentMiddleware(repo UserContentMetaRepo,
 			return
 		}
 		w.Header().Set("content-disposition",
-			fmt.Sprintf("attachment; filename=%q", meta.Filename))
-		w.Header().Set("content-type", meta.ContentType)
+			fmt.Sprintf("attachment; filename=%q", meta.Name()))
+		w.Header().Set("content-security-policy",
+			"sandbox; default-src 'none';")
+		w.Header().Set("content-type", meta.ContentType())
+		w.Header().Set("x-content-type-options", "nosniff")
 		h.ServeHTTP(w, r)
 	}
 }
@@ -110,8 +87,5 @@ func isNotFound(err error) bool {
 	var foundErr interface {
 		Found() bool
 	}
-	if !errors.As(err, &foundErr) {
-		return false
-	}
-	return !foundErr.Found()
+	return errors.As(err, &foundErr) && !foundErr.Found()
 }

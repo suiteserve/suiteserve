@@ -10,7 +10,7 @@
   "storage": {
     "db": "data/db",
     "user_content": {
-      "dir": "data/usercontent/",
+      "dir": "data/user_content/",
       "max_size_mb": 64
     }
   }
