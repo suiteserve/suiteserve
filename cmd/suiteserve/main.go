@@ -58,9 +58,8 @@ func main() {
 		UserContentHost: c.Http.UserContentHost,
 		UserContentDir:  c.Storage.UserContent.Dir,
 		UserContentRepo: nil,
-		V1:              nil,
+		V1:              api.NewV1Handler(r),
 	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
