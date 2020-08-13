@@ -2,6 +2,7 @@ package repo
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/tidwall/buntdb"
 )
 
@@ -125,7 +126,7 @@ func (r *Repo) WatchSuites(id string, padLt, padGt int) (*SuiteWatcher, error) {
 
 		var agg SuiteAgg
 		err := w.r.getById(SuiteAggColl, "", &agg)
-		if err != nil && err != ErrNotFound {
+		if err != nil && !errors.Is(err, notFoundErr{}) {
 			return err
 		}
 		w.in <- append(changes, SuiteAggUpdate{agg})

@@ -56,7 +56,7 @@ func WithRetry(i uint64) Event {
 // need to use this function at all.
 //
 // If the writer implements http.Flusher, the Flush function is called before
-// SendWithBom returns.
+// SendWithBom returns. An extra newline always follows the last event.
 func SendWithBom(w io.Writer, events ...Event) (n int, err error) {
 	if n, err = w.Write([]byte("\ufeff")); err != nil {
 		return n, err
@@ -69,7 +69,7 @@ func SendWithBom(w io.Writer, events ...Event) (n int, err error) {
 // bytes written and any error.
 //
 // If the writer implements http.Flusher, the Flush function is called before
-// Send returns.
+// Send returns. An extra newline always follows the last event.
 func Send(w io.Writer, events ...Event) (n int, err error) {
 	for _, event := range events {
 		n2, err := event(w)

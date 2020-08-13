@@ -14,7 +14,6 @@
 
 <script>
 import TabNav from '@/components/TabNav';
-import rpc from '@/api';
 
 export default {
   name: 'Suites',
@@ -29,19 +28,6 @@ export default {
     finished() {
       return this.total - this.running;
     },
-  },
-  mounted() {
-    const req = new rpc.WatchSuitesRequest();
-    req.setId('');
-    req.setPadOlder(10);
-
-    const stream = rpc.watchSuites(req);
-    stream.on('data', resp => {
-      console.log(resp);
-    });
-    stream.on('end', () => {
-      console.log('end');
-    });
   },
   methods: {
     loadMore() {

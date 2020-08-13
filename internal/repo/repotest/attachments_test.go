@@ -1,7 +1,6 @@
 package repotest
 
 import (
-	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/suiteserve/suiteserve/internal/repo"
@@ -11,7 +10,7 @@ import (
 func TestRepo_Attachment(t *testing.T) {
 	r := Open(t)
 	_, err := r.Attachment("nonexistent")
-	assert.True(t, errors.Is(err, repo.ErrNotFound), "want ErrNotFound")
+	assert.True(t, isNotFound(err), "want not found")
 
 	want := insertAttachment(t, r, repo.Attachment{
 		SoftDeleteEntity: repo.SoftDeleteEntity{

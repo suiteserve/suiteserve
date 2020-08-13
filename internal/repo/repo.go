@@ -32,7 +32,22 @@ func suiteIndexStartedAtPivot(v string) string {
 		`,"id":"` + gjson.Get(v, "id").String() + `"}`
 }
 
-var ErrNotFound = errors.New("not found")
+type notFoundErr struct{}
+
+func (e notFoundErr) Error() string {
+	return "not found"
+}
+
+func (e notFoundErr) Is(target error) bool {
+	var foundErr interface {
+		Found() bool
+	}
+	return errors.As(target, &foundErr) && e.Found() == foundErr.Found()
+}
+
+func (e notFoundErr) Found() bool {
+	return false
+}
 
 type Entity struct {
 	Id string `json:"id"`
@@ -117,13 +132,15 @@ func (r *Repo) insert(coll Coll, x insertable) (id string, err error) {
 	})
 }
 
-func (r *Repo) insertFunc(coll Coll, x insertable, after func(tx *buntdb.Tx) error) (id string, err error) {
+func (r *Repo) insertFunc(coll Coll, x insertable,
+	after func(tx *buntdb.Tx) error) (id string, err error) {
 	id = r.genId()
 	x.setId(id)
 	return id, r.setFunc(coll, id, x, after)
 }
 
-func (r *Repo) setFunc(coll Coll, id string, x interface{}, after func(tx *buntdb.Tx) error) error {
+func (r *Repo) setFunc(coll Coll, id string, x interface{},
+	after func(tx *buntdb.Tx) error) error {
 	b, err := json.Marshal(x)
 	if err != nil {
 		panic(err)
@@ -137,7 +154,8 @@ func (r *Repo) setFunc(coll Coll, id string, x interface{}, after func(tx *buntd
 	})
 }
 
-func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{}, updateX func()) error {
+func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{},
+	updateX func()) error {
 	k := key(coll, id)
 	v, err := tx.Get(k)
 	if err == nil {
@@ -162,10 +180,11 @@ func (r *Repo) getById(coll Coll, id string, x interface{}) error {
 	})
 }
 
-func (r *Repo) getByIdTx(tx *buntdb.Tx, coll Coll, id string, x interface{}) error {
+func (r *Repo) getByIdTx(tx *buntdb.Tx, coll Coll, id string,
+	x interface{}) error {
 	v, err := tx.Get(key(coll, id))
 	if err == buntdb.ErrNotFound {
-		return ErrNotFound
+		return notFoundErr{}
 	} else if err != nil {
 		return err
 	}

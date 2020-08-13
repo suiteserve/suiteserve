@@ -22,7 +22,10 @@ func (s *query) GetAttachments(_ context.Context,
 	switch r.Filter.(type) {
 	case *pb.GetAttachmentsRequest_Id:
 		a, err := s.Attachment(r.GetId())
-		if errors.Is(err, repo.ErrNotFound) {
+		var foundErr interface {
+			Found() bool
+		}
+		if errors.As(err, &foundErr) && !foundErr.Found() {
 			err = nil
 		} else if err != nil {
 			return nil, err

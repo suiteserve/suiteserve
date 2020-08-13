@@ -102,8 +102,7 @@ func errHandler(
 			if httpErr.cause != nil {
 				text += ": " + httpErr.cause.Error()
 			}
-			log.Printf("<%s> %d: %s", r.RemoteAddr, httpErr.code,
-				text)
+			log.Printf("<%s> %d %s", r.RemoteAddr, httpErr.code, text)
 			http.Error(w, httpErr.Error(), httpErr.code)
 		}
 	}
