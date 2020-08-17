@@ -5,7 +5,6 @@ import "encoding/json"
 type CaseStatus string
 
 const (
-	CaseStatusUnknown  CaseStatus = "unknown"
 	CaseStatusCreated  CaseStatus = "created"
 	CaseStatusStarted  CaseStatus = "started"
 	CaseStatusFinished CaseStatus = "finished"
@@ -14,7 +13,6 @@ const (
 type CaseResult string
 
 const (
-	CaseResultUnknown CaseResult = "unknown"
 	CaseResultPassed  CaseResult = "passed"
 	CaseResultFailed  CaseResult = "failed"
 	CaseResultSkipped CaseResult = "skipped"
@@ -44,6 +42,6 @@ func (r *Repo) InsertCase(c Case) (id string, err error) {
 
 func (r *Repo) Case(id string) (Case, error) {
 	var c Case
-	err := r.getById(CaseColl, id, &c)
+	err := r.byId(CaseColl, id, &c)
 	return c, err
 }

@@ -24,7 +24,7 @@ func (r *Repo) InsertAttachment(a Attachment) (id string, err error) {
 
 func (r *Repo) Attachment(id string) (Attachment, error) {
 	var a Attachment
-	err := r.getById(AttachmentColl, id, &a)
+	err := r.byId(AttachmentColl, id, &a)
 	return a, err
 }
 
@@ -36,14 +36,16 @@ func (r *Repo) CaseAttachments(caseId string) ([]Attachment, error) {
 	return r.attachmentsByOwner("", caseId)
 }
 
-func (r *Repo) attachmentsByOwner(suiteId, caseId string) ([]Attachment, error) {
+func (r *Repo) attachmentsByOwner(suiteId,
+	caseId string) ([]Attachment, error) {
 	var vals []string
 	pivot := fmt.Sprintf(`{"suite_id":%q,"case_id":%q}`, suiteId, caseId)
 	err := r.db.View(func(tx *buntdb.Tx) error {
-		return tx.DescendEqual(attachmentIndexOwner, pivot, func(k, v string) bool {
-			vals = append(vals, v)
-			return true
-		})
+		return tx.DescendEqual(attachmentIndexOwner, pivot,
+			func(k, v string) bool {
+				vals = append(vals, v)
+				return true
+			})
 	})
 	if err != nil {
 		return nil, err

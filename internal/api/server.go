@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/suiteserve/suiteserve/middleware"
 	"golang.org/x/sync/errgroup"
 	"io/ioutil"
 	"log"
@@ -15,6 +14,7 @@ import (
 )
 
 type Options struct {
+	Addr        string
 	TlsCertFile string
 	TlsKeyFile  string
 	PublicDir   string
@@ -26,22 +26,19 @@ type Options struct {
 	V1 http.Handler
 }
 
-func (o Options) newHandler() http.Handler {
+func (o Options) handler() http.Handler {
 	var m http.ServeMux
-	m.Handle("/v1/", http.StripPrefix("/v1", o.V1))
+	m.Handle("/v1/",
+		http.StripPrefix("/v1", o.V1))
 	m.Handle(o.UserContentHost+"/",
-		newSecMiddleware(
-			newUserContentMiddleware(o.UserContentRepo,
-				http.FileServer(http.Dir(o.UserContentDir)))))
+		secMw(userContentHandler(o.UserContentRepo, o.UserContentDir)))
 	m.Handle("/",
-		newSecMiddleware(
-			newUiSecMiddleware(
-				http.FileServer(http.Dir(o.PublicDir)))))
-	return middleware.Log(&m)
+		secMw(uiSecMw(uiHandler(o.PublicDir))))
+	return logMw(&m)
 }
 
-func Serve(ctx context.Context, addr string, opts Options) error {
-	ln, err := net.Listen("tcp", addr)
+func Serve(ctx context.Context, opts Options) error {
+	ln, err := net.Listen("tcp", opts.Addr)
 	if err != nil {
 		return err
 	}
@@ -51,7 +48,7 @@ func Serve(ctx context.Context, addr string, opts Options) error {
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
 		},
-		Handler: opts.newHandler(),
+		Handler: opts.handler(),
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -70,54 +67,53 @@ func Serve(ctx context.Context, addr string, opts Options) error {
 	return eg.Wait()
 }
 
-type httpError struct {
+type errHttp struct {
 	error string
 	code  int
 	cause error
 }
 
-func (e httpError) Error() string {
+func (e errHttp) Error() string {
 	if e.error == "" {
 		return http.StatusText(e.code)
 	}
 	return e.error
 }
 
-func (e httpError) Unwrap() error {
+func (e errHttp) Unwrap() error {
 	return e.cause
 }
 
-func errHandler(
-	h func(w http.ResponseWriter, r *http.Request) error) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := h(w, r); err != nil {
-			httpErr := httpError{
-				code:  http.StatusInternalServerError,
-				cause: err,
-			}
-			if !errors.As(err, &httpErr) && isNotFound(err) {
-				httpErr.code = http.StatusNotFound
-			}
-			text := httpErr.Error()
-			if httpErr.cause != nil {
-				text += ": " + httpErr.cause.Error()
-			}
-			log.Printf("<%s> %d %s", r.RemoteAddr, httpErr.code, text)
-			http.Error(w, httpErr.Error(), httpErr.code)
+type errHandlerFunc func(w http.ResponseWriter, r *http.Request) error
+
+func (f errHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if err := f(w, r); err != nil {
+		httpErr := errHttp{
+			code:  http.StatusInternalServerError,
+			cause: err,
 		}
+		if !errors.As(err, &httpErr) && isNotFound(err) {
+			httpErr.code = http.StatusNotFound
+		}
+		text := httpErr.Error()
+		if httpErr.cause != nil {
+			text += ": " + httpErr.cause.Error()
+		}
+		log.Printf("<%s> %d %s", r.RemoteAddr, httpErr.code, text)
+		http.Error(w, httpErr.Error(), httpErr.code)
 	}
 }
 
 func readJson(r *http.Request, dst interface{}) error {
 	if r.Header.Get("content-type") != "application/json" {
-		return httpError{code: http.StatusUnsupportedMediaType}
+		return errHttp{code: http.StatusUnsupportedMediaType}
 	}
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
 	if err := json.Unmarshal(b, dst); err != nil {
-		return httpError{
+		return errHttp{
 			error: "bad json",
 			code:  http.StatusBadRequest,
 			cause: err,

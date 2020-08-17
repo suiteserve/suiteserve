@@ -9,21 +9,25 @@ import (
 type Mask []string
 
 type Change interface {
-	isChange()
+	Type() string
 }
 
 type SuiteAggUpdate struct {
 	SuiteAgg
 }
 
-func (SuiteAggUpdate) isChange() {}
+func (u SuiteAggUpdate) Type() string {
+	return "suite_agg_update"
+}
 
 type SuiteUpsert struct {
 	Suite
-	Mask
+	Mask `json:"mask,omitempty"`
 }
 
-func (SuiteUpsert) isChange() {}
+func (u SuiteUpsert) Type() string {
+	return "suite_upsert"
+}
 
 type changeHandler interface {
 	handleChanges(changes []Change)
@@ -64,10 +68,7 @@ func newWatcher() *watcher {
 			}
 		}
 	}()
-	return &watcher{
-		in:  in,
-		out: out,
-	}
+	return &watcher{in, out}
 }
 
 type SuiteWatcher struct {
@@ -89,7 +90,7 @@ func (r *Repo) WatchSuites(id string, padLt, padGt int) (*SuiteWatcher, error) {
 		watcher: newWatcher(),
 	}
 	r.addHandler(&w)
-	return &w, w.r.db.View(func(tx *buntdb.Tx) error {
+	return &w, r.db.View(func(tx *buntdb.Tx) error {
 		var changes []Change
 		add := func(k, v string) bool {
 			var upsert SuiteUpsert
@@ -125,8 +126,8 @@ func (r *Repo) WatchSuites(id string, padLt, padGt int) (*SuiteWatcher, error) {
 		w.n = n
 
 		var agg SuiteAgg
-		err := w.r.getById(SuiteAggColl, "", &agg)
-		if err != nil && !errors.Is(err, notFoundErr{}) {
+		err := r.byId(SuiteAggColl, "", &agg)
+		if err != nil && !errors.Is(err, errNotFound{}) {
 			return err
 		}
 		w.in <- append(changes, SuiteAggUpdate{agg})
@@ -145,20 +146,22 @@ func (w *SuiteWatcher) Changes() <-chan []Change {
 
 func itrAroundSuite(tx *buntdb.Tx, id string, padLt, padGt int,
 	lt, eq, gt itr) error {
-	firstEq := newFirstCond(eq)
-	restLt := newRestCond(lt)
-	restGt := newRestCond(gt)
+	firstEq := firstCond(eq)
+	restLt := restCond(lt)
+	restGt := restCond(gt)
 	if id == "" {
 		return tx.Descend(suiteIndexStartedAt,
-			newAndCond(firstEq, restLt, newLimitCond(padGt+padLt)))
+			andCond(firstEq, restLt, limitCond(padGt+padLt)))
 	}
 	idVal, err := tx.Get(key(SuiteColl, id))
-	if err != nil {
+	if err == buntdb.ErrNotFound {
+		return errNotFound{}
+	} else if err != nil {
 		return err
 	}
 	pivot := suiteIndexStartedAtPivot(idVal)
 	err = tx.AscendGreaterOrEqual(suiteIndexStartedAt, pivot,
-		newAndCond(firstEq, restGt, newLimitCond(padGt)))
+		andCond(firstEq, restGt, limitCond(padGt)))
 	if err != nil {
 		return err
 	}
@@ -166,7 +169,7 @@ func itrAroundSuite(tx *buntdb.Tx, id string, padLt, padGt int,
 		return nil
 	}
 	return tx.DescendLessOrEqual(suiteIndexStartedAt, pivot,
-		newAndCond(restLt, newLimitCond(padLt)))
+		andCond(restLt, limitCond(padLt)))
 }
 
 func (w *SuiteWatcher) handleChanges(changes []Change) {

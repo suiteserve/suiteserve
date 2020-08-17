@@ -7,7 +7,6 @@ import (
 type SuiteStatus string
 
 const (
-	SuiteStatusUnknown      SuiteStatus = "unknown"
 	SuiteStatusStarted      SuiteStatus = "started"
 	SuiteStatusFinished     SuiteStatus = "finished"
 	SuiteStatusDisconnected SuiteStatus = "disconnected"
@@ -16,9 +15,8 @@ const (
 type SuiteResult string
 
 const (
-	SuiteResultUnknown SuiteResult = "unknown"
-	SuiteResultPassed  SuiteResult = "passed"
-	SuiteResultFailed  SuiteResult = "failed"
+	SuiteResultPassed SuiteResult = "passed"
+	SuiteResultFailed SuiteResult = "failed"
 )
 
 type Suite struct {
@@ -67,6 +65,6 @@ func (r *Repo) InsertSuite(s Suite) (id string, err error) {
 
 func (r *Repo) Suite(id string) (Suite, error) {
 	var s Suite
-	err := r.getById(SuiteColl, id, &s)
+	err := r.byId(SuiteColl, id, &s)
 	return s, err
 }

@@ -1,9 +1,12 @@
 package api
 
 import (
+	"encoding/json"
 	"github.com/suiteserve/suiteserve/internal/repo"
-	"github.com/suiteserve/suiteserve/middleware"
+	"github.com/suiteserve/suiteserve/sse"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 type Repo interface {
@@ -31,27 +34,34 @@ func NewV1Handler(repo Repo) http.Handler {
 	v1 := v1{repo}
 	var mux http.ServeMux
 	mux.Handle("/attachments/",
-		middleware.Param("/attachments/",
-			v1.attachment()))
+		pathParamMw("/attachments/", v1.attachmentHandler()))
 	mux.Handle("/attachments",
-		v1.attachmentCollection())
-	mux.Handle("/", middleware.NotFound())
-	return middleware.Methods(http.MethodGet, http.MethodHead)(&mux)
+		v1.attachmentCollHandler())
+	mux.Handle("/suites/",
+		pathParamMw("/suites/", v1.suiteHandler()))
+	mux.Handle("/suites",
+		v1.suiteCollHandler())
+	mux.Handle("/cases/",
+		pathParamMw("/cases/", v1.caseHandler()))
+	mux.Handle("/logs/",
+		pathParamMw("/logs/", v1.logLineHandler()))
+	mux.Handle("/", notFound())
+	return methodsMw(http.MethodGet, http.MethodHead)(&mux)
 }
 
-func (v *v1) attachment() http.HandlerFunc {
-	return errHandler(func(w http.ResponseWriter, r *http.Request) error {
-		id := middleware.GetParam(r)
+func (v *v1) attachmentHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id := pathParam(r)
 		a, err := v.repo.Attachment(id)
 		if err != nil {
 			return err
 		}
 		return writeJson(w, r, &a)
-	})
+	}
 }
 
-func (v *v1) attachmentCollection() http.HandlerFunc {
-	return errHandler(func(w http.ResponseWriter, r *http.Request) error {
+func (v *v1) attachmentCollHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		var a interface{}
 		var err error
 		if suiteId := r.FormValue("suite"); suiteId != "" {
@@ -59,11 +69,100 @@ func (v *v1) attachmentCollection() http.HandlerFunc {
 		} else if caseId := r.FormValue("case"); caseId != "" {
 			a, err = v.repo.CaseAttachments(caseId)
 		} else {
-			return httpError{code: http.StatusBadRequest}
+			return errHttp{code: http.StatusBadRequest}
 		}
 		if err != nil {
 			return err
 		}
 		return writeJson(w, r, a)
-	})
+	}
+}
+
+func (v *v1) suiteHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id := pathParam(r)
+		s, err := v.repo.Suite(id)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, &s)
+	}
+}
+
+func (v *v1) suiteCollHandler() http.Handler {
+	return sse.NewMiddleware(
+		errHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
+			padGtStr := r.FormValue("pad_gt")
+			id := r.FormValue("id")
+			padLtStr := r.FormValue("pad_lt")
+			padGt, err := strconv.ParseInt(padGtStr, 10, 32)
+			if err != nil {
+				return errHttp{code: http.StatusBadRequest, cause: err}
+			}
+			padLt, err := strconv.ParseInt(padLtStr, 10, 32)
+			if err != nil {
+				return errHttp{code: http.StatusBadRequest, cause: err}
+			}
+
+			watcher, err := v.repo.WatchSuites(id, int(padLt), int(padGt))
+			if err != nil {
+				return err
+			}
+			defer watcher.Close()
+
+			onChange := func() (bool, error) {
+				timer := time.NewTimer(15 * time.Second)
+				defer timer.Stop()
+				select {
+				case changes := <-watcher.Changes():
+					for _, c := range changes {
+						b, err := json.Marshal(c)
+						if err != nil {
+							panic(err)
+						}
+						_, err = sse.Send(w, sse.WithEventType(c.Type()),
+							sse.WithData(string(b)))
+						if err != nil {
+							return false, err
+						}
+					}
+				case <-timer.C:
+					_, err := sse.Send(w, sse.WithComment("keep-alive"))
+					if err != nil {
+						return false, err
+					}
+				case <-r.Context().Done():
+					return false, nil
+				}
+				return true, nil
+			}
+
+			for {
+				if ok, err := onChange(); !ok {
+					return err
+				}
+			}
+		}))
+}
+
+func (v *v1) caseHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id := pathParam(r)
+		c, err := v.repo.Case(id)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, &c)
+	}
+}
+
+func (v *v1) logLineHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id := pathParam(r)
+		ll, err := v.repo.LogLine(id)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, &ll)
+	}
 }

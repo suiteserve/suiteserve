@@ -32,20 +32,22 @@ func suiteIndexStartedAtPivot(v string) string {
 		`,"id":"` + gjson.Get(v, "id").String() + `"}`
 }
 
-type notFoundErr struct{}
+type foundErr interface {
+	Found() bool
+}
 
-func (e notFoundErr) Error() string {
+type errNotFound struct{}
+
+func (e errNotFound) Error() string {
 	return "not found"
 }
 
-func (e notFoundErr) Is(target error) bool {
-	var foundErr interface {
-		Found() bool
-	}
+func (e errNotFound) Is(target error) bool {
+	var foundErr foundErr
 	return errors.As(target, &foundErr) && e.Found() == foundErr.Found()
 }
 
-func (e notFoundErr) Found() bool {
+func (e errNotFound) Found() bool {
 	return false
 }
 
@@ -174,17 +176,17 @@ func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{},
 	return err
 }
 
-func (r *Repo) getById(coll Coll, id string, x interface{}) error {
+func (r *Repo) byId(coll Coll, id string, x interface{}) error {
 	return r.db.View(func(tx *buntdb.Tx) error {
-		return r.getByIdTx(tx, coll, id, x)
+		return r.byIdTx(tx, coll, id, x)
 	})
 }
 
-func (r *Repo) getByIdTx(tx *buntdb.Tx, coll Coll, id string,
+func (r *Repo) byIdTx(tx *buntdb.Tx, coll Coll, id string,
 	x interface{}) error {
 	v, err := tx.Get(key(coll, id))
 	if err == buntdb.ErrNotFound {
-		return notFoundErr{}
+		return errNotFound{}
 	} else if err != nil {
 		return err
 	}
@@ -205,9 +207,9 @@ func (r *Repo) genId() string {
 		atomic.AddUint32(&r.idInc, 1)&0xff, b)
 }
 
-func unmarshalJsonVals(vals []string, f func(i int) interface{}) {
+func unmarshalJsonVals(vals []string, fn func(i int) interface{}) {
 	for i, v := range vals {
-		if err := json.Unmarshal([]byte(v), f(i)); err != nil {
+		if err := json.Unmarshal([]byte(v), fn(i)); err != nil {
 			panic(err)
 		}
 	}
@@ -218,37 +220,8 @@ type entry struct {
 	v string
 }
 type itr func(k, v string) bool
-type consumer func(k, v string)
-type less func(a, b string) bool
 
-// newSkipKeyCond returns a new itr that wraps an inner itr, skipping the first
-// entry iff that first entry's key is equal to the given key. This can turn a
-// DescendLessOrEqual, for example, into a DescendLessThan (which doesn't
-// exist).
-func newSkipKeyCond(key string, inner itr) itr {
-	var fn itr
-	fn = func(k, v string) bool {
-		fn = inner
-		return k == key || inner(k, v)
-	}
-	return func(k, v string) bool {
-		return fn(k, v)
-	}
-}
-
-func newUntilKeyCond(key string) itr {
-	return func(k, v string) bool {
-		return k != key
-	}
-}
-
-func newGreaterOrEqual(pivot string, less less) itr {
-	return func(k, v string) bool {
-		return less(pivot, v)
-	}
-}
-
-func newLimitCond(limit int) itr {
+func limitCond(limit int) itr {
 	if limit < 0 {
 		return func(k, v string) bool {
 			return true
@@ -264,7 +237,7 @@ func newLimitCond(limit int) itr {
 	}
 }
 
-func newFirstCond(first itr) itr {
+func firstCond(first itr) itr {
 	var fn itr
 	rest := func(k, v string) bool {
 		return true
@@ -278,7 +251,7 @@ func newFirstCond(first itr) itr {
 	}
 }
 
-func newRestCond(rest itr) itr {
+func restCond(rest itr) itr {
 	var fn itr
 	fn = func(k, v string) bool {
 		fn = rest
@@ -289,10 +262,10 @@ func newRestCond(rest itr) itr {
 	}
 }
 
-// newAndCond returns a new itr that calls each given cond, returning true iff
-// all of the given conds return true for that entry. Short-circuits as logical
-// AND would.
-func newAndCond(conds ...itr) itr {
+// andCond returns a new itr that calls each given cond, returning true iff all
+// of the given conds return true for that entry. Short-circuits as logical AND
+// would.
+func andCond(conds ...itr) itr {
 	return func(k, v string) bool {
 		for _, fn := range conds {
 			if !fn(k, v) {
@@ -301,15 +274,6 @@ func newAndCond(conds ...itr) itr {
 		}
 		return true
 	}
-}
-
-func getId(key string) string {
-	for i, r := range key {
-		if r == ':' {
-			return key[i+1:]
-		}
-	}
-	panic("id not in string")
 }
 
 func key(coll Coll, id string) string {

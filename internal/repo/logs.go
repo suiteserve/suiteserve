@@ -3,7 +3,6 @@ package repo
 type LogLevelType string
 
 const (
-	LogLevelTypeUnknown LogLevelType = "unknown"
 	LogLevelTypeTrace   LogLevelType = "trace"
 	LogLevelTypeDebug   LogLevelType = "debug"
 	LogLevelTypeInfo    LogLevelType = "info"
@@ -27,6 +26,6 @@ func (r *Repo) InsertLogLine(l LogLine) (id string, err error) {
 
 func (r *Repo) LogLine(id string) (LogLine, error) {
 	var l LogLine
-	err := r.getById(LogColl, id, &l)
+	err := r.byId(LogColl, id, &l)
 	return l, err
 }
