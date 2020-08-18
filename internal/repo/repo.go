@@ -3,7 +3,6 @@ package repo
 import (
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/tidwall/buntdb"
 	"github.com/tidwall/gjson"
@@ -30,25 +29,6 @@ const (
 func suiteIndexStartedAtPivot(v string) string {
 	return `{"started_at":` + gjson.Get(v, "started_at").String() +
 		`,"id":"` + gjson.Get(v, "id").String() + `"}`
-}
-
-type foundErr interface {
-	Found() bool
-}
-
-type errNotFound struct{}
-
-func (e errNotFound) Error() string {
-	return "not found"
-}
-
-func (e errNotFound) Is(target error) bool {
-	var foundErr foundErr
-	return errors.As(target, &foundErr) && e.Found() == foundErr.Found()
-}
-
-func (e errNotFound) Found() bool {
-	return false
 }
 
 type Entity struct {
@@ -156,8 +136,15 @@ func (r *Repo) setFunc(coll Coll, id string, x interface{},
 	})
 }
 
-func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{},
-	updateX func()) error {
+func (r *Repo) update(coll Coll, id string, x interface{},
+	updateX func() error) error {
+	return r.db.Update(func(tx *buntdb.Tx) error {
+		return r.updateTx(tx, coll, id, x, updateX)
+	})
+}
+
+func (r *Repo) updateTx(tx *buntdb.Tx, coll Coll, id string, x interface{},
+	updateX func() error) error {
 	k := key(coll, id)
 	v, err := tx.Get(k)
 	if err == nil {
@@ -167,7 +154,9 @@ func (r *Repo) update(tx *buntdb.Tx, coll Coll, id string, x interface{},
 	} else if err != buntdb.ErrNotFound {
 		return err
 	}
-	updateX()
+	if err := updateX(); err != nil {
+		return err
+	}
 	b, err := json.Marshal(x)
 	if err != nil {
 		panic(err)

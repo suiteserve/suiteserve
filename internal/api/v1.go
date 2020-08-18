@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"github.com/suiteserve/suiteserve/sse"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -40,7 +42,7 @@ func NewV1Handler(repo Repo) http.Handler {
 	mux.Handle("/suites/",
 		pathParamMw("/suites/", v1.suiteHandler()))
 	mux.Handle("/suites",
-		v1.suiteCollHandler())
+		sse.NewMiddleware(v1.suiteCollHandler()))
 	mux.Handle("/cases/",
 		pathParamMw("/cases/", v1.caseHandler()))
 	mux.Handle("/logs/",
@@ -89,60 +91,59 @@ func (v *v1) suiteHandler() errHandlerFunc {
 	}
 }
 
-func (v *v1) suiteCollHandler() http.Handler {
-	return sse.NewMiddleware(
-		errHandlerFunc(func(w http.ResponseWriter, r *http.Request) error {
-			padGtStr := r.FormValue("pad_gt")
-			id := r.FormValue("id")
-			padLtStr := r.FormValue("pad_lt")
-			padGt, err := strconv.ParseInt(padGtStr, 10, 32)
-			if err != nil {
-				return errHttp{code: http.StatusBadRequest, cause: err}
-			}
-			padLt, err := strconv.ParseInt(padLtStr, 10, 32)
-			if err != nil {
-				return errHttp{code: http.StatusBadRequest, cause: err}
-			}
+func (v *v1) suiteCollHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		padGtStr := r.FormValue("pad_gt")
+		id := r.FormValue("id")
+		padLtStr := r.FormValue("pad_lt")
+		padGt, err := strconv.ParseInt(padGtStr, 10, 32)
+		if err != nil {
+			return errHttp{code: http.StatusBadRequest, cause: err}
+		}
+		padLt, err := strconv.ParseInt(padLtStr, 10, 32)
+		if err != nil {
+			return errHttp{code: http.StatusBadRequest, cause: err}
+		}
 
-			watcher, err := v.repo.WatchSuites(id, int(padLt), int(padGt))
-			if err != nil {
+		watcher, err := v.repo.WatchSuites(id, int(padLt), int(padGt))
+		if err != nil {
+			return err
+		}
+		defer watcher.Close()
+
+		for {
+			if ok, err := suiteWatchWriter(r.Context(), w, watcher); !ok {
 				return err
 			}
-			defer watcher.Close()
+		}
+	}
+}
 
-			onChange := func() (bool, error) {
-				timer := time.NewTimer(15 * time.Second)
-				defer timer.Stop()
-				select {
-				case changes := <-watcher.Changes():
-					for _, c := range changes {
-						b, err := json.Marshal(c)
-						if err != nil {
-							panic(err)
-						}
-						_, err = sse.Send(w, sse.WithEventType(c.Type()),
-							sse.WithData(string(b)))
-						if err != nil {
-							return false, err
-						}
-					}
-				case <-timer.C:
-					_, err := sse.Send(w, sse.WithComment("keep-alive"))
-					if err != nil {
-						return false, err
-					}
-				case <-r.Context().Done():
-					return false, nil
-				}
-				return true, nil
+func suiteWatchWriter(ctx context.Context, w io.Writer,
+	watcher *repo.SuiteWatcher) (bool, error) {
+	timer := time.NewTimer(15 * time.Second)
+	defer timer.Stop()
+	select {
+	case changes := <-watcher.Changes():
+		for _, c := range changes {
+			b, err := json.Marshal(c)
+			if err != nil {
+				panic(err)
 			}
-
-			for {
-				if ok, err := onChange(); !ok {
-					return err
-				}
+			_, err = sse.Send(w, sse.WithEventType(c.Type()),
+				sse.WithData(string(b)))
+			if err != nil {
+				return false, err
 			}
-		}))
+		}
+	case <-timer.C:
+		if _, err := sse.Send(w, sse.WithComment("keep-alive")); err != nil {
+			return false, err
+		}
+	case <-ctx.Done():
+		return false, nil
+	}
+	return true, nil
 }
 
 func (v *v1) caseHandler() errHandlerFunc {

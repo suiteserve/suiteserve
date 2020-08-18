@@ -1,6 +1,8 @@
 package repo
 
 import (
+	"github.com/golang/protobuf/protoc-gen-go/generator"
+	fieldmask_utils "github.com/mennanov/fieldmask-utils"
 	"github.com/tidwall/buntdb"
 )
 
@@ -39,26 +41,35 @@ type SuiteAgg struct {
 	StartedCount int64 `json:"started_count"`
 }
 
-type SuitePage struct {
-	SuiteAgg
-	HasMore bool    `json:"has_more"`
-	Suites  []Suite `json:"suites"`
-}
-
 func (r *Repo) InsertSuite(s Suite) (id string, err error) {
 	return r.insertFunc(SuiteColl, &s, func(tx *buntdb.Tx) error {
 		var agg SuiteAgg
-		err := r.update(tx, SuiteAggColl, "", &agg, func() {
+		err := r.updateTx(tx, SuiteAggColl, "", &agg, func() error {
 			agg.Version++
 			agg.TotalCount++
 			if s.Status == SuiteStatusStarted {
 				agg.StartedCount++
 			}
+			return nil
 		})
 		if err != nil {
 			return err
 		}
 		r.notifyHandlers([]Change{SuiteUpsert{Suite: s}, SuiteAggUpdate{agg}})
+		return nil
+	})
+}
+
+func (r *Repo) UpdateSuite(s1 Suite, mask Mask) error {
+	var s0 Suite
+	return r.update(SuiteColl, s1.Id, &s0, func() error {
+		fm, err := fieldmask_utils.MaskFromPaths(mask, generator.CamelCase)
+		if err != nil {
+			return errBadMask{err}
+		}
+		if err := fieldmask_utils.StructToStruct(fm, &s1, &s0); err != nil {
+			return errBadMask{err}
+		}
 		return nil
 	})
 }

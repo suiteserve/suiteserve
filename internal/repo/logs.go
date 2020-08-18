@@ -3,11 +3,11 @@ package repo
 type LogLevelType string
 
 const (
-	LogLevelTypeTrace   LogLevelType = "trace"
-	LogLevelTypeDebug   LogLevelType = "debug"
-	LogLevelTypeInfo    LogLevelType = "info"
-	LogLevelTypeWarn    LogLevelType = "warn"
-	LogLevelTypeError   LogLevelType = "error"
+	LogLevelTypeTrace LogLevelType = "trace"
+	LogLevelTypeDebug LogLevelType = "debug"
+	LogLevelTypeInfo  LogLevelType = "info"
+	LogLevelTypeWarn  LogLevelType = "warn"
+	LogLevelTypeError LogLevelType = "error"
 )
 
 type LogLine struct {
@@ -25,7 +25,7 @@ func (r *Repo) InsertLogLine(l LogLine) (id string, err error) {
 }
 
 func (r *Repo) LogLine(id string) (LogLine, error) {
-	var l LogLine
-	err := r.byId(LogColl, id, &l)
-	return l, err
+	var ll LogLine
+	err := r.byId(LogColl, id, &ll)
+	return ll, err
 }

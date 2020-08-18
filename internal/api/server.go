@@ -137,8 +137,8 @@ func writeJson(w http.ResponseWriter, r *http.Request, src interface{}) error {
 }
 
 func isNotFound(err error) bool {
-	var foundErr interface {
-		Found() bool
+	var errNotFound interface {
+		NotFound() bool
 	}
-	return errors.As(err, &foundErr) && !foundErr.Found()
+	return errors.As(err, &errNotFound)
 }
