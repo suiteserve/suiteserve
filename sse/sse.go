@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-type Event func(io.Writer) (int, error)
+type Event func(w io.Writer) (n int, err error)
 
 // WithComment returns an Event that writes comment events to the stream.
 func WithComment(s string) Event {
@@ -90,10 +90,10 @@ func Send(w io.Writer, events ...Event) (n int, err error) {
 }
 
 func sendFields(w io.Writer, k, v string) (int, error) {
-	if v == "" {
-		return w.Write([]byte(k + "\n"))
-	}
 	return forLines(v, func(line string) (int, error) {
+		if line == "" {
+			return w.Write([]byte(k + "\n"))
+		}
 		if strings.HasPrefix(line, " ") {
 			line = " " + line
 		}
@@ -101,13 +101,13 @@ func sendFields(w io.Writer, k, v string) (int, error) {
 	})
 }
 
-func forLines(s string, f func(line string) (int, error)) (int, error) {
-	lines := strings.FieldsFunc(s, func(r rune) bool {
-		return r == '\r' || r == '\n'
-	})
+func forLines(s string, fn func(line string) (int, error)) (int, error) {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	lines := strings.Split(s, "\n")
 	var n int
 	for _, line := range lines {
-		n2, err := f(line)
+		n2, err := fn(line)
 		n += n2
 		if err != nil {
 			return n, err

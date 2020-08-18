@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/suiteserve/suiteserve/sse"
+	"io/ioutil"
 	"strconv"
 	"testing"
 )
@@ -41,9 +42,9 @@ var sendTests = []struct {
 	{
 		events: []sse.Event{
 			sse.WithId("123"),
-			sse.WithEventType("abc\r\n cba"),
+			sse.WithEventType("abc\r\n c\n\rba"),
 		},
-		want: "id:123\nevent:abc\nevent:  cba\n\n",
+		want: "id:123\nevent:abc\nevent:  c\nevent\nevent:ba\n\n",
 	},
 	{
 		events: []sse.Event{
@@ -54,12 +55,12 @@ var sendTests = []struct {
 	},
 	{
 		events: []sse.Event{
-			sse.WithRetry(999),
-			sse.WithEventType("abc\r\ncba"),
-			sse.WithId("  123"),
-			sse.WithData("hello"),
+			sse.WithRetry(1),
+			sse.WithEventType("x\r\n\n\ry"),
+			sse.WithId("  ab"),
+			sse.WithData("hi"),
 		},
-		want: "retry:999\nevent:abc\nevent:cba\nid:   123\ndata:hello\n\n",
+		want: "retry:1\nevent:x\nevent\nevent\nevent:y\nid:   ab\ndata:hi\n\n",
 	},
 	{
 		events: []sse.Event{sse.WithRetry(0), sse.WithData("a,b\r\n,c")},
@@ -76,6 +77,20 @@ func TestSend(t *testing.T) {
 			assert.Equal(t, len(st.want), n)
 			assert.Equal(t, st.want, out.String())
 		})
+	}
+}
+
+var sendBenchmark = []sse.Event{
+	sse.WithComment("keep-alive"),
+	sse.WithId("1badb002"),
+	sse.WithEventType("insert"),
+	sse.WithData("Lorem\r\nipsum\ndolor\rsit\n\ramet."),
+	sse.WithRetry(500),
+}
+
+func BenchmarkSend(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_, _ = sse.Send(ioutil.Discard, sendBenchmark...)
 	}
 }
 
