@@ -81,13 +81,6 @@ func secMw(h http.Handler) http.HandlerFunc {
 	}
 }
 
-func uiSecMw(h http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		h.ServeHTTP(w, r)
-	}
-}
-
 func uiHandler(publicDir string) errHandlerFunc {
 	fileRepo := http.FileServer(http.Dir(publicDir))
 	return func(w http.ResponseWriter, r *http.Request) error {

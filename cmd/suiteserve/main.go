@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 )
 
 var (
@@ -34,8 +35,8 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	log.Printf("Using database at %q", c.Storage.Db)
-	r, err := repo.Open(c.Storage.Db)
+	log.Printf("Using database at %q", "")
+	r, err := repo.Open("")
 	if err != nil {
 		log.Fatalf("open repo: %v", err)
 	}
@@ -52,7 +53,8 @@ func main() {
 	}
 
 	opts := api.Options{
-		Addr:            net.JoinHostPort(c.Http.Host, c.Http.Port),
+		Addr:            net.JoinHostPort(c.Http.Host,
+			strconv.FormatUint(uint64(c.Http.Port), 10)),
 		TlsCertFile:     c.Http.TlsCertFile,
 		TlsKeyFile:      c.Http.TlsKeyFile,
 		PublicDir:       c.Http.PublicDir,

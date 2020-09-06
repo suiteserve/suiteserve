@@ -1,29 +1,39 @@
 package repo
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/asdine/storm/v3"
+)
 
-type errBadMask struct {
+type errBadJson struct{
 	cause error
 }
 
-func (e errBadMask) Error() string {
-	return fmt.Sprintf("bad mask: %v", e.cause)
+func (e errBadJson) Error() string {
+	return fmt.Sprintf("bad json: %v", e.cause)
 }
 
-func (e errBadMask) BadMask() bool {
+func (errBadJson) BadJson() bool {
 	return true
 }
 
-func (e errBadMask) Unwrap() error {
+func (e errBadJson) Unwrap() error {
 	return e.cause
 }
 
 type errNotFound struct{}
 
-func (e errNotFound) Error() string {
+func (errNotFound) Error() string {
 	return "not found"
 }
 
-func (e errNotFound) NotFound() bool {
+func (errNotFound) NotFound() bool {
 	return true
+}
+
+func wrapNotFoundErr(err error) error {
+	if err == storm.ErrNotFound {
+		return errNotFound{}
+	}
+	return err
 }

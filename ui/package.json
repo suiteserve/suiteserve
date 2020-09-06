@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "serve": "npx vue-cli-service serve",
+    "start": "npx vue-cli-service serve",
     "build": "npx vue-cli-service build"
   },
   "dependencies": {
-    "@suiteserve/protocol-web": "0.1.16",
     "vue": "^2.6.11",
     "vue-router": "^3.3.4",
     "vuex": "^3.5.1"

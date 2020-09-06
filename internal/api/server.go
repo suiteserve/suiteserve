@@ -33,7 +33,7 @@ func (o Options) handler() http.Handler {
 	m.Handle(o.UserContentHost+"/",
 		secMw(userContentHandler(o.UserContentRepo, o.UserContentDir)))
 	m.Handle("/",
-		secMw(uiSecMw(uiHandler(o.PublicDir))))
+		secMw(uiHandler(o.PublicDir)))
 	return logMw(&m)
 }
 
@@ -122,8 +122,8 @@ func readJson(r *http.Request, dst interface{}) error {
 	return nil
 }
 
-func writeJson(w http.ResponseWriter, r *http.Request, src interface{}) error {
-	b, err := json.Marshal(src)
+func writeJson(w http.ResponseWriter, r *http.Request, x interface{}) error {
+	b, err := json.Marshal(x)
 	if err != nil {
 		panic(err)
 	}

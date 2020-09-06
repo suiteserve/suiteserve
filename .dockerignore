@@ -1,4 +1,8 @@
+/build/
 /data/
+/tls/
 /ui/dist/
 /ui/node_modules/
 /vendor/
+
+/suiteserve

@@ -23,7 +23,7 @@ var setQueryTests = []struct {
 		iw: func(ids []string) setQueryInputWant {
 			return setQueryInputWant{
 				want: []repo.Change{
-					repo.SuiteAggUpdate{
+					repo.SuiteAggUpsert{
 						SuiteAgg: repo.SuiteAgg{},
 					},
 				},
@@ -36,7 +36,7 @@ var setQueryTests = []struct {
 				padLt: 2,
 				padGt: 4,
 				want: []repo.Change{
-					repo.SuiteAggUpdate{
+					repo.SuiteAggUpsert{
 						SuiteAgg: repo.SuiteAgg{},
 					},
 				},
@@ -52,7 +52,7 @@ var setQueryTests = []struct {
 					repo.SuiteUpsert{
 						Suite: repo.Suite{Entity: repo.Entity{Id: ids[0]}},
 					},
-					repo.SuiteAggUpdate{
+					repo.SuiteAggUpsert{
 						SuiteAgg: repo.SuiteAgg{
 							VersionedEntity: repo.VersionedEntity{
 								Version: 1,
@@ -106,7 +106,7 @@ var setQueryTests = []struct {
 							StartedAt: 100,
 						},
 					},
-					repo.SuiteAggUpdate{
+					repo.SuiteAggUpsert{
 						SuiteAgg: repo.SuiteAgg{
 							VersionedEntity: repo.VersionedEntity{
 								Version: 5,

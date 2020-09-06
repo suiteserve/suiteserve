@@ -1,11 +1,12 @@
 module.exports = {
   devServer: {
     host: 'localhost',
+    port: 8081,
     proxy: 'https://localhost:8080',
     https: true,
-    key: '../config/key.pem',
-    cert: '../config/cert.pem',
-    ca: '../config/ca.pem',
+    key: '../tls/key.pem',
+    cert: '../tls/cert.pem',
+    ca: '../tls/ca.pem',
   },
   integrity: true,
 };

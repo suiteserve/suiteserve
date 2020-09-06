@@ -8,18 +8,24 @@ import (
 type Config struct {
 	Http struct {
 		Host            string `json:"host"`
-		UserContentHost string `json:"user_content_host"`
-		Port            string `json:"port"`
+		Port            uint16 `json:"port"`
 		TlsCertFile     string `json:"tls_cert_file"`
 		TlsKeyFile      string `json:"tls_key_file"`
 		PublicDir       string `json:"public_dir"`
+		UserContentHost string `json:"user_content_host"`
 	} `json:"http"`
 	Storage struct {
-		Db          string `json:"db"`
 		UserContent struct {
 			Dir       string `json:"dir"`
 			MaxSizeMb int    `json:"max_size_mb"`
 		} `json:"user_content"`
+		Rethinkdb struct {
+			Host     string `json:"host"`
+			Port     uint16 `json:"port"`
+			User     string `json:"user"`
+			PassFile string `json:"pass_file"`
+			Db       string `json:"db"`
+		} `json:"rethinkdb"`
 	} `json:"storage"`
 }
 
@@ -29,5 +35,8 @@ func Load(filename string) (*Config, error) {
 		return nil, err
 	}
 	var c Config
-	return &c, json.Unmarshal(b, &c)
+	if err := json.Unmarshal(b, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

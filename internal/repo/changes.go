@@ -1,54 +1,38 @@
 package repo
 
 import (
-	"encoding/json"
-	"errors"
-	"github.com/tidwall/buntdb"
+	"github.com/asdine/storm/v3"
+	"sync"
 )
-
-type Mask []string
 
 type Change interface {
 	Type() string
+	Data() []byte
 }
 
-type SuiteAggUpdate struct {
-	SuiteAgg
+type ChangeList []Change
+
+type commit struct{
+	tx storm.Node
+	cl ChangeList
 }
 
-func (u SuiteAggUpdate) Type() string {
-	return "suite_agg_update"
+type bufWatcher struct {
+	in  chan<- ChangeList
+	out <-chan ChangeList
 }
 
-type SuiteUpsert struct {
-	Suite
-	Mask `json:"mask,omitempty"`
-}
-
-func (u SuiteUpsert) Type() string {
-	return "suite_upsert"
-}
-
-type changeHandler interface {
-	handleChanges(changes []Change)
-}
-
-type watcher struct {
-	in  chan<- []Change
-	out <-chan []Change
-}
-
-func newWatcher() *watcher {
-	in := make(chan []Change)
-	out := make(chan []Change)
-	var buf [][]Change
-	getNext := func() []Change {
+func newBufWatcher() bufWatcher {
+	in := make(chan ChangeList)
+	out := make(chan ChangeList)
+	var buf []ChangeList
+	getNext := func() ChangeList {
 		if len(buf) == 0 {
 			return nil
 		}
 		return buf[0]
 	}
-	getOut := func() chan<- []Change {
+	getOut := func() chan<- ChangeList {
 		if len(buf) == 0 {
 			return nil
 		}
@@ -58,120 +42,85 @@ func newWatcher() *watcher {
 		defer close(out)
 		for {
 			select {
-			case changes, ok := <-in:
+			case v, ok := <-in:
 				if !ok {
 					return
 				}
-				buf = append(buf, changes)
+				buf = append(buf, v)
 			case getOut() <- getNext():
 				buf = buf[1:]
 			}
 		}
 	}()
-	return &watcher{in, out}
+	return bufWatcher{in, out}
 }
 
-type SuiteWatcher struct {
-	r *Repo
-	*watcher
-
-	id    string
-	padLt int
-	padGt int
-
-	n   int
-	min entry
-	max entry
+type watcher interface {
+	onCommit(c commit) error
 }
 
-func (r *Repo) WatchSuites(id string, padLt, padGt int) (*SuiteWatcher, error) {
-	w := SuiteWatcher{
-		r:       r,
-		watcher: newWatcher(),
+type changeBroker struct {
+	mu       sync.Mutex
+	watchers []watcher
+}
+
+func (b *changeBroker) publish(c commit) (err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, w := range b.watchers {
+		if err2 := w.onCommit(c); err2 != nil && err == nil {
+			err = err2
+		}
 	}
-	r.addHandler(&w)
-	return &w, r.db.View(func(tx *buntdb.Tx) error {
-		var changes []Change
-		add := func(k, v string) bool {
-			var upsert SuiteUpsert
-			if err := json.Unmarshal([]byte(v), &upsert.Suite); err != nil {
-				panic(err)
-			}
-			changes = append(changes, upsert)
-			return true
-		}
-		var n int
-		lt := func(k, v string) bool {
-			w.min = entry{k, v}
-			n++
-			return add(k, v)
-		}
-		eq := func(k, v string) bool {
-			w.min = entry{k, v}
-			w.max = entry{k, v}
-			n++
-			return add(k, v)
-		}
-		gt := func(k, v string) bool {
-			w.max = entry{k, v}
-			n++
-			return add(k, v)
-		}
-		if err := itrAroundSuite(tx, id, padLt, padGt, lt, eq, gt); err != nil {
-			return err
-		}
-		w.id = id
-		w.padLt = padLt
-		w.padGt = padGt
-		w.n = n
-
-		var agg SuiteAgg
-		err := r.byId(SuiteAggColl, "", &agg)
-		if err != nil && !errors.Is(err, errNotFound{}) {
-			return err
-		}
-		w.in <- append(changes, SuiteAggUpdate{agg})
-		return nil
-	})
+	return
 }
 
-func (w *SuiteWatcher) Close() {
-	w.r.removeHandler(w)
-	close(w.in)
+func (b *changeBroker) watch(w watcher) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.watchers = append(b.watchers, w)
 }
 
-func (w *SuiteWatcher) Changes() <-chan []Change {
-	return w.out
+func (b *changeBroker) unwatch(w watcher) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for i, w2 := range b.watchers {
+		if w2 == w {
+			b.watchers = append(b.watchers[:i], b.watchers[i+1:]...)
+			return
+		}
+	}
 }
 
-func itrAroundSuite(tx *buntdb.Tx, id string, padLt, padGt int,
-	lt, eq, gt itr) error {
-	firstEq := firstCond(eq)
-	restLt := restCond(lt)
-	restGt := restCond(gt)
-	if id == "" {
-		return tx.Descend(suiteIndexStartedAt,
-			andCond(firstEq, restLt, limitCond(padGt+padLt)))
-	}
-	idVal, err := tx.Get(key(SuiteColl, id))
-	if err == buntdb.ErrNotFound {
-		return errNotFound{}
-	} else if err != nil {
-		return err
-	}
-	pivot := suiteIndexStartedAtPivot(idVal)
-	err = tx.AscendGreaterOrEqual(suiteIndexStartedAt, pivot,
-		andCond(firstEq, restGt, limitCond(padGt)))
-	if err != nil {
-		return err
-	}
-	if padLt == 0 {
-		return nil
-	}
-	return tx.DescendLessOrEqual(suiteIndexStartedAt, pivot,
-		andCond(restLt, limitCond(padLt)))
+type SuiteUpsert struct {
+	s1 *Suite
+	s0 *Suite
 }
 
-func (w *SuiteWatcher) handleChanges(changes []Change) {
+func (SuiteUpsert) Type() string {
+	return "suite_upsert"
+}
 
+func (u *SuiteUpsert) Data() []byte {
+	return mustMarshalJson(u.s1)
+}
+
+type SuiteDelete string
+
+func (SuiteDelete) Type() string {
+	return "suite_delete"
+}
+
+func (d *SuiteDelete) Data() []byte {
+	return mustMarshalJson(d)
+}
+
+type SuiteAggUpsert SuiteAgg
+
+func (SuiteAggUpsert) Type() string {
+	return "suite_agg_upsert"
+}
+
+func (u *SuiteAggUpsert) Data() []byte {
+	return mustMarshalJson(u)
 }

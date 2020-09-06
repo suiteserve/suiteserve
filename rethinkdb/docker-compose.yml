@@ -1,0 +1,13 @@
+version: '2.0'
+
+services:
+  rethinkdb:
+    image: rethinkdb:2
+    ports:
+    - 8082:8080
+    - 28015:28015
+    volumes:
+    - rethinkdb:/data
+
+volumes:
+  rethinkdb:

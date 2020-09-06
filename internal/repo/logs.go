@@ -11,21 +11,22 @@ const (
 )
 
 type LogLine struct {
-	Entity
-	CaseId    string       `json:"case_id"`
+	Entity    `storm:"inline"`
+	CaseId    string           `json:"case_id"`
 	Idx       int64        `json:"idx"`
-	Level     LogLevelType `json:"level"`
-	Trace     string       `json:"trace"`
-	Message   string       `json:"message"`
-	Timestamp int64        `json:"timestamp"`
+	Level     LogLevelType `json:"level,omitempty"`
+	Trace     string       `json:"trace,omitempty"`
+	Message   string       `json:"message,omitempty"`
+	Timestamp int64        `json:"timestamp,omitempty"`
 }
 
-func (r *Repo) InsertLogLine(l LogLine) (id string, err error) {
-	return r.insert(LogColl, &l)
+func (r *Repo) InsertLogLine(ll LogLine) (string, error) {
+	// err := r.db.Save(&ll)
+	// return ll.Id, err
+	return "", nil
 }
 
-func (r *Repo) LogLine(id string) (LogLine, error) {
-	var ll LogLine
-	err := r.byId(LogColl, id, &ll)
-	return ll, err
+func (r *Repo) LogLine(id string) (ll LogLine, err error) {
+	// err = wrapNotFoundErr(r.db.One("Id", id, &ll))
+	return
 }

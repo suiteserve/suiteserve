@@ -1,17 +1,23 @@
 {
   "http": {
     "host": "localhost",
-    "user_content_host": "localhostusercontent",
-    "port": "8080",
-    "tls_cert_file": "config/cert.pem",
-    "tls_key_file": "config/key.pem",
-    "public_dir": "ui/dist/"
+    "port": 8080,
+    "tls_cert_file": "tls/cert.pem",
+    "tls_key_file": "tls/key.pem",
+    "public_dir": "ui/dist/",
+    "user_content_host": "localhostusercontent"
   },
   "storage": {
-    "db": "data/db",
     "user_content": {
-      "dir": "data/user_content/",
+      "dir": "data/",
       "max_size_mb": 64
+    },
+    "rethinkdb": {
+      "host": "localhost",
+      "port": 28015,
+      "user": "suiteserve",
+      "pass_file": "config/rethinkdb_pass",
+      "db": "suiteserve"
     }
   }
 }

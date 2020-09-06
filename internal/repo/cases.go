@@ -21,27 +21,29 @@ const (
 )
 
 type Case struct {
-	Entity
-	VersionedEntity
-	SuiteId     string                     `json:"suite_id"`
-	Name        string                     `json:"name"`
-	Description string                     `json:"description"`
-	Tags        []string                   `json:"tags"`
-	Idx         int64                      `json:"idx"`
-	Args        map[string]json.RawMessage `json:"args"`
-	Status      CaseStatus                 `json:"status"`
-	Result      CaseResult                 `json:"result"`
-	CreatedAt   int64                      `json:"created_at"`
-	StartedAt   int64                      `json:"started_at"`
-	FinishedAt  int64                      `json:"finished_at"`
+	Entity          `storm:"inline"`
+	VersionedEntity `storm:"inline"`
+	SuiteId         string                         `json:"suite_id"`
+	Name            string                     `json:"name,omitempty"`
+	Description     string                     `json:"description,omitempty"`
+	Tags            []string                   `json:"tags,omitempty"`
+	Idx             int64                      `json:"idx"`
+	Args            map[string]json.RawMessage `json:"args,omitempty"`
+	Status          CaseStatus                 `json:"status,omitempty"`
+	Result          CaseResult                 `json:"result,omitempty"`
+	CreatedAt       int64                      `json:"created_at,omitempty"`
+	StartedAt       int64                      `json:"started_at,omitempty"`
+	FinishedAt      int64                      `json:"finished_at,omitempty"`
 }
 
-func (r *Repo) InsertCase(c Case) (id string, err error) {
-	return r.insert(CaseColl, &c)
+func (r *Repo) InsertCase(c Case) (string, error) {
+	// err := r.db.Save(&c)
+	// return c.Id, err
+	// return c.Id, nil
+	return "", nil
 }
 
-func (r *Repo) Case(id string) (Case, error) {
-	var c Case
-	err := r.byId(CaseColl, id, &c)
-	return c, err
+func (r *Repo) Case(id string) (c Case, err error) {
+	// err = wrapNotFoundErr(r.db.One("Id", id, &c))
+	return
 }

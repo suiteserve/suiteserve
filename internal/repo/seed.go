@@ -3,7 +3,7 @@ package repo
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/tidwall/buntdb"
+	bolt "go.etcd.io/bbolt"
 	"log"
 	"math/rand"
 )
@@ -11,10 +11,10 @@ import (
 var seedRand = rand.New(rand.NewSource(1597422555541))
 
 func (r *Repo) Seed() error {
-	var n int
-	err := r.db.View(func(tx *buntdb.Tx) (err error) {
-		n, err = tx.Len()
-		return err
+	var n int64
+	err := r.db.View(func(tx *bolt.Tx) error {
+		n = tx.Size()
+		return nil
 	})
 	if err != nil {
 		return err
@@ -30,19 +30,19 @@ func (r *Repo) Seed() error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("> insert suite %s\n", id)
+		fmt.Printf("> insert suite %q\n", id)
 		for j := 0; j < int(s.PlannedCases); j++ {
 			id, err := r.InsertCase(genCase(id))
 			if err != nil {
 				return err
 			}
-			fmt.Printf("  > insert case %s\n", id)
+			fmt.Printf("  > insert case %q\n", id)
 			for k := 0; k < genIdx(60); k++ {
 				id, err := r.InsertLogLine(genLogLine(id))
 				if err != nil {
 					return err
 				}
-				fmt.Printf("    > insert log line %s\n", id)
+				fmt.Printf("    > insert log line %q\n", id)
 			}
 		}
 	}
