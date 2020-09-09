@@ -19,7 +19,7 @@ var (
 	debugFlag = flag.Bool("debug", false,
 		"Whether to print extra debug information with log messages")
 	seedFlag = flag.Bool("seed", false,
-		"Whether to seed the empty database with test data")
+		"Whether to seed the empty database with sample data")
 )
 
 func main() {
@@ -53,7 +53,7 @@ func main() {
 	}
 
 	opts := api.Options{
-		Addr:            net.JoinHostPort(c.Http.Host,
+		Addr: net.JoinHostPort(c.Http.Host,
 			strconv.FormatUint(uint64(c.Http.Port), 10)),
 		TlsCertFile:     c.Http.TlsCertFile,
 		TlsKeyFile:      c.Http.TlsKeyFile,

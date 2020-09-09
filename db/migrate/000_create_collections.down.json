@@ -1,0 +1,14 @@
+[
+  {
+    "drop": "attachments"
+  },
+  {
+    "drop": "suites"
+  },
+  {
+    "drop": "cases"
+  },
+  {
+    "drop": "logs"
+  }
+]

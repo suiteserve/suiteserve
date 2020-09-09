@@ -1,9 +1,10 @@
 package repo
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
+	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"math/rand"
 )
@@ -11,17 +12,22 @@ import (
 var seedRand = rand.New(rand.NewSource(1597422555541))
 
 func (r *Repo) Seed() error {
-	var n int64
-	err := r.db.View(func(tx *bolt.Tx) error {
-		n = tx.Size()
-		return nil
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	colls, err := r.db.ListCollectionNames(ctx,
+		bson.D{{"name", bson.D{{"$ne", "schema_migrations"}}}})
 	if err != nil {
 		return err
 	}
-	if n > 0 {
-		log.Print("Not seeding non-empty database")
-		return nil
+	for _, coll := range colls {
+		n, err := r.db.Collection(coll).EstimatedDocumentCount(ctx)
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			log.Print("Not seeding non-empty database")
+			return nil
+		}
 	}
 	log.Print("Seeding database...")
 	for i := 0; i < 60; i++ {

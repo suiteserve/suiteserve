@@ -10,15 +10,11 @@ type Attachment struct {
 	SoftDeleteEntity
 	SuiteId     string `json:"suite_id"`
 	CaseId      string `json:"case_id"`
-	Filename    string      `json:"filename,omitempty"`
-	Url         string      `json:"url,omitempty"`
-	ContentType string      `json:"content_type,omitempty"`
-	Size        int64       `json:"size"`
-	Timestamp   int64       `json:"timestamp,omitempty"`
-}
-
-func (a *Attachment) SetId(id string) {
-	// a.Id = id
+	Filename    string `json:"filename"`
+	Url         string `json:"url"`
+	ContentType string `json:"content_type" bson:"content_type"`
+	Size        int64  `json:"size"`
+	Timestamp   int64  `json:"timestamp,omitempty" bson:",omitempty"`
 }
 
 func (r *Repo) InsertAttachment(a Attachment) (string, error) {

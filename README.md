@@ -2,52 +2,58 @@
 Test reporting API and real-time UI.
 
 ## Developing
-For the best development experience, ensure that you have installed:
-
+For the best development experience, install the following:
 - [Docker](https://www.docker.com)
 - [Docker Compose](https://docs.docker.com/compose/install/)
 - [GNU Make](https://www.gnu.org/software/make/)
 - [Go](https://golang.org)
+- [migrate](https://github.com/golang-migrate/migrate)
+  - Install with `go get -tags 'mongodb' -u github.com/golang-migrate/migrate/cmd/migrate`.
+  - Ensure that `$GOPATH/bin` is in your path.
 - [mkcert](https://github.com/FiloSottile/mkcert)
 - [Node.js](https://nodejs.org)
 - [NPM](https://www.npmjs.com)
 
 ### Run for Development
-Ensure that RethinkDB is running and provisioned:
+First, run `make tls/cert.pem` to generate the TLS certificate and key for development-only use with SuiteServe, `webpack-dev-server`, and Mongo Express. This command also installs the root CA into your web browser in order to avoid security warnings, but you may have to restart your browser for that to take effect. You only have to do this once.
+
+Next, bring up MongoDB:
 ```bash
-$ make db-provision
+$ make dev-db
 ```
-This will bring up the RethinkDB Docker container and then provision it with the necessary user, database, and tables. To bring down the container, run:
+
+This will start the MongoDB Docker container and then provision it with the necessary users and permissions, followed by the migrations. To bring down the container, run:
 ```bash
-$ cd rethinkdb
+$ cd db
 $ docker-compose down
 ```
-Append `-v` to the `docker-compose down` command to also purge the database. Keep RethinkDB running during development.
 
-Run `make tls/cert.pem` to generate the TLS certificate and key for development-only use with SuiteServe and the Webpack DevServer. This command also installs the root CA into your web browser in order to avoid security warnings, but you may have to restart your browser for it to take effect.
+Optionally, purge the database with `docker-compose rm -fv`. Keep MongoDB running during development.
 
-Now start SuiteServe:
+Now, start SuiteServe:
 ```bash
 $ go run cmd/suiteserve/main.go -debug -seed
 ```
+
 The `-debug` option adds precise timestamps and code locations to log messages. The `-seed` option inserts sample data into the database if the database tables are empty.
 
-In another terminal, start the Webpack DevServer:
+Finally, in another terminal, start `webpack-dev-server`:
 ```bash
 $ cd ui
 $ npm start
 ```
-The following services are now available:
+
+The following services will now be available:
 - **SuiteServe** &mdash; [https://localhost:8080](https://localhost:8080)
   - Serves the UI and test reporting API.
   - Does not hot-reload on code changes.
   - Code changes in `ui/` will not be seen until `ui/dist/` is built.
-- **Webpack DevServer** &mdash; [https://localhost:8081](https://localhost:8081)
+- **`webpack-dev-server`** &mdash; [https://localhost:8081](https://localhost:8081)
   - Serves the UI and forwards non-UI requests to [localhost:8080](https://localhost:8080).
   - Hot-reloads on code changes in `ui/`.
   - Does not require `ui/dist/` to exist.
   - Useful for UI development, but not for production.
-- **RethinkDB Administration Console** &mdash; [http://localhost:8082](http://localhost:8082)
+- **Mongo Express** &mdash; [https://localhost:8082](https://localhost:8082)
 
 As needed, build or rebuild `ui/dist/` with:
 ```bash
@@ -59,4 +65,12 @@ $ make ui/dist
 Run `make` to build the SuiteServe binary file named "suiteserve".
 
 ### Build for Docker
-Build with `docker build -t suiteserve .` and run with `docker run -v $(pwd)/tls:/app/tls suiteserve`.
+Build the SuiteServe Docker image:
+```bash
+$ docker build -t suiteserve .
+```
+
+To start a container, make sure a MongoDB instance is available and then update `config/config.json` to point to it. Run:
+```bash
+$ docker run -v $(pwd)/config:/app/config -v $(pwd)/tls:/app/tls suiteserve
+```

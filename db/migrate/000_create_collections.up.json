@@ -1,0 +1,14 @@
+[
+  {
+    "create": "attachments"
+  },
+  {
+    "create": "suites"
+  },
+  {
+    "create": "cases"
+  },
+  {
+    "create": "logs"
+  }
+]

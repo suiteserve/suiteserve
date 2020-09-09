@@ -12,11 +12,12 @@
       "dir": "data/",
       "max_size_mb": 64
     },
-    "rethinkdb": {
+    "mongodb": {
       "host": "localhost",
-      "port": 28015,
+      "port": 27017,
       "user": "suiteserve",
-      "pass_file": "config/rethinkdb_pass",
+      "pass_file": "config/db_pass",
+      "repl_set": "rs0",
       "db": "suiteserve"
     }
   }

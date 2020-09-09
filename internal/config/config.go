@@ -19,13 +19,14 @@ type Config struct {
 			Dir       string `json:"dir"`
 			MaxSizeMb int    `json:"max_size_mb"`
 		} `json:"user_content"`
-		Rethinkdb struct {
+		MongoDb struct {
 			Host     string `json:"host"`
 			Port     uint16 `json:"port"`
 			User     string `json:"user"`
 			PassFile string `json:"pass_file"`
+			ReplSet  string `json:"repl_set"`
 			Db       string `json:"db"`
-		} `json:"rethinkdb"`
+		} `json:"mongodb"`
 	} `json:"storage"`
 }
 
