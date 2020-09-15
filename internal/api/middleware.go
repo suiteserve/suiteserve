@@ -1,18 +1,15 @@
 package api
 
 import (
-	"context"
 	"fmt"
+	"github.com/gorilla/mux"
+	"github.com/suiteserve/suiteserve/internal/repo"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 )
-
-type ctxKey int
-
-const pathParamKey ctxKey = iota
 
 func logMw(h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -21,24 +18,16 @@ func logMw(h http.Handler) http.HandlerFunc {
 	}
 }
 
-func pathParamMw(ignorePrefix string, h http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, ignorePrefix)
-		if strings.ContainsRune(path, '/') {
-			notFound()(w, r)
-			return
-		}
-		ctx := context.WithValue(r.Context(), pathParamKey, path)
-		h.ServeHTTP(w, r.WithContext(ctx))
-	}
-}
-
-func pathParam(r *http.Request) string {
-	v, ok := r.Context().Value(pathParamKey).(string)
+func idParam(r *http.Request) (repo.Id, error) {
+	hex, ok := mux.Vars(r)["id"]
 	if !ok {
-		panic("path param not found")
+		panic("id param not found")
 	}
-	return v
+	id, err := repo.HexToId(hex)
+	if err != nil {
+		return nil, errHttp{code: http.StatusBadRequest, cause: err}
+	}
+	return id, nil
 }
 
 func methodsMw(methods ...string) func(h http.Handler) http.HandlerFunc {

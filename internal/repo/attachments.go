@@ -1,61 +1,86 @@
 package repo
 
 import (
-	bolt "go.etcd.io/bbolt"
+	"context"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Attachment struct {
-	Entity
-	VersionedEntity
-	SoftDeleteEntity
-	SuiteId     string `json:"suite_id"`
-	CaseId      string `json:"case_id"`
-	Filename    string `json:"filename"`
-	Url         string `json:"url"`
-	ContentType string `json:"content_type" bson:"content_type"`
-	Size        int64  `json:"size"`
-	Timestamp   int64  `json:"timestamp,omitempty" bson:",omitempty"`
+	Entity           `bson:",inline"`
+	VersionedEntity  `bson:",inline"`
+	SoftDeleteEntity `bson:",inline"`
+	SuiteId          Id     `json:"suite_id,omitempty" bson:"suite_id,omitempty"`
+	CaseId           Id     `json:"case_id,omitempty" bson:"case_id,omitempty"`
+	Filename         string `json:"filename"`
+	ContentType      string `json:"content_type" bson:"content_type"`
+	Size             int64  `json:"size"`
+	Timestamp        int64  `json:"timestamp"`
 }
 
-func (r *Repo) InsertAttachment(a Attachment) (string, error) {
-	err := r.db.Update(func(tx *bolt.Tx) error {
-		// k, err := database.Insert(tx, attachmentBkt, database.IdKvGen(&a))
-		// if err != nil {
-		// 	return err
-		// }
-		// _, err = database.Insert(tx, attachmentSuiteOwnerIdxBkt,
-		// 	database.IdIndexKvGen(k, a.SuiteId))
-		// if err != nil {
-		// 	return err
-		// }
-		// _, err = database.Insert(tx, attachmentCaseOwnerIdxBkt,
-		// 	database.IdIndexKvGen(k, a.CaseId))
-		// return err
-		return nil
+func (r *Repo) InsertAttachment(ctx context.Context, a Attachment) (Id, error) {
+	return r.insert(ctx, "attachments", a)
+}
+
+func (r *Repo) Attachment(ctx context.Context, id Id) (*Attachment, error) {
+	var a Attachment
+	if err := r.findById(ctx, "attachments", id, &a); err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+func (r *Repo) Attachments(ctx context.Context) ([]Attachment, error) {
+	opts := options.Find().SetSort(bson.D{
+		{"suite_id", 1},
+		{"case_id", 1},
+		{"timestamp", 1},
+		{"_id", 1},
 	})
-	// return a.Id, err
-	return "", err
+	res, err := r.db.Collection("attachments").Find(ctx, bson.D{}, opts)
+	if err != nil {
+		return nil, err
+	}
+	a := make([]Attachment, 0)
+	if err := res.All(ctx, &a); err != nil {
+		return nil, err
+	}
+	return a, nil
 }
 
-func (r *Repo) Attachment(id string) (a Attachment, err error) {
-	err = r.db.View(func(tx *bolt.Tx) error {
-		// return database.Find(tx, attachmentBkt, database.IdKGen(id), &a)
-		return nil
+func (r *Repo) SuiteAttachments(ctx context.Context,
+	suiteId Id) ([]Attachment, error) {
+	filter := bson.D{{"suite_id", suiteId}}
+	opts := options.Find().SetSort(bson.D{
+		{"case_id", 1},
+		{"timestamp", 1},
+		{"_id", 1},
 	})
-	return
+	res, err := r.db.Collection("attachments").Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	a := make([]Attachment, 0)
+	if err := res.All(ctx, &a); err != nil {
+		return nil, err
+	}
+	return a, nil
 }
 
-func (r *Repo) SuiteAttachments(suiteId string) (a []Attachment, err error) {
-	err = r.db.View(func(tx *bolt.Tx) error {
-		// database.Ascend(tx, attachment)
-		return nil
+func (r *Repo) CaseAttachments(ctx context.Context,
+	caseId Id) ([]Attachment, error) {
+	filter := bson.D{{"suite_id", nil}, {"case_id", caseId}}
+	opts := options.Find().SetSort(bson.D{
+		{"timestamp", 1},
+		{"_id", 1},
 	})
-
-	// err = wrapNotFoundErr(r.db.Find("SuiteId", suiteId, &a))
-	return
-}
-
-func (r *Repo) CaseAttachments(caseId string) (a []Attachment, err error) {
-	// err = wrapNotFoundErr(r.db.Find("CaseId", caseId, &a))
-	return
+	res, err := r.db.Collection("attachments").Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	a := make([]Attachment, 0)
+	if err := res.All(ctx, &a); err != nil {
+		return nil, err
+	}
+	return a, nil
 }

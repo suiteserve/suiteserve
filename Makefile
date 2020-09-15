@@ -8,8 +8,16 @@ test:
 .PHONY: dev-db
 dev-db:
 	cd db; docker-compose up -d
+
+.PHONY: dev-db-migrate-up
+dev-db-migrate-up: dev-db
 	migrate -database mongodb://ssmigrate:pass@localhost:27017/suiteserve \
 		-path db/migrate up
+
+.PHONY: dev-db-migrate-down
+dev-db-migrate-down:
+	migrate -database mongodb://ssmigrate:pass@localhost:27017/suiteserve \
+		-path db/migrate down
 
 ui/node_modules:
 	cd ui; npm i

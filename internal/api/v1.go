@@ -1,26 +1,30 @@
 package api
 
 import (
+	"context"
+	"github.com/gorilla/mux"
 	"github.com/suiteserve/suiteserve/internal/repo"
-	"github.com/suiteserve/suiteserve/sse"
 	"net/http"
 )
 
 type Repo interface {
-	InsertAttachment(repo.Attachment) (id string, err error)
-	Attachment(id string) (repo.Attachment, error)
-	SuiteAttachments(suiteId string) ([]repo.Attachment, error)
-	CaseAttachments(caseId string) ([]repo.Attachment, error)
+	InsertAttachment(ctx context.Context, a repo.Attachment) (id repo.Id, err error)
+	Attachment(ctx context.Context, id repo.Id) (*repo.Attachment, error)
+	Attachments(ctx context.Context) ([]repo.Attachment, error)
+	SuiteAttachments(ctx context.Context, suiteId repo.Id) ([]repo.Attachment, error)
+	CaseAttachments(ctx context.Context, caseId repo.Id) ([]repo.Attachment, error)
 
-	InsertSuite(repo.Suite) (id string, err error)
-	Suite(id string) (repo.Suite, error)
-	// WatchSuites(id string, padLt, padGt int) (*repo.SuiteWatcher, error)
+	InsertSuite(ctx context.Context, s repo.Suite) (id repo.Id, err error)
+	Suite(ctx context.Context, id repo.Id) (*repo.Suite, error)
+	DeleteSuite(ctx context.Context, id repo.Id, at int64) error
+	FinishSuite(ctx context.Context, id repo.Id, result repo.SuiteResult, at int64) error
+	DisconnectSuite(ctx context.Context, id repo.Id, at int64) error
 
-	InsertCase(repo.Case) (id string, err error)
-	Case(id string) (repo.Case, error)
+	InsertCase(ctx context.Context, c repo.Case) (id repo.Id, err error)
+	Case(ctx context.Context, id repo.Id) (*repo.Case, error)
 
-	InsertLogLine(repo.LogLine) (id string, err error)
-	LogLine(id string) (repo.LogLine, error)
+	InsertLogLine(ctx context.Context, ll repo.LogLine) (id repo.Id, err error)
+	LogLine(ctx context.Context, id repo.Id) (*repo.LogLine, error)
 }
 
 type v1 struct {
@@ -29,27 +33,27 @@ type v1 struct {
 
 func NewV1Handler(repo Repo) http.Handler {
 	v1 := v1{repo}
-	var mux http.ServeMux
-	mux.Handle("/attachments/",
-		pathParamMw("/attachments/", v1.attachmentHandler()))
-	mux.Handle("/attachments",
-		v1.attachmentCollHandler())
-	mux.Handle("/suites/",
-		pathParamMw("/suites/", v1.suiteHandler()))
-	mux.Handle("/suites",
-		sse.NewMiddleware(v1.suiteCollHandler()))
-	mux.Handle("/cases/",
-		pathParamMw("/cases/", v1.caseHandler()))
-	mux.Handle("/logs/",
-		pathParamMw("/logs/", v1.logLineHandler()))
-	mux.Handle("/", notFound())
-	return methodsMw(http.MethodGet, http.MethodHead)(&mux)
+	r := mux.NewRouter()
+	r.NotFoundHandler = notFound()
+	r.MethodNotAllowedHandler = methodNotAllowed()
+	r.Handle("/attachments", v1.attachmentCollHandler())
+	r.Handle("/attachments/{id}", v1.attachmentHandler())
+	r.Handle("/suites", v1.suiteCollHandler())
+	r.Handle("/suites/{id}", v1.suiteHandler())
+	r.Handle("/suites/{id}/cases", v1.suiteCasesHandler())
+	r.Handle("/cases/{id}", v1.caseHandler())
+	r.Handle("/cases/{id}/logs", v1.caseLogsHandler())
+	r.Handle("/logs/{id}", v1.logLineHandler())
+	return methodsMw(http.MethodGet, http.MethodHead)(r)
 }
 
 func (v *v1) attachmentHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id := pathParam(r)
-		a, err := v.repo.Attachment(id)
+		id, err := idParam(r)
+		if err != nil {
+			return err
+		}
+		a, err := v.repo.Attachment(r.Context(), id)
 		if err != nil {
 			return err
 		}
@@ -59,14 +63,22 @@ func (v *v1) attachmentHandler() errHandlerFunc {
 
 func (v *v1) attachmentCollHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		var a interface{}
+		var a []repo.Attachment
 		var err error
 		if suiteId := r.FormValue("suite"); suiteId != "" {
-			a, err = v.repo.SuiteAttachments(suiteId)
+			id, err := repo.HexToId(suiteId)
+			if err != nil {
+				return errHttp{code: http.StatusBadRequest, cause: err}
+			}
+			a, err = v.repo.SuiteAttachments(r.Context(), id)
 		} else if caseId := r.FormValue("case"); caseId != "" {
-			a, err = v.repo.CaseAttachments(caseId)
+			id, err := repo.HexToId(caseId)
+			if err != nil {
+				return errHttp{code: http.StatusBadRequest, cause: err}
+			}
+			a, err = v.repo.CaseAttachments(r.Context(), id)
 		} else {
-			return errHttp{code: http.StatusBadRequest}
+			a, err = v.repo.Attachments(r.Context())
 		}
 		if err != nil {
 			return err
@@ -77,8 +89,25 @@ func (v *v1) attachmentCollHandler() errHandlerFunc {
 
 func (v *v1) suiteHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id := pathParam(r)
-		s, err := v.repo.Suite(id)
+		id, err := idParam(r)
+		if err != nil {
+			return err
+		}
+		s, err := v.repo.Suite(r.Context(), id)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, &s)
+	}
+}
+
+func (v *v1) suiteCasesHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id, err := idParam(r)
+		if err != nil {
+			return err
+		}
+		s, err := v.repo.Suite(r.Context(), id)
 		if err != nil {
 			return err
 		}
@@ -87,6 +116,9 @@ func (v *v1) suiteHandler() errHandlerFunc {
 }
 
 func (v *v1) suiteCollHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		return nil
+	}
 	// return func(w http.ResponseWriter, r *http.Request) error {
 	// 	padGtStr := r.FormValue("pad_gt")
 	// 	id := r.FormValue("id")
@@ -112,7 +144,6 @@ func (v *v1) suiteCollHandler() errHandlerFunc {
 	// 		}
 	// 	}
 	// }
-	return nil
 }
 
 // func suiteWatchWriter(ctx context.Context, w io.Writer,
@@ -144,8 +175,25 @@ func (v *v1) suiteCollHandler() errHandlerFunc {
 
 func (v *v1) caseHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id := pathParam(r)
-		c, err := v.repo.Case(id)
+		id, err := idParam(r)
+		if err != nil {
+			return err
+		}
+		c, err := v.repo.Case(r.Context(), id)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, &c)
+	}
+}
+
+func (v *v1) caseLogsHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id, err := idParam(r)
+		if err != nil {
+			return err
+		}
+		c, err := v.repo.Case(r.Context(), id)
 		if err != nil {
 			return err
 		}
@@ -155,8 +203,11 @@ func (v *v1) caseHandler() errHandlerFunc {
 
 func (v *v1) logLineHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id := pathParam(r)
-		ll, err := v.repo.LogLine(id)
+		id, err := idParam(r)
+		if err != nil {
+			return err
+		}
+		ll, err := v.repo.LogLine(r.Context(), id)
 		if err != nil {
 			return err
 		}

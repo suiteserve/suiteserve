@@ -3,68 +3,137 @@ package repo
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"math/rand"
 )
 
-var seedRand = rand.New(rand.NewSource(1597422555541))
+var (
+	seedLlIdx int64 = 0
+	seedRand        = rand.New(rand.NewSource(1597422555541))
+)
 
 func (r *Repo) Seed() error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	colls, err := r.db.ListCollectionNames(ctx,
-		bson.D{{"name", bson.D{{"$ne", "schema_migrations"}}}})
+	ok, err := r.shouldSeed()
 	if err != nil {
 		return err
 	}
-	for _, coll := range colls {
-		n, err := r.db.Collection(coll).EstimatedDocumentCount(ctx)
-		if err != nil {
-			return err
-		}
-		if n > 0 {
-			log.Print("Not seeding non-empty database")
-			return nil
-		}
+	if !ok {
+		log.Print("Not seeding non-empty database")
+		return nil
 	}
 	log.Print("Seeding database...")
 	for i := 0; i < 60; i++ {
-		s := genSuite()
-		id, err := r.InsertSuite(s)
+		s, err := r.seedSuite()
 		if err != nil {
 			return err
 		}
-		fmt.Printf("> insert suite %q\n", id)
-		for j := 0; j < int(s.PlannedCases); j++ {
-			id, err := r.InsertCase(genCase(id))
+		for i := 0; i < genIdx(2); i++ {
+			if _, err := r.seedAttachment(s.Id, nil); err != nil {
+				return err
+			}
+		}
+		for i := 0; i < int(s.PlannedCases); i++ {
+			c, err := r.seedCase(s.Id)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("  > insert case %q\n", id)
-			for k := 0; k < genIdx(60); k++ {
-				id, err := r.InsertLogLine(genLogLine(id))
-				if err != nil {
+			for i := 0; i < genIdx(2); i++ {
+				if _, err := r.seedAttachment(nil, c.Id); err != nil {
 					return err
 				}
-				fmt.Printf("    > insert log line %q\n", id)
+			}
+			for i := 0; i < genIdx(60); i++ {
+				if _, err := r.seedLogLine(c.Id); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	return nil
 }
 
+func (r *Repo) shouldSeed() (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	colls, err := r.db.ListCollectionNames(ctx,
+		bson.D{{"name", bson.D{{"$ne", "schema_migrations"}}}})
+	if err != nil {
+		return false, err
+	}
+	for _, coll := range colls {
+		n, err := r.db.Collection(coll).EstimatedDocumentCount(ctx)
+		if err != nil {
+			return false, err
+		}
+		if n > 0 {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (r *Repo) seedAttachment(suiteId, caseId Id) (*Attachment, error) {
+	a := genAttachment(suiteId, caseId)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	id, err := r.InsertAttachment(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	a.Id = id
+	return &a, nil
+}
+
+func genAttachment(suiteId, caseId Id) Attachment {
+	filenames := []string{
+		"test.txt",
+		"hello_world.png",
+		"index.html",
+	}
+	contentTypes := []string{
+		"text/plain; charset=utf-8",
+		"image/png",
+		"text/html",
+	}
+	size := int64(genIdx(1 << 16))
+	timestamp, deletedAt, _, _ := genTimestamps()
+	var a Attachment
+	a.SuiteId = suiteId
+	a.CaseId = caseId
+	a.Filename = filenames[genIdx(len(filenames))]
+	a.ContentType = contentTypes[genIdx(len(contentTypes))]
+	a.Size = size
+	a.Timestamp = timestamp
+	if genBool(0.1) {
+		a.Deleted = true
+		a.DeletedAt = deletedAt
+	}
+	return a
+}
+
+func (r *Repo) seedSuite() (*Suite, error) {
+	s := genSuite()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	id, err := r.InsertSuite(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	s.Id = id
+	return &s, nil
+}
+
 func genSuite() Suite {
 	startedAt, disconnectedAt, finishedAt, deletedAt := genTimestamps()
-	nameArr := []string{
+	names := []string{
 		"Massa Tincidunt Dui",
 		"Auctor",
 		"Sit Amet Luctus",
 		"In Cursus",
 		"Sit Amet Tellus Cras",
 	}
-	tagsArr := [][]string{
+	tags := [][]string{
 		{"erat", "sed"},
 		{"id"},
 		{"risus"},
@@ -75,23 +144,23 @@ func genSuite() Suite {
 		nil,
 		nil,
 	}
-	statusArr := []SuiteStatus{
+	statuses := []SuiteStatus{
 		SuiteStatusStarted,
 		SuiteStatusFinished,
 		SuiteStatusDisconnected,
 	}
-	resultArr := []SuiteResult{
+	results := []SuiteResult{
 		SuiteResultPassed,
 		SuiteResultFailed,
 	}
 	var s Suite
-	s.Name = nameArr[genIdx(len(nameArr))]
-	s.Tags = tagsArr[genIdx(len(tagsArr))]
+	s.Name = names[genIdx(len(names))]
+	s.Tags = tags[genIdx(len(tags))]
 	s.PlannedCases = int64(genIdx(20))
-	s.Status = statusArr[genIdx(len(statusArr))]
+	s.Status = statuses[genIdx(len(statuses))]
 	switch s.Status {
 	case SuiteStatusFinished:
-		s.Result = resultArr[genIdx(len(resultArr))]
+		s.Result = results[genIdx(len(results))]
 		s.FinishedAt = finishedAt
 	case SuiteStatusDisconnected:
 		s.DisconnectedAt = disconnectedAt
@@ -104,15 +173,27 @@ func genSuite() Suite {
 	return s
 }
 
-func genCase(suiteId string) Case {
+func (r *Repo) seedCase(suiteId Id) (*Case, error) {
+	c := genCase(suiteId)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	id, err := r.InsertCase(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	c.Id = id
+	return &c, nil
+}
+
+func genCase(suiteId Id) Case {
 	createdAt, startedAt, finishedAt, _ := genTimestamps()
-	nameArr := []string{
+	names := []string{
 		"Lorem ipsum dolor sit",
 		"Aliquam ut porttitor leo",
 		"Ullamcorper dignissim cras tincidunt",
 		"Morbi tincidunt ornare",
 	}
-	descriptionArr := []string{
+	descriptions := []string{
 		"Elementum tempus egestas sed sed.",
 		"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do " +
 			"eiusmod tempor incididunt ut labore et dolore magna aliqua. " +
@@ -120,7 +201,7 @@ func genCase(suiteId string) Case {
 		"",
 		"Cursus in hac habitasse platea dictumst quisque.",
 	}
-	tagsArr := [][]string{
+	tags := [][]string{
 		{"erat", "sed"},
 		{"id"},
 		{"risus"},
@@ -131,7 +212,7 @@ func genCase(suiteId string) Case {
 		nil,
 		nil,
 	}
-	argsArr := []map[string]json.RawMessage{
+	args := []map[string]json.RawMessage{
 		nil,
 		{
 			"x": json.RawMessage("10"),
@@ -145,12 +226,12 @@ func genCase(suiteId string) Case {
 			"arg": json.RawMessage(`null`),
 		},
 	}
-	statusArr := []CaseStatus{
+	statuses := []CaseStatus{
 		CaseStatusCreated,
 		CaseStatusStarted,
 		CaseStatusFinished,
 	}
-	resultArr := []CaseResult{
+	results := []CaseResult{
 		CaseResultPassed,
 		CaseResultFailed,
 		CaseResultSkipped,
@@ -159,34 +240,44 @@ func genCase(suiteId string) Case {
 	}
 	var c Case
 	c.SuiteId = suiteId
-	c.Name = nameArr[genIdx(len(nameArr))]
-	c.Description = descriptionArr[genIdx(len(descriptionArr))]
-	c.Tags = tagsArr[genIdx(len(tagsArr))]
+	c.Name = names[genIdx(len(names))]
+	c.Description = descriptions[genIdx(len(descriptions))]
+	c.Tags = tags[genIdx(len(tags))]
 	c.Idx = int64(genIdx(30))
-	c.Args = argsArr[genIdx(len(argsArr))]
-	c.Status = statusArr[genIdx(len(statusArr))]
+	c.Args = args[genIdx(len(args))]
+	c.Status = statuses[genIdx(len(statuses))]
 	switch c.Status {
 	case CaseStatusStarted:
 		c.StartedAt = startedAt
 	case CaseStatusFinished:
-		c.Result = resultArr[genIdx(len(resultArr))]
+		c.Result = results[genIdx(len(results))]
 		c.FinishedAt = finishedAt
 	}
 	c.CreatedAt = createdAt
 	return c
 }
 
-var idxInc int64 = 0
+func (r *Repo) seedLogLine(caseId Id) (*LogLine, error) {
+	ll := genLogLine(caseId)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	id, err := r.InsertLogLine(ctx, ll)
+	if err != nil {
+		return nil, err
+	}
+	ll.Id = id
+	return &ll, nil
+}
 
-func genLogLine(caseId string) LogLine {
-	levelArr := []LogLevelType{
+func genLogLine(caseId Id) LogLine {
+	levels := []LogLevelType{
 		LogLevelTypeTrace,
 		LogLevelTypeDebug,
 		LogLevelTypeInfo,
 		LogLevelTypeWarn,
 		LogLevelTypeError,
 	}
-	traceArr := []string{
+	traces := []string{
 		`panic: Hello, world!
 
 goroutine 1 [running]:
@@ -210,7 +301,7 @@ main.main()
   File "<stdin>", line 2, in f3
 ZeroDivisionError: division by zero`,
 	}
-	messageArr := []string{
+	messages := []string{
 		"Morbi blandit cursus risus at.",
 		"Elit duis tristique sollicitudin nibh sit.\nRhoncus mattis rhoncus " +
 			"urna neque viverra. Diam ut venenatis tellus in.",
@@ -219,13 +310,13 @@ ZeroDivisionError: division by zero`,
 	}
 	var ll LogLine
 	ll.CaseId = caseId
-	ll.Idx = idxInc
-	idxInc++
-	ll.Level = levelArr[genIdx(len(levelArr))]
+	ll.Idx = seedLlIdx
+	seedLlIdx++
+	ll.Level = levels[genIdx(len(levels))]
 	if ll.Level == LogLevelTypeError {
-		ll.Trace = traceArr[genIdx(len(traceArr))]
+		ll.Trace = traces[genIdx(len(traces))]
 	}
-	ll.Message = messageArr[genIdx(len(messageArr))]
+	ll.Message = messages[genIdx(len(messages))]
 	ll.Timestamp, _, _, _ = genTimestamps()
 	return ll
 }

@@ -1,0 +1,28 @@
+[
+  {
+    "create": "attachments"
+  },
+  {
+    "createIndexes": "attachments",
+    "indexes": [
+      {
+        "key": {
+          "suite_id": 1,
+          "case_id": 1,
+          "timestamp": 1,
+          "_id": 1
+        },
+        "name": "suite_case"
+      }
+    ]
+  },
+  {
+    "create": "suites"
+  },
+  {
+    "create": "cases"
+  },
+  {
+    "create": "logs"
+  }
+]

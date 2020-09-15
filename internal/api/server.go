@@ -3,9 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"golang.org/x/sync/errgroup"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -67,63 +65,26 @@ func Serve(ctx context.Context, opts Options) error {
 	return eg.Wait()
 }
 
-type errHttp struct {
-	error string
-	code  int
-	cause error
-}
+// func readJson(r *http.Request, dst interface{}) error {
+// 	if r.Header.Get("content-type") != "application/json" {
+// 		return errHttp{code: http.StatusUnsupportedMediaType}
+// 	}
+// 	b, err := ioutil.ReadAll(r.Body)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if err := json.Unmarshal(b, dst); err != nil {
+// 		return errHttp{
+// 			error: "bad json",
+// 			code:  http.StatusBadRequest,
+// 			cause: err,
+// 		}
+// 	}
+// 	return nil
+// }
 
-func (e errHttp) Error() string {
-	if e.error == "" {
-		return http.StatusText(e.code)
-	}
-	return e.error
-}
-
-func (e errHttp) Unwrap() error {
-	return e.cause
-}
-
-type errHandlerFunc func(w http.ResponseWriter, r *http.Request) error
-
-func (f errHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if err := f(w, r); err != nil {
-		httpErr := errHttp{
-			code:  http.StatusInternalServerError,
-			cause: err,
-		}
-		if !errors.As(err, &httpErr) && isNotFound(err) {
-			httpErr.code = http.StatusNotFound
-		}
-		text := httpErr.Error()
-		if httpErr.cause != nil {
-			text += ": " + httpErr.cause.Error()
-		}
-		log.Printf("<%s> %d %s", r.RemoteAddr, httpErr.code, text)
-		http.Error(w, httpErr.Error(), httpErr.code)
-	}
-}
-
-func readJson(r *http.Request, dst interface{}) error {
-	if r.Header.Get("content-type") != "application/json" {
-		return errHttp{code: http.StatusUnsupportedMediaType}
-	}
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(b, dst); err != nil {
-		return errHttp{
-			error: "bad json",
-			code:  http.StatusBadRequest,
-			cause: err,
-		}
-	}
-	return nil
-}
-
-func writeJson(w http.ResponseWriter, r *http.Request, x interface{}) error {
-	b, err := json.Marshal(x)
+func writeJson(w http.ResponseWriter, r *http.Request, v interface{}) error {
+	b, err := json.Marshal(v)
 	if err != nil {
 		panic(err)
 	}
@@ -134,11 +95,4 @@ func writeJson(w http.ResponseWriter, r *http.Request, x interface{}) error {
 		_, err = w.Write(b)
 	}
 	return err
-}
-
-func isNotFound(err error) bool {
-	var errNotFound interface {
-		NotFound() bool
-	}
-	return errors.As(err, &errNotFound)
 }

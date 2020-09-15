@@ -97,30 +97,30 @@ type SuiteUpsert struct {
 	s0 *Suite
 }
 
-func (SuiteUpsert) Type() string {
-	return "suite_upsert"
-}
-
-func (u *SuiteUpsert) Data() []byte {
-	return mustMarshalJson(u.s1)
-}
+// func (SuiteUpsert) Type() string {
+// 	return "suite_upsert"
+// }
+//
+// func (u *SuiteUpsert) Data() []byte {
+// 	return mustMarshalJson(u.s1)
+// }
 
 type SuiteDelete string
 
-func (SuiteDelete) Type() string {
-	return "suite_delete"
-}
+// func (SuiteDelete) Type() string {
+// 	return "suite_delete"
+// }
+//
+// func (d *SuiteDelete) Data() []byte {
+// 	return mustMarshalJson(d)
+// }
 
-func (d *SuiteDelete) Data() []byte {
-	return mustMarshalJson(d)
-}
-
-type SuiteAggUpsert SuiteAgg
-
-func (SuiteAggUpsert) Type() string {
-	return "suite_agg_upsert"
-}
-
-func (u *SuiteAggUpsert) Data() []byte {
-	return mustMarshalJson(u)
-}
+// type SuiteAggUpsert SuiteAgg
+//
+// func (SuiteAggUpsert) Type() string {
+// 	return "suite_agg_upsert"
+// }
+//
+// func (u *SuiteAggUpsert) Data() []byte {
+// 	return mustMarshalJson(u)
+// }

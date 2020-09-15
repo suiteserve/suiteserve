@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"github.com/suiteserve/suiteserve/internal/api"
 	"github.com/suiteserve/suiteserve/internal/config"
 	"github.com/suiteserve/suiteserve/internal/repo"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -30,36 +32,32 @@ func main() {
 	}
 
 	log.Printf("Using config at %q", *configFlag)
-	c, err := config.Load(*configFlag)
+	cfg, err := config.Load(*configFlag)
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
 
-	log.Printf("Using database at %q", "")
-	r, err := repo.Open("")
-	if err != nil {
-		log.Fatalf("open repo: %v", err)
-	}
+	r := openRepo(cfg)
 	defer func() {
 		if err := r.Close(); err != nil {
 			log.Printf("close repo: %v", err)
 		}
 	}()
-
 	if *seedFlag {
 		if err := r.Seed(); err != nil {
 			log.Fatalf("seed repo: %v", err)
 		}
 	}
 
+	apiAddr := net.JoinHostPort(cfg.Http.Host,
+		strconv.FormatUint(uint64(cfg.Http.Port), 10))
 	opts := api.Options{
-		Addr: net.JoinHostPort(c.Http.Host,
-			strconv.FormatUint(uint64(c.Http.Port), 10)),
-		TlsCertFile:     c.Http.TlsCertFile,
-		TlsKeyFile:      c.Http.TlsKeyFile,
-		PublicDir:       c.Http.PublicDir,
-		UserContentHost: c.Http.UserContentHost,
-		UserContentDir:  c.Storage.UserContent.Dir,
+		Addr: apiAddr,
+		TlsCertFile:     cfg.Http.TlsCertFile,
+		TlsKeyFile:      cfg.Http.TlsKeyFile,
+		PublicDir:       cfg.Http.PublicDir,
+		UserContentHost: cfg.Http.UserContentHost,
+		UserContentDir:  cfg.Storage.UserContent.Dir,
 		UserContentRepo: nil,
 		V1:              api.NewV1Handler(r),
 	}
@@ -67,11 +65,30 @@ func main() {
 	defer cancel()
 	go func() {
 		ch := make(chan os.Signal, 1)
+		defer close(ch)
 		signal.Notify(ch, os.Interrupt)
+		defer signal.Stop(ch)
 		<-ch
 		cancel()
 	}()
 	if err := api.Serve(ctx, opts); err != nil {
 		log.Fatalf("serve api: %v", err)
 	}
+}
+
+func openRepo(cfg *config.Config) *repo.Repo {
+	addr := net.JoinHostPort(cfg.Storage.MongoDb.Host,
+		strconv.FormatUint(uint64(cfg.Storage.MongoDb.Port), 10))
+	pass, err := ioutil.ReadFile(cfg.Storage.MongoDb.PassFile)
+	if err != nil {
+		log.Fatalf("read mongodb pass file: %v", err)
+	}
+	pass = bytes.TrimSuffix(pass, []byte{'\n'})
+	log.Printf("Using database at %q", addr)
+	r, err := repo.Open(addr, cfg.Storage.MongoDb.ReplSet,
+		cfg.Storage.MongoDb.User, string(pass), cfg.Storage.MongoDb.Db)
+	if err != nil {
+		log.Fatalf("open repo: %v", err)
+	}
+	return r
 }
