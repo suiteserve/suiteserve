@@ -28,7 +28,7 @@ type VersionedEntity struct {
 }
 
 type SoftDeleteEntity struct {
-	Deleted   bool  `json:"deleted,omitempty" bson:",omitempty"`
+	Deleted   bool  `json:"deleted,omitempty"`
 	DeletedAt int64 `json:"deleted_at,omitempty" bson:"deleted_at,omitempty"`
 }
 
@@ -59,7 +59,7 @@ func Open(addr, replSet, user, pass, db string) (*Repo, error) {
 	if err := client.Ping(ctx, readpref.Primary()); err != nil {
 		return nil, err
 	}
-	return &Repo{client.Database(db)}, nil
+	return &Repo{db: client.Database(db)}, nil
 }
 
 func decodeIdValue(_ bsoncodec.DecodeContext, vr bsonrw.ValueReader,
@@ -105,11 +105,12 @@ func (r *Repo) findById(ctx context.Context, coll string, id Id,
 
 func (r *Repo) updateById(ctx context.Context, coll string, id Id,
 	set bson.D) error {
-	v := bson.D{
+	filter := bson.D{{"_id", id}}
+	update := bson.D{
 		{"$inc", bson.D{{"version", 1}}},
 		{"$set", set},
 	}
-	res, err := r.db.Collection(coll).UpdateOne(ctx, bson.D{{"_id", id}}, v)
+	res, err := r.db.Collection(coll).UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -118,6 +119,23 @@ func (r *Repo) updateById(ctx context.Context, coll string, id Id,
 	}
 	return nil
 }
+
+// func (r *Repo) findAndUpdateById(ctx context.Context, coll string, id Id,
+// 	set, oldProj bson.D, old interface{}) error {
+// 	filter := bson.D{{"_id", id}}
+// 	update := bson.D{
+// 		{"$inc", bson.D{{"version", 1}}},
+// 		{"$set", set},
+// 	}
+// 	opts := options.FindOneAndUpdate().SetProjection(oldProj)
+// 	err := r.db.Collection(coll).
+// 		FindOneAndUpdate(ctx, filter, update, opts).
+// 		Decode(old)
+// 	if err == mongo.ErrNoDocuments {
+// 		return errNotFound{}
+// 	}
+// 	return err
+// }
 
 func (r *Repo) deleteById(ctx context.Context, coll string, id Id,
 	at int64) error {

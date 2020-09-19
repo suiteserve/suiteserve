@@ -16,6 +16,11 @@ type Repo interface {
 
 	InsertSuite(ctx context.Context, s repo.Suite) (id repo.Id, err error)
 	Suite(ctx context.Context, id repo.Id) (*repo.Suite, error)
+	// SuitePage(ctx context.Context) (*repo.SuitePage, error)
+	// SuitePageTo(ctx context.Context, id repo.Id) (*repo.SuitePage, error)
+	// SuitePageFrom(ctx context.Context, id repo.Id) (*repo.SuitePage, error)
+	// SuitePageAround(ctx context.Context, id repo.Id) (*repo.SuitePage, error)
+	WatchSuites(ctx context.Context) *repo.Watcher
 	DeleteSuite(ctx context.Context, id repo.Id, at int64) error
 	FinishSuite(ctx context.Context, id repo.Id, result repo.SuiteResult, at int64) error
 	DisconnectSuite(ctx context.Context, id repo.Id, at int64) error
@@ -36,50 +41,29 @@ func NewV1Handler(repo Repo) http.Handler {
 	r := mux.NewRouter()
 	r.NotFoundHandler = notFound()
 	r.MethodNotAllowedHandler = methodNotAllowed()
-	r.Handle("/attachments", v1.attachmentCollHandler())
+	r.Handle("/attachments", v1.suiteAttachmentsHandler()).
+		Queries("suite", "{suiteId}")
+	r.Handle("/attachments", v1.caseAttachmentsHandler()).
+		Queries("case", "{caseId}")
+	r.Handle("/attachments", v1.allAttachmentsHandler())
 	r.Handle("/attachments/{id}", v1.attachmentHandler())
-	r.Handle("/suites", v1.suiteCollHandler())
+	r.Handle("/suites", v1.watchSuitesHandler()).
+		Queries("watch", "{watch}", "from", "{fromId}")
 	r.Handle("/suites/{id}", v1.suiteHandler())
-	r.Handle("/suites/{id}/cases", v1.suiteCasesHandler())
+	// r.Handle("/suites/{id}/cases", v1.suiteCasesHandler())
 	r.Handle("/cases/{id}", v1.caseHandler())
-	r.Handle("/cases/{id}/logs", v1.caseLogsHandler())
+	// r.Handle("/cases/{id}/logs", v1.caseLogsHandler())
 	r.Handle("/logs/{id}", v1.logLineHandler())
 	return methodsMw(http.MethodGet, http.MethodHead)(r)
 }
 
-func (v *v1) attachmentHandler() errHandlerFunc {
+func (v *v1) suiteAttachmentsHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id, err := idParam(r)
+		suiteId, err := hexVarToId(r, "suiteId")
 		if err != nil {
 			return err
 		}
-		a, err := v.repo.Attachment(r.Context(), id)
-		if err != nil {
-			return err
-		}
-		return writeJson(w, r, &a)
-	}
-}
-
-func (v *v1) attachmentCollHandler() errHandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) error {
-		var a []repo.Attachment
-		var err error
-		if suiteId := r.FormValue("suite"); suiteId != "" {
-			id, err := repo.HexToId(suiteId)
-			if err != nil {
-				return errHttp{code: http.StatusBadRequest, cause: err}
-			}
-			a, err = v.repo.SuiteAttachments(r.Context(), id)
-		} else if caseId := r.FormValue("case"); caseId != "" {
-			id, err := repo.HexToId(caseId)
-			if err != nil {
-				return errHttp{code: http.StatusBadRequest, cause: err}
-			}
-			a, err = v.repo.CaseAttachments(r.Context(), id)
-		} else {
-			a, err = v.repo.Attachments(r.Context())
-		}
+		a, err := v.repo.SuiteAttachments(r.Context(), suiteId)
 		if err != nil {
 			return err
 		}
@@ -87,9 +71,62 @@ func (v *v1) attachmentCollHandler() errHandlerFunc {
 	}
 }
 
+func (v *v1) caseAttachmentsHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		caseId, err := hexVarToId(r, "caseId")
+		if err != nil {
+			return err
+		}
+		a, err := v.repo.CaseAttachments(r.Context(), caseId)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, a)
+	}
+}
+
+func (v *v1) allAttachmentsHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		a, err := v.repo.Attachments(r.Context())
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, a)
+	}
+}
+
+func (v *v1) attachmentHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id, err := hexVarToId(r, "id")
+		if err != nil {
+			return err
+		}
+		a, err := v.repo.Attachment(r.Context(), id)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, a)
+	}
+}
+
+func (v *v1) watchSuitesHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		// fromId, err := hexVarToId(r, "from")
+		// if err != nil {
+		// 	return err
+		// }
+		// v.repo.Suite
+		// s, err := v.repo.Suite(r.Context(), id)
+		// if err != nil {
+		// 	return err
+		// }
+		return writeJson(w, r, nil)
+	}
+}
+
 func (v *v1) suiteHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id, err := idParam(r)
+		id, err := hexVarToId(r, "id")
 		if err != nil {
 			return err
 		}
@@ -97,53 +134,8 @@ func (v *v1) suiteHandler() errHandlerFunc {
 		if err != nil {
 			return err
 		}
-		return writeJson(w, r, &s)
+		return writeJson(w, r, s)
 	}
-}
-
-func (v *v1) suiteCasesHandler() errHandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) error {
-		id, err := idParam(r)
-		if err != nil {
-			return err
-		}
-		s, err := v.repo.Suite(r.Context(), id)
-		if err != nil {
-			return err
-		}
-		return writeJson(w, r, &s)
-	}
-}
-
-func (v *v1) suiteCollHandler() errHandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) error {
-		return nil
-	}
-	// return func(w http.ResponseWriter, r *http.Request) error {
-	// 	padGtStr := r.FormValue("pad_gt")
-	// 	id := r.FormValue("id")
-	// 	padLtStr := r.FormValue("pad_lt")
-	// 	padGt, err := strconv.ParseInt(padGtStr, 10, 32)
-	// 	if err != nil {
-	// 		return errHttp{code: http.StatusBadRequest, cause: err}
-	// 	}
-	// 	padLt, err := strconv.ParseInt(padLtStr, 10, 32)
-	// 	if err != nil {
-	// 		return errHttp{code: http.StatusBadRequest, cause: err}
-	// 	}
-	//
-	// 	watcher, err := v.repo.WatchSuites(id, int(padLt), int(padGt))
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	defer watcher.Close()
-	//
-	// 	for {
-	// 		if ok, err := suiteWatchWriter(r.Context(), w, watcher); !ok {
-	// 			return err
-	// 		}
-	// 	}
-	// }
 }
 
 // func suiteWatchWriter(ctx context.Context, w io.Writer,
@@ -175,7 +167,7 @@ func (v *v1) suiteCollHandler() errHandlerFunc {
 
 func (v *v1) caseHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id, err := idParam(r)
+		id, err := hexVarToId(r, "id")
 		if err != nil {
 			return err
 		}
@@ -183,27 +175,13 @@ func (v *v1) caseHandler() errHandlerFunc {
 		if err != nil {
 			return err
 		}
-		return writeJson(w, r, &c)
-	}
-}
-
-func (v *v1) caseLogsHandler() errHandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) error {
-		id, err := idParam(r)
-		if err != nil {
-			return err
-		}
-		c, err := v.repo.Case(r.Context(), id)
-		if err != nil {
-			return err
-		}
-		return writeJson(w, r, &c)
+		return writeJson(w, r, c)
 	}
 }
 
 func (v *v1) logLineHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id, err := idParam(r)
+		id, err := hexVarToId(r, "id")
 		if err != nil {
 			return err
 		}
@@ -211,6 +189,6 @@ func (v *v1) logLineHandler() errHandlerFunc {
 		if err != nil {
 			return err
 		}
-		return writeJson(w, r, &ll)
+		return writeJson(w, r, ll)
 	}
 }

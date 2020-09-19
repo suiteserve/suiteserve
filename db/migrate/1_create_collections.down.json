@@ -1,14 +1,17 @@
 [
   {
-    "drop": "attachments"
-  },
-  {
-    "drop": "suites"
+    "drop": "logs"
   },
   {
     "drop": "cases"
   },
   {
-    "drop": "logs"
+    "drop": "suites_agg"
+  },
+  {
+    "drop": "suites"
+  },
+  {
+    "drop": "attachments"
   }
 ]

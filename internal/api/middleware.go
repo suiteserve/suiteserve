@@ -18,22 +18,7 @@ func logMw(h http.Handler) http.HandlerFunc {
 	}
 }
 
-func idParam(r *http.Request) (repo.Id, error) {
-	hex, ok := mux.Vars(r)["id"]
-	if !ok {
-		panic("id param not found")
-	}
-	id, err := repo.HexToId(hex)
-	if err != nil {
-		return nil, errHttp{code: http.StatusBadRequest, cause: err}
-	}
-	return id, nil
-}
-
 func methodsMw(methods ...string) func(h http.Handler) http.HandlerFunc {
-	for i, m := range methods {
-		methods[i] = strings.ToUpper(m)
-	}
 	return func(h http.Handler) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			for _, m := range methods {
@@ -46,22 +31,6 @@ func methodsMw(methods ...string) func(h http.Handler) http.HandlerFunc {
 		}
 	}
 }
-
-// func methodMapMw(methods map[string]http.Handler) http.HandlerFunc {
-// 	methodsCpy := make(map[string]http.Handler, len(methods))
-// 	for m, h := range methods {
-// 		methodsCpy[strings.ToUpper(m)] = h
-// 	}
-// 	return func(w http.ResponseWriter, r *http.Request) {
-// 		for m, h := range methodsCpy {
-// 			if m == r.Method {
-// 				h.ServeHTTP(w, r)
-// 				return
-// 			}
-// 		}
-// 		methodNotAllowed()(w, r)
-// 	}
-// }
 
 func secMw(h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +86,18 @@ func userContentHandler(repo FileMetaRepo, dir string) errHandlerFunc {
 		fs.ServeHTTP(w, r)
 		return nil
 	}
+}
+
+func hexVarToId(r *http.Request, name string) (repo.Id, error) {
+	hex, ok := mux.Vars(r)[name]
+	if !ok {
+		panic(name + " param not found")
+	}
+	id, err := repo.HexToId(hex)
+	if err != nil {
+		return nil, errHttp{code: http.StatusBadRequest, cause: err}
+	}
+	return id, nil
 }
 
 func methodNotAllowed() http.HandlerFunc {

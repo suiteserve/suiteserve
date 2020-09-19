@@ -1,11 +1,7 @@
-import Vue from 'vue';
-import VueRouter from 'vue-router';
-import Cases from '@/components/Cases';
+import { createRouter, createWebHistory } from 'vue-router'
 
-Vue.use(VueRouter);
-
-export default new VueRouter({
-  mode: 'history',
+export default createRouter({
+  history: createWebHistory(),
   routes: [
     {
       path: '/suites/:suiteId',
@@ -24,4 +20,4 @@ export default new VueRouter({
       ],
     },
   ],
-})
+});

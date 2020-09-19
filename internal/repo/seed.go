@@ -28,7 +28,7 @@ func (r *Repo) Seed() error {
 		if err != nil {
 			return err
 		}
-		for i := 0; i < genIdx(2); i++ {
+		for i := 0; i < genIdx(3); i++ {
 			if _, err := r.seedAttachment(s.Id, nil); err != nil {
 				return err
 			}
@@ -38,7 +38,7 @@ func (r *Repo) Seed() error {
 			if err != nil {
 				return err
 			}
-			for i := 0; i < genIdx(2); i++ {
+			for i := 0; i < genIdx(3); i++ {
 				if _, err := r.seedAttachment(nil, c.Id); err != nil {
 					return err
 				}
@@ -57,7 +57,14 @@ func (r *Repo) shouldSeed() (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	colls, err := r.db.ListCollectionNames(ctx,
-		bson.D{{"name", bson.D{{"$ne", "schema_migrations"}}}})
+		bson.D{{"name", bson.D{
+			{"$in", bson.A{
+				"attachments",
+				"suites",
+				"cases",
+				"logs",
+			}},
+		}}})
 	if err != nil {
 		return false, err
 	}

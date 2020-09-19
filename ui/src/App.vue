@@ -5,9 +5,10 @@
   </main>
 </template>
 
-<script>
-import Suites from '@/components/Suites';
+<script lang="ts">
+import Suites from './components/Suites';
 
+// noinspection JSUnusedGlobalSymbols
 export default {
   name: 'App',
   components: {
