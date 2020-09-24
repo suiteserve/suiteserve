@@ -7,6 +7,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const suitePageLimit = 30
+
 type SuiteStatus string
 
 const (
@@ -37,31 +39,124 @@ type Suite struct {
 }
 
 type SuitePage struct {
-	NextId        Id      `json:"next_id" bson:"next_id"`
-	TotalCount    int64   `json:"total_count" bson:"total_count"`
-	FinishedCount int64   `json:"finished_count" bson:"finished_count"`
-	Suites        []Suite `json:"suites"`
+	More   bool    `json:"more"`
+	Suites []Suite `json:"suites"`
 }
 
 func (r *Repo) InsertSuite(ctx context.Context, s Suite) (Id, error) {
 	return r.insert(ctx, "suites", s)
 }
 
-func (r *Repo) Suite(ctx context.Context, id Id) (*Suite, error) {
+func (r *Repo) Suite(ctx context.Context, id Id) (interface{}, error) {
 	var s Suite
 	if err := r.findById(ctx, "suites", id, &s); err != nil {
 		return nil, err
 	}
-	return &s, nil
+	return s, nil
 }
 
-func (r *Repo) SuitePage(ctx context.Context) (*SuitePage, error) {
+func (r *Repo) SuitePage(ctx context.Context) (interface{}, error) {
 	c, err := r.db.Collection("suites").Aggregate(ctx, mongo.Pipeline{
-		{{}},
-	}, options.Aggregate().SetHint("latest"))
+		{{"$match", bson.D{
+			{"deleted", false},
+		}}},
+		{{"$sort", bson.D{
+			{"started_at", -1},
+			{"_id", -1},
+		}}},
+		{{"$limit", suitePageLimit + 1}},
+		{{"$group", bson.D{
+			{"_id", nil},
+			{"suites", bson.D{
+				{"$push", "$$ROOT"},
+			}},
+		}}},
+		{{"$set", bson.D{
+			{"more", bson.D{
+				{"$eq", bson.A{
+					bson.D{{"$size", "$suites"}},
+					suitePageLimit + 1,
+				}},
+			}},
+			{"suites", bson.D{
+				{"$slice", bson.A{"$suites", suitePageLimit}},
+			}},
+		}}},
+	})
 	if err != nil {
 		return nil, err
 	}
+	s := []SuitePage{}
+	if err := c.All(ctx, &s); err != nil {
+		return nil, err
+	}
+	if len(s) == 0 {
+		return SuitePage{Suites: []Suite{}}, nil
+	}
+	return s[0], nil
+}
+
+func (r *Repo) SuitePageAfter(ctx context.Context, id Id) (interface{}, error) {
+	var pivot Suite
+	err := r.db.Collection("suites").FindOne(ctx, bson.D{
+		{"_id", id},
+	}, options.FindOne().SetProjection(bson.D{
+		{"started_at", 1},
+	})).Decode(&pivot)
+	if err == mongo.ErrNoDocuments {
+		return nil, errNotFound{}
+	} else if err != nil {
+		return nil, err
+	}
+	c, err := r.db.Collection("suites").Aggregate(ctx, mongo.Pipeline{
+		{{"$match", bson.D{
+			{"deleted", false},
+			{"started_at", bson.D{
+				{"$lte", pivot.StartedAt},
+			}},
+			{"$or", bson.A{
+				bson.D{{"started_at", bson.D{
+					{"$lt", pivot.StartedAt},
+				}}},
+				bson.D{{"_id", bson.D{
+					{"$lt", pivot.Id},
+				}}},
+			}},
+		}}},
+		{{"$sort", bson.D{
+			{"started_at", -1},
+			{"_id", -1},
+		}}},
+		{{"$limit", suitePageLimit + 1}},
+		{{"$group", bson.D{
+			{"_id", nil},
+			{"suites", bson.D{
+				{"$push", "$$ROOT"},
+			}},
+		}}},
+		{{"$set", bson.D{
+			{"more", bson.D{
+				{"$eq", bson.A{
+					bson.D{{"$size", "$suites"}},
+					suitePageLimit + 1,
+				}},
+			}},
+			{"suites", bson.D{
+				{"$slice", bson.A{"$suites", suitePageLimit}},
+			}},
+		}}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	s := []SuitePage{}
+	if err := c.All(ctx, &s); err != nil {
+		return nil, err
+	}
+	if len(s) == 0 {
+		return SuitePage{Suites: []Suite{}}, nil
+	}
+	return s[0], nil
 }
 
 func (r *Repo) WatchSuites(ctx context.Context) *Watcher {
@@ -69,36 +164,13 @@ func (r *Repo) WatchSuites(ctx context.Context) *Watcher {
 }
 
 func (r *Repo) DeleteSuite(ctx context.Context, id Id, at int64) error {
-	// var old Suite
-	// r.db.Collection("asdf").Cou
-	// err := r.findAndUpdateById(ctx, "suites", id, bson.D{
-	// 	{"deleted", true},
-	// 	{"deleted_at", at},
-	// }, bson.D{
-	// 	{"deleted", 1},
-	// 	{"status", 1},
-	// }, &old)
-	// if err != nil {
-	// 	return err
-	// }
-	// if old.Deleted {
-	// 	// was already deleted, so do nothing
-	// 	return nil
-	// }
-	// // newly deleted
-	// incStarted := 0
-	// if old.Status == SuiteStatusStarted {
-	// 	incStarted = -1
-	// }
-	// return r.updateSuiteAgg(ctx, -1, 0)
-	return nil
+	return r.deleteById(ctx, "suites", id, at)
 }
 
-func (r *Repo) FinishSuite(ctx context.Context, id Id, result SuiteResult,
-	at int64) error {
+func (r *Repo) FinishSuite(ctx context.Context, id Id, res SuiteResult, at int64) error {
 	return r.updateById(ctx, "suites", id, bson.D{
 		{"status", SuiteStatusFinished},
-		{"result", result},
+		{"result", res},
 		{"finished_at", at},
 	})
 }
@@ -109,13 +181,3 @@ func (r *Repo) DisconnectSuite(ctx context.Context, id Id, at int64) error {
 		{"disconnected_at", at},
 	})
 }
-
-// func (r *Repo) updateSuiteAgg(ctx context.Context, incTotal, incStarted int) error {
-// 	_, err := r.db.Collection("suites_agg").UpdateOne(ctx, bson.D{}, bson.D{
-// 		{"$inc", bson.D{
-// 			{"total", incTotal},
-// 			{"started", incStarted},
-// 		}},
-// 	}, options.Update().SetUpsert(true))
-// 	return err
-// }

@@ -1,4 +1,3 @@
-// noinspection JSUnusedGlobalSymbols
 export default {
   port: 8081,
   https: true,

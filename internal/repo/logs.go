@@ -28,10 +28,10 @@ func (r *Repo) InsertLogLine(ctx context.Context, ll LogLine) (Id, error) {
 	return r.insert(ctx, "logs", ll)
 }
 
-func (r *Repo) LogLine(ctx context.Context, id Id) (*LogLine, error) {
+func (r *Repo) LogLine(ctx context.Context, id Id) (interface{}, error) {
 	var ll LogLine
 	if err := r.findById(ctx, "logs", id, &ll); err != nil {
 		return nil, err
 	}
-	return &ll, nil
+	return ll, nil
 }

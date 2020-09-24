@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const timeout = 3 * time.Second
+
 type Options struct {
 	Addr        string
 	TlsCertFile string
@@ -24,15 +26,15 @@ type Options struct {
 	V1 http.Handler
 }
 
-func (o Options) handler() http.Handler {
+func (o Options) newHandler() http.Handler {
 	var m http.ServeMux
 	m.Handle("/v1/",
 		http.StripPrefix("/v1", o.V1))
 	m.Handle(o.UserContentHost+"/",
-		secMw(userContentHandler(o.UserContentRepo, o.UserContentDir)))
+		userContentHandler(o.UserContentRepo, o.UserContentDir))
 	m.Handle("/",
-		secMw(uiHandler(o.PublicDir)))
-	return logMw(&m)
+		uiHandler(o.PublicDir))
+	return logMw(secMw(&m))
 }
 
 func Serve(ctx context.Context, opts Options) error {
@@ -46,7 +48,7 @@ func Serve(ctx context.Context, opts Options) error {
 		BaseContext: func(net.Listener) context.Context {
 			return ctx
 		},
-		Handler: opts.handler(),
+		Handler: opts.newHandler(),
 	}
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -58,7 +60,7 @@ func Serve(ctx context.Context, opts Options) error {
 	})
 	eg.Go(func() error {
 		<-ctx.Done()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		return srv.Shutdown(ctx)
 	})

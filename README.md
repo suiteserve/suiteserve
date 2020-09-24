@@ -8,7 +8,7 @@ For the best development experience, install the following:
 - [GNU Make](https://www.gnu.org/software/make/)
 - [Go](https://golang.org)
 - [migrate](https://github.com/golang-migrate/migrate)
-  - Install with `go get -tags 'mongodb' -u github.com/golang-migrate/migrate/cmd/migrate`.
+  - Install with `go get -tags 'mongodb' -u github.com/golang-migrate/migrate/v4/cmd/migrate`.
   - Ensure that `$GOPATH/bin` is in your path.
 - [mkcert](https://github.com/FiloSottile/mkcert)
 - [Node.js](https://nodejs.org)

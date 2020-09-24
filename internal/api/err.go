@@ -27,25 +27,22 @@ type errHandlerFunc func(w http.ResponseWriter, r *http.Request) error
 
 func (f errHandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := f(w, r); err != nil {
-		httpErr := errHttp{
-			code:  http.StatusInternalServerError,
-			cause: err,
+		herr := errHttp{code: http.StatusInternalServerError, cause: err}
+		if !errors.As(err, &herr) && isNotFound(err) {
+			herr.code = http.StatusNotFound
 		}
-		if !errors.As(err, &httpErr) && isNotFound(err) {
-			httpErr.code = http.StatusNotFound
+		text := herr.Error()
+		if herr.cause != nil {
+			text += ": " + herr.cause.Error()
 		}
-		text := httpErr.Error()
-		if httpErr.cause != nil {
-			text += ": " + httpErr.cause.Error()
-		}
-		log.Printf("<%s> %d %s", r.RemoteAddr, httpErr.code, text)
-		http.Error(w, httpErr.Error(), httpErr.code)
+		log.Printf("<%s> %d %s", r.RemoteAddr, herr.code, text)
+		http.Error(w, herr.Error(), herr.code)
 	}
 }
 
 func isNotFound(err error) bool {
 	var errNotFound interface {
-		NotFound() bool
+		NotFound()
 	}
 	return errors.As(err, &errNotFound)
 }

@@ -39,20 +39,20 @@ func secMw(h http.Handler) http.HandlerFunc {
 	}
 }
 
-func uiHandler(publicDir string) errHandlerFunc {
-	fileRepo := http.FileServer(http.Dir(publicDir))
+func uiHandler(dir string) errHandlerFunc {
+	fs := http.FileServer(http.Dir(dir))
 	return func(w http.ResponseWriter, r *http.Request) error {
 		path, err := filepath.Abs(r.URL.Path)
 		if err != nil {
 			return errHttp{code: http.StatusBadRequest, cause: err}
 		}
-		path = filepath.Join(publicDir, path)
+		path = filepath.Join(dir, path)
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			http.ServeFile(w, r, filepath.Join(publicDir, "index.html"))
+			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
 		} else if err != nil {
 			return err
 		} else {
-			fileRepo.ServeHTTP(w, r)
+			fs.ServeHTTP(w, r)
 		}
 		return nil
 	}
@@ -67,31 +67,29 @@ type FileMetaRepo interface {
 	FileMeta(id string) (FileMeta, error)
 }
 
-func userContentHandler(repo FileMetaRepo, dir string) errHandlerFunc {
+func userContentHandler(mr FileMetaRepo, dir string) errHandlerFunc {
 	fs := http.FileServer(http.Dir(dir))
 	return func(w http.ResponseWriter, r *http.Request) error {
 		id := strings.TrimPrefix(r.URL.Path, "/")
-		meta, err := repo.FileMeta(id)
-		if isNotFound(err) {
-			return errHttp{code: http.StatusNotFound, cause: err}
-		} else if err != nil {
+		m, err := mr.FileMeta(id)
+		if err != nil {
 			return err
 		}
 		w.Header().Set("content-disposition",
-			fmt.Sprintf("attachment; filename=%q", meta.Name()))
+			fmt.Sprintf("attachment; filename=%q", m.Name()))
 		w.Header().Set("content-security-policy",
 			"sandbox; default-src 'none';")
-		w.Header().Set("content-type", meta.ContentType())
+		w.Header().Set("content-type", m.ContentType())
 		w.Header().Set("x-content-type-options", "nosniff")
 		fs.ServeHTTP(w, r)
 		return nil
 	}
 }
 
-func hexVarToId(r *http.Request, name string) (repo.Id, error) {
+func parseIdVar(r *http.Request, name string) (repo.Id, error) {
 	hex, ok := mux.Vars(r)[name]
 	if !ok {
-		panic(name + " param not found")
+		panic(name + " var not found")
 	}
 	id, err := repo.HexToId(hex)
 	if err != nil {

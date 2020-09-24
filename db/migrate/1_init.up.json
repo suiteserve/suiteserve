@@ -1,0 +1,46 @@
+[
+  {
+    "create": "attachments"
+  },
+  {
+    "createIndexes": "attachments",
+    "indexes": [
+      {
+        "key": {
+          "suite_id": 1,
+          "case_id": 1,
+          "timestamp": -1,
+          "_id": -1
+        },
+        "name": "all",
+        "partialFilterExpression": {
+          "deleted": false
+        }
+      }
+    ]
+  },
+  {
+    "create": "suites"
+  },
+  {
+    "createIndexes": "suites",
+    "indexes": [
+      {
+        "key": {
+          "started_at": -1,
+          "_id": -1
+        },
+        "name": "latest",
+        "partialFilterExpression": {
+          "deleted": false
+        }
+      }
+    ]
+  },
+  {
+    "create": "cases"
+  },
+  {
+    "create": "logs"
+  }
+]

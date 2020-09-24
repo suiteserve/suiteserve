@@ -62,14 +62,16 @@ func Open(addr, replSet, user, pass, db string) (*Repo, error) {
 	return &Repo{db: client.Database(db)}, nil
 }
 
-func decodeIdValue(_ bsoncodec.DecodeContext, vr bsonrw.ValueReader,
-	v reflect.Value) error {
+func decodeIdValue(_ bsoncodec.DecodeContext, vr bsonrw.ValueReader, v reflect.Value) error {
 	if !v.IsValid() || v.Type() != idType {
 		return bsoncodec.ValueDecoderError{
 			Name:     "DecodeIdValue",
 			Types:    []reflect.Type{idType},
 			Received: v,
 		}
+	}
+	if vr.Type() == bson.TypeNull {
+		return vr.ReadNull()
 	}
 	oid, err := vr.ReadObjectID()
 	if err != nil {
@@ -94,8 +96,7 @@ func (r *Repo) insert(ctx context.Context, coll string,
 	return res.InsertedID, nil
 }
 
-func (r *Repo) findById(ctx context.Context, coll string, id Id,
-	v interface{}) error {
+func (r *Repo) findById(ctx context.Context, coll string, id Id, v interface{}) error {
 	err := r.db.Collection(coll).FindOne(ctx, bson.D{{"_id", id}}).Decode(v)
 	if err == mongo.ErrNoDocuments {
 		return errNotFound{}
@@ -103,14 +104,15 @@ func (r *Repo) findById(ctx context.Context, coll string, id Id,
 	return err
 }
 
-func (r *Repo) updateById(ctx context.Context, coll string, id Id,
-	set bson.D) error {
-	filter := bson.D{{"_id", id}}
-	update := bson.D{
-		{"$inc", bson.D{{"version", 1}}},
+func (r *Repo) updateById(ctx context.Context, coll string, id Id, set interface{}) error {
+	res, err := r.db.Collection(coll).UpdateOne(ctx, bson.D{
+		{"_id", id},
+	}, bson.D{
+		{"$inc", bson.D{
+			{"version", 1},
+		}},
 		{"$set", set},
-	}
-	res, err := r.db.Collection(coll).UpdateOne(ctx, filter, update)
+	})
 	if err != nil {
 		return err
 	}
@@ -120,25 +122,7 @@ func (r *Repo) updateById(ctx context.Context, coll string, id Id,
 	return nil
 }
 
-// func (r *Repo) findAndUpdateById(ctx context.Context, coll string, id Id,
-// 	set, oldProj bson.D, old interface{}) error {
-// 	filter := bson.D{{"_id", id}}
-// 	update := bson.D{
-// 		{"$inc", bson.D{{"version", 1}}},
-// 		{"$set", set},
-// 	}
-// 	opts := options.FindOneAndUpdate().SetProjection(oldProj)
-// 	err := r.db.Collection(coll).
-// 		FindOneAndUpdate(ctx, filter, update, opts).
-// 		Decode(old)
-// 	if err == mongo.ErrNoDocuments {
-// 		return errNotFound{}
-// 	}
-// 	return err
-// }
-
-func (r *Repo) deleteById(ctx context.Context, coll string, id Id,
-	at int64) error {
+func (r *Repo) deleteById(ctx context.Context, coll string, id Id, at int64) error {
 	return r.updateById(ctx, coll, id, bson.D{
 		{"deleted", true},
 		{"deleted_at", at},
@@ -146,9 +130,5 @@ func (r *Repo) deleteById(ctx context.Context, coll string, id Id,
 }
 
 func HexToId(hex string) (Id, error) {
-	oid, err := primitive.ObjectIDFromHex(hex)
-	if err != nil {
-		return nil, err
-	}
-	return oid, nil
+	return primitive.ObjectIDFromHex(hex)
 }

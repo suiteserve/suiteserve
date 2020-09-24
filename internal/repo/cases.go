@@ -43,10 +43,10 @@ func (r *Repo) InsertCase(ctx context.Context, c Case) (Id, error) {
 	return r.insert(ctx, "cases", c)
 }
 
-func (r *Repo) Case(ctx context.Context, id Id) (*Case, error) {
+func (r *Repo) Case(ctx context.Context, id Id) (interface{}, error) {
 	var c Case
 	if err := r.findById(ctx, "cases", id, &c); err != nil {
 		return nil, err
 	}
-	return &c, nil
+	return c, nil
 }

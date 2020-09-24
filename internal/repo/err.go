@@ -6,6 +6,4 @@ func (errNotFound) Error() string {
 	return "not found"
 }
 
-func (errNotFound) NotFound() bool {
-	return true
-}
+func (errNotFound) NotFound() {}
