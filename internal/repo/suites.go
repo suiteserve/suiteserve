@@ -4,10 +4,7 @@ import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-const suitePageLimit = 30
 
 type SuiteStatus string
 
@@ -56,78 +53,44 @@ func (r *Repo) Suite(ctx context.Context, id Id) (interface{}, error) {
 }
 
 func (r *Repo) SuitePage(ctx context.Context) (interface{}, error) {
-	c, err := r.db.Collection("suites").Aggregate(ctx, mongo.Pipeline{
-		{{"$match", bson.D{
-			{"deleted", false},
-		}}},
-		{{"$sort", bson.D{
-			{"started_at", -1},
-			{"_id", -1},
-		}}},
-		{{"$limit", suitePageLimit + 1}},
-		{{"$group", bson.D{
-			{"_id", nil},
-			{"suites", bson.D{
-				{"$push", "$$ROOT"},
-			}},
-		}}},
-		{{"$set", bson.D{
-			{"more", bson.D{
-				{"$eq", bson.A{
-					bson.D{{"$size", "$suites"}},
-					suitePageLimit + 1,
-				}},
-			}},
-			{"suites", bson.D{
-				{"$slice", bson.A{"$suites", suitePageLimit}},
-			}},
-		}}},
+	return r.suitePage(ctx, bson.D{
+		{"deleted", false},
 	})
-	if err != nil {
-		return nil, err
-	}
-	s := []SuitePage{}
-	if err := c.All(ctx, &s); err != nil {
-		return nil, err
-	}
-	if len(s) == 0 {
-		return SuitePage{Suites: []Suite{}}, nil
-	}
-	return s[0], nil
 }
 
 func (r *Repo) SuitePageAfter(ctx context.Context, id Id) (interface{}, error) {
 	var pivot Suite
-	err := r.db.Collection("suites").FindOne(ctx, bson.D{
-		{"_id", id},
-	}, options.FindOne().SetProjection(bson.D{
+	err := r.findByIdProj(ctx, "suites", id, bson.D{
 		{"started_at", 1},
-	})).Decode(&pivot)
-	if err == mongo.ErrNoDocuments {
-		return nil, errNotFound{}
-	} else if err != nil {
+	}, &pivot)
+	if err != nil {
 		return nil, err
 	}
+	return r.suitePage(ctx, bson.D{
+		{"deleted", false},
+		{"started_at", bson.D{
+			{"$lte", pivot.StartedAt},
+		}},
+		{"$or", bson.A{
+			bson.D{{"started_at", bson.D{
+				{"$lt", pivot.StartedAt},
+			}}},
+			bson.D{{"_id", bson.D{
+				{"$lt", pivot.Id},
+			}}},
+		}},
+	})
+}
+
+func (r *Repo) suitePage(ctx context.Context, match bson.D) (interface{}, error) {
+	const limit = 30
 	c, err := r.db.Collection("suites").Aggregate(ctx, mongo.Pipeline{
-		{{"$match", bson.D{
-			{"deleted", false},
-			{"started_at", bson.D{
-				{"$lte", pivot.StartedAt},
-			}},
-			{"$or", bson.A{
-				bson.D{{"started_at", bson.D{
-					{"$lt", pivot.StartedAt},
-				}}},
-				bson.D{{"_id", bson.D{
-					{"$lt", pivot.Id},
-				}}},
-			}},
-		}}},
+		{{"$match", match}},
 		{{"$sort", bson.D{
 			{"started_at", -1},
 			{"_id", -1},
 		}}},
-		{{"$limit", suitePageLimit + 1}},
+		{{"$limit", limit + 1}},
 		{{"$group", bson.D{
 			{"_id", nil},
 			{"suites", bson.D{
@@ -138,11 +101,11 @@ func (r *Repo) SuitePageAfter(ctx context.Context, id Id) (interface{}, error) {
 			{"more", bson.D{
 				{"$eq", bson.A{
 					bson.D{{"$size", "$suites"}},
-					suitePageLimit + 1,
+					limit + 1,
 				}},
 			}},
 			{"suites", bson.D{
-				{"$slice", bson.A{"$suites", suitePageLimit}},
+				{"$slice", bson.A{"$suites", limit}},
 			}},
 		}}},
 	})

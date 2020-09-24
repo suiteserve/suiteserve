@@ -96,21 +96,25 @@ func (r *Repo) insert(ctx context.Context, coll string,
 	return res.InsertedID, nil
 }
 
-func (r *Repo) findById(ctx context.Context, coll string, id Id, v interface{}) error {
-	err := r.db.Collection(coll).FindOne(ctx, bson.D{{"_id", id}}).Decode(v)
+func (r *Repo) findByIdProj(ctx context.Context, coll string, id Id, proj, v interface{}) error {
+	filter := bson.D{{"_id", id}}
+	opts := options.FindOne().SetProjection(proj)
+	err := r.db.Collection(coll).FindOne(ctx, filter, opts).Decode(v)
 	if err == mongo.ErrNoDocuments {
 		return errNotFound{}
 	}
 	return err
 }
 
+func (r *Repo) findById(ctx context.Context, coll string, id Id, v interface{}) error {
+	return r.findByIdProj(ctx, coll, id, nil, v)
+}
+
 func (r *Repo) updateById(ctx context.Context, coll string, id Id, set interface{}) error {
 	res, err := r.db.Collection(coll).UpdateOne(ctx, bson.D{
 		{"_id", id},
 	}, bson.D{
-		{"$inc", bson.D{
-			{"version", 1},
-		}},
+		{"$inc", bson.D{{"version", 1}}},
 		{"$set", set},
 	})
 	if err != nil {
