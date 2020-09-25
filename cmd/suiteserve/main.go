@@ -64,12 +64,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go func() {
+		defer cancel()
 		ch := make(chan os.Signal, 1)
 		defer close(ch)
 		signal.Notify(ch, os.Interrupt)
 		defer signal.Stop(ch)
 		<-ch
-		cancel()
+		log.Print("Shutting down...")
 	}()
 	if err := api.Serve(ctx, opts); err != nil {
 		log.Fatalf("serve api: %v", err)

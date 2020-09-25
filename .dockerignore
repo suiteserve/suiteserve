@@ -1,5 +1,5 @@
-/config/
 /data/
+/db/
 /tls/
 /ui/dist/
 /ui/node_modules/

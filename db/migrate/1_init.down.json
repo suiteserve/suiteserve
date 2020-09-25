@@ -6,9 +6,6 @@
     "drop": "cases"
   },
   {
-    "drop": "suites_agg"
-  },
-  {
     "drop": "suites"
   },
   {
