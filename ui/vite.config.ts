@@ -9,8 +9,8 @@ export default {
   proxy: {
     '/v1/': {
       target: 'https://localhost:8080',
-      secure: true,
+      secure: false,
       changeOrigin: true,
     },
   },
-}
+};

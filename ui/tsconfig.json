@@ -2,8 +2,19 @@
   "compilerOptions": {
     "target": "esnext",
     "module": "esnext",
+    "moduleResolution": "node",
     "strict": true,
-    "jsx": "preserve",
-    "moduleResolution": "node"
-  }
+    "lib": [
+      "dom",
+      "esnext"
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.vue"
+  ],
+  "exclude": [
+    "/dist/",
+    "/node_modules/"
+  ]
 }

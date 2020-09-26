@@ -1,24 +1,19 @@
 <template>
-  <main id="app">
-    <Suites/>
-    <router-view name="cases"></router-view>
-  </main>
+  <HelloWorld msg="Hello Vue 3.0 + Vite" />
 </template>
 
 <script lang="ts">
-import Suites from './components/Suites';
+import { defineComponent } from 'vue';
+import HelloWorld from './components/HelloWorld.vue';
+import * as api from './api';
 
-// noinspection JSUnusedGlobalSymbols
-export default {
+export default defineComponent({
   name: 'App',
   components: {
-    Suites,
+    HelloWorld,
   },
-}
+  async mounted(): Promise<void> {
+    console.log((await api.getAllAttachments()).map((value) => value.timestamp));
+  },
+});
 </script>
-
-<style>
-#app {
-  display: flex;
-}
-</style>

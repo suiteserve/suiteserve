@@ -18,9 +18,6 @@ type Repo interface {
 	Suite(ctx context.Context, id repo.Id) (interface{}, error)
 	SuitePage(ctx context.Context) (interface{}, error)
 	SuitePageAfter(ctx context.Context, id repo.Id) (interface{}, error)
-	// SuitePageTo(ctx context.Context, id repo.Id) (*repo.SuitePage, error)
-	// SuitePageFrom(ctx context.Context, id repo.Id) (*repo.SuitePage, error)
-	// SuitePageAround(ctx context.Context, id repo.Id) (*repo.SuitePage, error)
 	WatchSuites(ctx context.Context) *repo.Watcher
 	DeleteSuite(ctx context.Context, id repo.Id, at int64) error
 	FinishSuite(ctx context.Context, id repo.Id, result repo.SuiteResult, at int64) error
