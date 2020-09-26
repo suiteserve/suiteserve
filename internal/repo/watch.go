@@ -8,11 +8,16 @@ import (
 )
 
 type Watcher struct {
-	ch  chan json.RawMessage
+	ch  chan Change
 	err error
 }
 
-func (w *Watcher) Ch() <-chan json.RawMessage {
+type Change struct {
+	Msg  json.RawMessage
+	Coll string
+}
+
+func (w *Watcher) Ch() <-chan Change {
 	return w.ch
 }
 
@@ -20,15 +25,17 @@ func (w *Watcher) Err() error {
 	return w.err
 }
 
-type WatchEvent struct {
+type watchEvent struct {
 	Id     `json:"id" bson:"_id"`
 	Insert interface{} `json:"insert,omitempty" bson:"fullDocument"`
 	Update interface{} `json:"update,omitempty"`
 	Delete interface{} `json:"delete,omitempty"`
+
+	coll string
 }
 
 func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
-	w := Watcher{ch: make(chan json.RawMessage)}
+	w := Watcher{ch: make(chan Change)}
 	s, err := r.db.Collection(coll).Watch(ctx, mongo.Pipeline{
 		{{"$match", bson.D{
 			{"operationType", bson.D{
@@ -40,11 +47,13 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 		}}},
 		{{"$set", bson.D{
 			{"_id", "$documentKey._id"},
+			{"coll", "$ns.coll"},
 			{"update", "$updateDescription.updatedFields"},
 			{"delete", "$updateDescription.removedFields"},
 		}}},
 		{{"$project", bson.D{
 			{"fullDocument", 1},
+			{"coll", 1},
 			{"update", 1},
 			{"delete", 1},
 		}}},
@@ -55,7 +64,6 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 		return &w
 	}
 	go func() {
-		defer close(w.ch)
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
@@ -63,8 +71,9 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 				w.err = cerr
 			}
 		}()
+		defer close(w.ch)
 		for s.Next(ctx) {
-			var e WatchEvent
+			var e watchEvent
 			if err := s.Decode(&e); err != nil {
 				w.err = err
 				return
@@ -73,7 +82,10 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 			if err != nil {
 				panic(err)
 			}
-			w.ch <- b
+			w.ch <- Change{
+				Msg:  b,
+				Coll: e.coll,
+			}
 		}
 		w.err = s.Err()
 	}()

@@ -2,9 +2,14 @@ package api
 
 import (
 	"context"
+	"errors"
 	"github.com/gorilla/mux"
 	"github.com/suiteserve/suiteserve/internal/repo"
+	"github.com/suiteserve/suiteserve/sse"
+	"io"
+	"log"
 	"net/http"
+	"time"
 )
 
 type Repo interface {
@@ -54,9 +59,9 @@ func (v v1) newRouter() http.Handler {
 	// suites
 	r.Handle("/suites", findByIdHandler(v.repo.SuitePageAfter)).
 		Queries("after", "{id}")
+	r.Handle("/suites", sse.NewMiddleware(v.watchSuitesHandler())).
+		Queries("watch", "true")
 	r.Handle("/suites", findAllHandler(v.repo.SuitePage))
-	r.Handle("/suites", v.watchSuitesHandler()).
-		Queries("watch", "{watch}", "from", "{fromId}")
 	r.Handle("/suites/{id}", findByIdHandler(v.repo.Suite))
 	// r.Handle("/suites/{id}/cases", v1.suiteCasesHandler())
 
@@ -70,47 +75,41 @@ func (v v1) newRouter() http.Handler {
 	return methodsMw(http.MethodGet, http.MethodHead)(r)
 }
 
-func (v *v1) watchSuitesHandler() errHandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) error {
-		// fromId, err := hexVarToId(r, "from")
-		// if err != nil {
-		// 	return err
-		// }
-		// v.repo.Suite
-		// s, err := v.repo.Suite(r.Context(), id)
-		// if err != nil {
-		// 	return err
-		// }
-		return writeJson(w, r, nil)
+func (v *v1) watchSuitesHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		watcher := v.repo.WatchSuites(r.Context())
+		var err error
+		for ok := true; ok; {
+			ok, err = v.watchSuitesTick(w, watcher)
+			// TODO: don't like this... Vite also doesn't like how we close
+			if err != nil && !errors.Is(err, context.Canceled) {
+				log.Printf("<%s> %v", r.RemoteAddr, err)
+				return
+			}
+		}
 	}
 }
 
-// func suiteWatchWriter(ctx context.Context, w io.Writer,
-// 	watcher *repo.SuiteWatcher) (bool, error) {
-// 	timer := time.NewTimer(15 * time.Second)
-// 	defer timer.Stop()
-// 	select {
-// 	case changes := <-watcher.Changes():
-// 		for _, c := range changes {
-// 			b, err := json.Marshal(c)
-// 			if err != nil {
-// 				panic(err)
-// 			}
-// 			_, err = sse.Send(w, sse.WithEventType(c.Type()),
-// 				sse.WithData(string(b)))
-// 			if err != nil {
-// 				return false, err
-// 			}
-// 		}
-// 	case <-timer.C:
-// 		if _, err := sse.Send(w, sse.WithComment("keep-alive")); err != nil {
-// 			return false, err
-// 		}
-// 	case <-ctx.Done():
-// 		return false, nil
-// 	}
-// 	return true, nil
-// }
+func (v *v1) watchSuitesTick(w io.Writer, watcher *repo.Watcher) (bool, error) {
+	timer := time.NewTimer(15 * time.Second)
+	defer timer.Stop()
+	select {
+	case c, ok := <-watcher.Ch():
+		if !ok {
+			return false, watcher.Err()
+		}
+		_, err := sse.Send(w, sse.WithEventType(c.Coll),
+			sse.WithData(string(c.Msg)))
+		if err != nil {
+			return false, err
+		}
+	case <-timer.C:
+		if _, err := sse.Send(w, sse.WithComment("keep-alive")); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
 
 func findHandler(fn func(r *http.Request) (interface{}, error)) errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
