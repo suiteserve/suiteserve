@@ -123,6 +123,10 @@ export async function getSuite(id: string): Promise<Suite> {
   return getJson(`/v1/suites/${encodeURIComponent(id)}`);
 }
 
+export function watchSuites(): EventSource {
+  return new EventSource('/v1/suites?watch=true');
+}
+
 export async function getSuitePage(): Promise<SuitePage> {
   return getJson('/v1/suites');
 }

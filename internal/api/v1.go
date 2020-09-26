@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"github.com/gorilla/mux"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"github.com/suiteserve/suiteserve/sse"
@@ -80,9 +79,7 @@ func (v *v1) watchSuitesHandler() http.HandlerFunc {
 		watcher := v.repo.WatchSuites(r.Context())
 		var err error
 		for ok := true; ok; {
-			ok, err = v.watchSuitesTick(w, watcher)
-			// TODO: don't like this... Vite also doesn't like how we close
-			if err != nil && !errors.Is(err, context.Canceled) {
+			if ok, err = v.watchSuitesTick(w, watcher); err != nil {
 				log.Printf("<%s> %v", r.RemoteAddr, err)
 				return
 			}

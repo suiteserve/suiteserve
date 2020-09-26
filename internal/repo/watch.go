@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -87,7 +88,9 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 				Coll: e.coll,
 			}
 		}
-		w.err = s.Err()
+		if s.Err() != nil && !errors.Is(s.Err(), context.Canceled) {
+			w.err = s.Err()
+		}
 	}()
 	return &w
 }
