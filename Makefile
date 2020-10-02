@@ -1,5 +1,5 @@
-suiteserve: ui/dist
-	CGO_ENABLED=0 go build -o suiteserve cmd/suiteserve/main.go
+suiteserve: ui/build
+	CGO_ENABLED=0 go build -o suiteserve github.com/suiteserve/suiteserve/cmd/suiteserve
 
 .PHONY: test
 test:
@@ -20,10 +20,10 @@ dev-db-migrate-down:
 		-path db/migrate down
 
 ui/node_modules:
-	cd ui; npm i
+	cd ui; yarn install
 
-ui/dist: ui/node_modules
-	cd ui; npm run build
+ui/build: ui/node_modules
+	cd ui; yarn build
 
 tls/ca.pem tls/cert.pem tls/key.pem:
 	mkcert -install -cert-file tls/cert.pem -key-file tls/key.pem \
@@ -33,5 +33,5 @@ tls/ca.pem tls/cert.pem tls/key.pem:
 .PHONY: clean
 clean:
 	cd data; find . ! -name . ! -name .gitignore -exec rm -r {} +
-	rm -rf ui/dist ui/node_modules
+	rm -rf ui/build ui/node_modules
 	rm -f tls/ca.pem tls/cert.pem tls/key.pem suiteserve

@@ -8,15 +8,15 @@ RUN CGO_ENABLED=0 go install
 
 FROM node:14-alpine AS ui-builder
 WORKDIR /ui/
-COPY ui/package*.json ./
+COPY ui2.old ./
 RUN npm i
-COPY ui/ ./
+COPY ui2.old ./
 RUN npm run build
 
 FROM scratch
 WORKDIR /app/
 COPY --from=app-builder /go/bin/suiteserve ./
-COPY --from=ui-builder /ui/dist/ ui/dist/
+COPY --from=ui-builder /ui2.old ui/dist/
 EXPOSE 8080
 VOLUME /app/data/
 ENTRYPOINT ["./suiteserve"]
