@@ -1,0 +1,37 @@
+.SuiteNavTab {
+  --padding: 1em;
+
+  display: flex;
+  align-items: center;
+  padding: var(--padding);
+}
+
+.SuiteNavTab:hover {
+  background-color: var(--hover-color);
+}
+
+.SuiteNavTab.Active {
+  --border-width: 3px;
+
+  border-left: var(--border-width) solid var(--dark-1);
+
+  padding-left: calc(var(--padding) - var(--border-width));
+}
+
+.SuiteNavTab > * {
+  min-width: 0;
+}
+
+.SuiteNavTab > *:not(:last-child) {
+  margin-right: 1em;
+}
+
+.SuiteNavTab p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.StartedAt {
+  color: var(--text-muted);
+}

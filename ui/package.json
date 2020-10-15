@@ -3,16 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@reduxjs/toolkit": "^1.4.0",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
+    "@types/classnames": "^2.2.10",
     "@types/jest": "^24.0.0",
     "@types/node": "^12.0.0",
     "@types/react": "^16.9.0",
     "@types/react-dom": "^16.9.0",
+    "@types/react-redux": "^7.1.9",
+    "@types/react-router-dom": "^5.1.6",
+    "classnames": "^2.2.6",
+    "eslint-config-prettier": "^6.12.0",
     "http-proxy-middleware": "^1.0.5",
+    "prettier": "^2.1.2",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
+    "react-redux": "^7.2.1",
     "react-router-dom": "^5.2.0",
     "react-scripts": "3.4.3",
     "typescript": "~3.7.2"
@@ -21,10 +29,21 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "typecheck": "tsc --noEmit --noErrorTruncation --incremental false --pretty false",
+    "lint": "eslint --fix 'src/**/*.{js,jsx,ts,tsx}'",
+    "format": "prettier --write '{public,src}/**/*.{css,html,js,jsx,ts,tsx}'",
+    "fix": "yarn typecheck && yarn lint && yarn format"
+  },
+  "prettier": {
+    "jsxSingleQuote": true,
+    "singleQuote": true
   },
   "eslintConfig": {
-    "extends": "react-app"
+    "extends": [
+      "react-app",
+      "prettier",
+      "prettier/react"
+    ]
   },
   "browserslist": {
     "production": [

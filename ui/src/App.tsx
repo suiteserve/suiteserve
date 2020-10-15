@@ -1,26 +1,17 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { Suites } from './features/suites';
+import { Cases } from './features/cases';
+import { Logs } from './features/logs';
+import { Route, Switch } from 'react-router-dom';
 
-function App() {
+export const App: React.FC = () => {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <Switch>
+        <Route path='/suites/:suiteId/cases/:caseId' component={Logs} />
+        <Route path='/suites/:suiteId' component={Cases} />
+        <Route path='/' component={Suites} />
+      </Switch>
     </div>
   );
-}
-
-export default App;
+};

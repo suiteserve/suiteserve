@@ -7,11 +7,7 @@ require (
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/gorilla/mux v1.8.0
-	github.com/graph-gophers/dataloader v5.0.0+incompatible // indirect
-	github.com/graph-gophers/graphql-go v0.0.0-20200819123640-3b5ddcd884ae // indirect
-	github.com/graphql-go/graphql v0.7.9 // indirect
 	github.com/klauspost/compress v1.11.0 // indirect
-	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/stretchr/testify v1.5.1
 	github.com/xdg/stringprep v1.0.0 // indirect
 	go.mongodb.org/mongo-driver v1.4.1

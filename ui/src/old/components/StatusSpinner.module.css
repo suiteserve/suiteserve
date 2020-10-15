@@ -1,0 +1,38 @@
+.StatusSpinner {
+  border: 3px solid var(--mute-color);
+  border-radius: 50%;
+
+  width: 1.5em;
+  height: 1.5em;
+}
+
+.Running.Ok :global,
+.Running.Error :global {
+  border-color: var(--mute-color);
+
+  animation: 1s linear infinite spin;
+}
+
+.Ok {
+  border-color: var(--primary-color);
+}
+
+.Running.Ok {
+  border-top-color: var(--primary-color);
+}
+
+.Warn {
+  border-color: var(--warn-color);
+}
+
+.Running.Warn {
+  border-top-color: var(--warn-color);
+}
+
+.Error {
+  border-color: var(--error-color);
+}
+
+.Running.Error {
+  border-top-color: var(--error-color);
+}
