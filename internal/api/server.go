@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"golang.org/x/sync/errgroup"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -67,23 +68,23 @@ func Serve(ctx context.Context, opts Options) error {
 	return eg.Wait()
 }
 
-// func readJson(r *http.Request, dst interface{}) error {
-// 	if r.Header.Get("content-type") != "application/json" {
-// 		return errHttp{code: http.StatusUnsupportedMediaType}
-// 	}
-// 	b, err := ioutil.ReadAll(r.Body)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if err := json.Unmarshal(b, dst); err != nil {
-// 		return errHttp{
-// 			error: "bad json",
-// 			code:  http.StatusBadRequest,
-// 			cause: err,
-// 		}
-// 	}
-// 	return nil
-// }
+func readJson(r *http.Request, dst interface{}) error {
+	if r.Header.Get("content-type") != "application/json" {
+		return errHttp{code: http.StatusUnsupportedMediaType}
+	}
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(b, dst); err != nil {
+		return errHttp{
+			error: "bad json",
+			code:  http.StatusBadRequest,
+			cause: err,
+		}
+	}
+	return nil
+}
 
 func writeJson(w http.ResponseWriter, r *http.Request, v interface{}) error {
 	b, err := json.Marshal(v)

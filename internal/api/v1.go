@@ -51,29 +51,85 @@ func (v v1) newRouter() http.Handler {
 
 	// attachments
 	r.Handle("/attachments", findByIdHandler(v.repo.SuiteAttachments)).
-		Queries("suite", "{id}")
+		Queries("suite", "{id}").
+		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/attachments", findByIdHandler(v.repo.CaseAttachments)).
-		Queries("case", "{id}")
-	r.Handle("/attachments", findAllHandler(v.repo.AllAttachments))
-	r.Handle("/attachments/{id}", findByIdHandler(v.repo.Attachment))
+		Queries("case", "{id}").
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/attachments", findAllHandler(v.repo.AllAttachments)).
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/attachments/{id}", findByIdHandler(v.repo.Attachment)).
+		Methods(http.MethodGet, http.MethodHead)
 
 	// suites
+	r.Handle("/suites", v.insertSuiteHandler()).
+		Methods(http.MethodPost)
 	r.Handle("/suites", findByIdHandler(v.repo.SuitePageAfter)).
-		Queries("after", "{id}")
+		Queries("after", "{id}").
+		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/suites", sse.NewMiddleware(v.watchSuitesHandler())).
-		Queries("watch", "true")
-	r.Handle("/suites", findAllHandler(v.repo.SuitePage))
-	r.Handle("/suites/{id}", findByIdHandler(v.repo.Suite))
-	r.Handle("/suites/{id}/cases", findByIdHandler(v.repo.SuiteCases))
+		Queries("watch", "true").
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/suites", findAllHandler(v.repo.SuitePage)).
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/suites/{id}", findByIdHandler(v.repo.Suite)).
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/suites/{id}/cases", findByIdHandler(v.repo.SuiteCases)).
+		Methods(http.MethodGet, http.MethodHead)
 
 	// cases
-	r.Handle("/cases/{id}", findByIdHandler(v.repo.Case))
-	r.Handle("/cases/{id}/logs", findByIdHandler(v.repo.CaseLogLines))
+	r.Handle("/cases/{id}", findByIdHandler(v.repo.Case)).
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/cases/{id}/logs", findByIdHandler(v.repo.CaseLogLines)).
+		Methods(http.MethodGet, http.MethodHead)
 
 	// logs
-	r.Handle("/logs/{id}", findByIdHandler(v.repo.LogLine))
+	r.Handle("/logs/{id}", findByIdHandler(v.repo.LogLine)).
+		Methods(http.MethodGet, http.MethodHead)
 
-	return methodsMw(http.MethodGet, http.MethodHead)(r)
+	return r
+}
+
+func (v *v1) insertSuiteHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		var s repo.Suite
+		if err := readJson(r, &s); err != nil {
+			return err
+		}
+		id, err := v.repo.InsertSuite(r.Context(), s)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, id)
+	}
+}
+
+func (v *v1) insertCaseHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		var c repo.Case
+		if err := readJson(r, &c); err != nil {
+			return err
+		}
+		id, err := v.repo.InsertCase(r.Context(), c)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, id)
+	}
+}
+
+func (v *v1) insertLogLineHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		var ll repo.LogLine
+		if err := readJson(r, &ll); err != nil {
+			return err
+		}
+		id, err := v.repo.InsertLogLine(r.Context(), ll)
+		if err != nil {
+			return err
+		}
+		return writeJson(w, r, id)
+	}
 }
 
 func (v *v1) watchSuitesHandler() http.HandlerFunc {
