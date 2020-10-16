@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type LogLevelType string
@@ -31,6 +32,18 @@ func (r *Repo) InsertLogLine(ctx context.Context, ll LogLine) (Id, error) {
 func (r *Repo) LogLine(ctx context.Context, id Id) (interface{}, error) {
 	var ll LogLine
 	if err := r.findById(ctx, "logs", id, &ll); err != nil {
+		return nil, err
+	}
+	return ll, nil
+}
+
+func (r *Repo) CaseLogLines(ctx context.Context, caseId Id) (interface{}, error) {
+	res, err := r.db.Collection("logs").Find(ctx, bson.D{{"case_id", caseId}})
+	if err != nil {
+		return nil, err
+	}
+	ll := []LogLine{}
+	if err := res.All(ctx, &ll); err != nil {
 		return nil, err
 	}
 	return ll, nil

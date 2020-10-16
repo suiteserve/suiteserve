@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"encoding/json"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type CaseStatus string
@@ -46,6 +47,18 @@ func (r *Repo) InsertCase(ctx context.Context, c Case) (Id, error) {
 func (r *Repo) Case(ctx context.Context, id Id) (interface{}, error) {
 	var c Case
 	if err := r.findById(ctx, "cases", id, &c); err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (r *Repo) SuiteCases(ctx context.Context, suiteId Id) (interface{}, error) {
+	res, err := r.db.Collection("cases").Find(ctx, bson.D{{"suite_id", suiteId}})
+	if err != nil {
+		return nil, err
+	}
+	c := []Case{}
+	if err := res.All(ctx, &c); err != nil {
 		return nil, err
 	}
 	return c, nil

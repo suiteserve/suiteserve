@@ -83,7 +83,7 @@ func (r *Repo) SuitePageAfter(ctx context.Context, id Id) (interface{}, error) {
 }
 
 func (r *Repo) suitePage(ctx context.Context, match bson.D) (interface{}, error) {
-	const limit = 30
+	const limit = 100
 	c, err := r.db.Collection("suites").Aggregate(ctx, mongo.Pipeline{
 		{{"$match", match}},
 		{{"$sort", bson.D{

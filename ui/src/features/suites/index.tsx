@@ -1,13 +1,20 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import * as api from '../../api';
 import {SuiteResult, SuiteStatus} from '../../api';
 import styles from './Suites.module.css';
 import {Link} from 'react-router-dom';
 
 export const Suites: React.FC = () => {
-  const suites = api.SAMPLE_SUITES.sort((a, b) => {
-    return b.started_at - a.started_at;
-  });
+  const [suites, setSuites] = useState([] as api.Suite[])
+
+  useEffect(() => {
+    new api.ServerSource().getSuitePage().then(suitePage => {
+      setSuites(suitePage.suites.sort((a, b) => {
+        return b.started_at - a.started_at;
+      }))
+    })
+  }, [])
+
   return (
     <div className={styles.Suites}>
       <h1>All Suites</h1>

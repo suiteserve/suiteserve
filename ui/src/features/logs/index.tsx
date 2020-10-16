@@ -1,18 +1,23 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import * as api from '../../api';
 import { Link, useParams } from 'react-router-dom';
 import styles from './Logs.module.css';
 
 export const Logs: React.FC = () => {
   const { suiteId, caseId } = useParams<{ suiteId: string; caseId: string }>();
-  const logs = api.SAMPLE_LOGS.filter(
-    (l) => l.case_id.toString() === caseId
-  ).sort((a, b) => {
-    if (a.timestamp === b.timestamp) {
-      return b.idx - a.idx;
-    }
-    return b.timestamp - a.timestamp;
-  });
+  const [logs, setLogs] = useState([] as api.LogLine[])
+
+  useEffect(() => {
+    new api.ServerSource().getCaseLogs(caseId).then(logs => {
+      setLogs(logs.sort((a, b) => {
+        if (a.idx === b.idx) {
+          return b.idx - a.idx;
+        }
+        return b.timestamp - a.timestamp;
+      }))
+    })
+  }, [caseId])
+
   return (
     <div className={styles.Logs}>
       <Link to='/'>All Suites</Link> / <Link to={`/suites/${suiteId}`}>{suiteId}</Link>

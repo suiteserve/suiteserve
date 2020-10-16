@@ -29,9 +29,11 @@ type Repo interface {
 
 	InsertCase(ctx context.Context, c repo.Case) (id repo.Id, err error)
 	Case(ctx context.Context, id repo.Id) (interface{}, error)
+	SuiteCases(ctx context.Context, suiteId repo.Id) (interface{}, error)
 
 	InsertLogLine(ctx context.Context, ll repo.LogLine) (id repo.Id, err error)
 	LogLine(ctx context.Context, id repo.Id) (interface{}, error)
+	CaseLogLines(ctx context.Context, llId repo.Id) (interface{}, error)
 }
 
 type v1 struct {
@@ -62,11 +64,11 @@ func (v v1) newRouter() http.Handler {
 		Queries("watch", "true")
 	r.Handle("/suites", findAllHandler(v.repo.SuitePage))
 	r.Handle("/suites/{id}", findByIdHandler(v.repo.Suite))
-	// r.Handle("/suites/{id}/cases", v1.suiteCasesHandler())
+	r.Handle("/suites/{id}/cases", findByIdHandler(v.repo.SuiteCases))
 
 	// cases
 	r.Handle("/cases/{id}", findByIdHandler(v.repo.Case))
-	// r.Handle("/cases/{id}/logs", v1.caseLogsHandler())
+	r.Handle("/cases/{id}/logs", findByIdHandler(v.repo.CaseLogLines))
 
 	// logs
 	r.Handle("/logs/{id}", findByIdHandler(v.repo.LogLine))

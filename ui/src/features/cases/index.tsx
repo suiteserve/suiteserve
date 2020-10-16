@@ -1,22 +1,23 @@
-import React from 'react';
-import * as api from '../../api';
+import React, {useEffect, useState} from 'react';
 import { Link, NavLink, useParams } from 'react-router-dom';
 import styles from './Cases.module.css';
-import {CaseResult, CaseStatus} from '../../api';
+import * as api from '../../api';
 
 export const Cases: React.FC = () => {
   const { suiteId } = useParams<{ suiteId: string }>();
-  const cases = api.SAMPLE_CASES.filter(
-    (c) => c.suite_id.toString() === suiteId
-  ).sort((a, b) => {
-    if (a.idx === b.idx) {
-      return b.created_at - a.created_at;
-    }
-    return b.idx - a.idx;
-  });
-  const attachments = api.SAMPLE_ATTACHMENTS.filter(
-    (a) => a.suite_id?.toString() === suiteId
-  );
+  const [cases, setCases] = useState([] as api.Case[])
+
+  useEffect(() => {
+    new api.ServerSource().getSuiteCases(suiteId).then(cases => {
+      setCases(cases.sort((a, b) => {
+        if (a.idx === b.idx) {
+          return b.idx - a.idx;
+        }
+        return b.created_at - a.created_at;
+      }))
+    })
+  }, [suiteId])
+
   return (
     <div className={styles.Cases}>
       <Link to='/'>All Suites</Link>
@@ -46,8 +47,8 @@ export const Cases: React.FC = () => {
               </td>
               <td>{c.tags?.join(', ')}</td>
               <td>{c.description}</td>
-              <td className={c.status === CaseStatus.CREATED ? styles.Warn : ''}>{c.status}</td>
-              <td className={c.result === CaseResult.PASSED ? styles.Good : styles.Bad}>{c.result}</td>
+              <td className={c.status === api.CaseStatus.CREATED ? styles.Warn : ''}>{c.status}</td>
+              <td className={c.result === api.CaseResult.PASSED ? styles.Good : styles.Bad}>{c.result}</td>
               <td>{new Date(c.created_at).toISOString()}</td>
               <td>
                 {!c.started_at
