@@ -1,0 +1,31 @@
+.Logs table {
+  font-size: 12px;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+
+  border-collapse: collapse;
+}
+
+.Logs thead tr {
+  font-weight: bold;
+}
+
+.Logs tbody tr:nth-child(even) {
+  background-color: #d0ecf2;
+}
+
+.Logs td {
+  padding: 0.5em;
+}
+
+.Good {
+  color: forestgreen;
+}
+
+.Bad {
+  color: crimson;
+}
+
+.Warn {
+  color: #888;
+}

@@ -1,0 +1,31 @@
+.Cases table {
+  font-size: 12px;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+
+  border-collapse: collapse;
+}
+
+.Cases thead tr {
+  font-weight: bold;
+}
+
+.Cases tbody tr:nth-child(even) {
+  background-color: #d0ecf2;
+}
+
+.Cases td {
+  padding: 0.5em;
+}
+
+.Good {
+  color: forestgreen;
+}
+
+.Bad {
+  color: crimson;
+}
+
+.Warn {
+  color: #888;
+}

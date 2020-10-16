@@ -6,12 +6,10 @@ import { Route, Switch } from 'react-router-dom';
 
 export const App: React.FC = () => {
   return (
-    <div>
-      <Switch>
-        <Route path='/suites/:suiteId/cases/:caseId' component={Logs} />
-        <Route path='/suites/:suiteId' component={Cases} />
-        <Route path='/' component={Suites} />
-      </Switch>
-    </div>
+    <Switch>
+      <Route path='/suites/:suiteId/cases/:caseId' component={Logs} />
+      <Route path='/suites/:suiteId' component={Cases} />
+      <Route path='/' component={Suites} />
+    </Switch>
   );
 };

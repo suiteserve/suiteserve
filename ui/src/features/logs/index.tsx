@@ -1,7 +1,7 @@
 import React from 'react';
 import * as api from '../../api';
-import { LogLevelType } from '../../api';
 import { Link, useParams } from 'react-router-dom';
+import styles from './Logs.module.css';
 
 export const Logs: React.FC = () => {
   const { suiteId, caseId } = useParams<{ suiteId: string; caseId: string }>();
@@ -13,61 +13,32 @@ export const Logs: React.FC = () => {
     }
     return b.timestamp - a.timestamp;
   });
-  const attachments = api.SAMPLE_ATTACHMENTS.filter(
-    (a) => a.case_id?.toString() === caseId
-  );
   return (
-    <div>
-      <p>
-        <Link to={`/`}>All Suites</Link> /{' '}
-        <Link to={`/suites/${suiteId}`}>{suiteId}</Link>
-      </p>
-      <h1>
-        Logs for Case {caseId} in Suite {suiteId}
-      </h1>
+    <div className={styles.Logs}>
+      <Link to='/'>All Suites</Link> / <Link to={`/suites/${suiteId}`}>{suiteId}</Link>
+      <h1>Logs for Case {caseId}</h1>
       <table>
+        <thead>
+          <tr>
+            <td>Index</td>
+            <td>Level</td>
+            <td>Trace</td>
+            <td>Message</td>
+            <td>Timestamp</td>
+          </tr>
+        </thead>
         <tbody>
-          {logs.map((l) => (
-            <tr
-              key={l.id}
-              style={{
-                fontFamily:
-                  'SFMono-Regular,Consolas,Liberation Mono,Menlo,monospace',
-                fontSize: '12px',
-              }}
-            >
-              <td
-                style={{
-                  padding: '0.25em 0.5em',
-                }}
-              >
-                {new Date(l.timestamp).toISOString()}
-              </td>
-              <td
-                style={{
-                  padding: '0.25em 0.5em',
-                  color: l.level === LogLevelType.ERROR ? 'red' : undefined,
-                }}
-              >
-                {l.level}
-              </td>
-              <td
-                style={{
-                  padding: '0.25em 0.5em',
-                }}
-              >
-                {l.message}
-              </td>
+          {logs.map((logLine) => (
+            <tr key={logLine.id}>
+              <td>{logLine.idx}</td>
+              <td>{logLine.level}</td>
+              <td><pre>{logLine.trace}</pre></td>
+              <td><pre>{logLine.message}</pre></td>
+              <td>{new Date(logLine.timestamp).toISOString()}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      <h1>Attachments for Case {caseId}</h1>
-      <ul>
-        {attachments.map((a) => (
-          <li key={a.id}>{a.filename}</li>
-        ))}
-      </ul>
     </div>
   );
 };
