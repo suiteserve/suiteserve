@@ -38,6 +38,7 @@ type Repo struct {
 
 func Open(addr, replSet, user, pass, db string) (*Repo, error) {
 	reg := bson.NewRegistryBuilder().
+		RegisterTypeEncoder(idType, bsoncodec.ValueEncoderFunc(encodeIdValue)).
 		RegisterTypeDecoder(idType, bsoncodec.ValueDecoderFunc(decodeIdValue)).
 		Build()
 	opts := options.Client().
@@ -60,6 +61,21 @@ func Open(addr, replSet, user, pass, db string) (*Repo, error) {
 		return nil, err
 	}
 	return &Repo{db: client.Database(db)}, nil
+}
+
+func encodeIdValue(_ bsoncodec.EncodeContext, vw bsonrw.ValueWriter, v reflect.Value) error {
+	if !v.IsValid() || v.Type() != idType {
+		return bsoncodec.ValueEncoderError{
+			Name:     "EncodeIdValue",
+			Types:    []reflect.Type{idType},
+			Received: v,
+		}
+	}
+	oid, err := primitive.ObjectIDFromHex(v.Interface().(string))
+	if err != nil {
+		return err
+	}
+	return vw.WriteObjectID(oid)
 }
 
 func decodeIdValue(_ bsoncodec.DecodeContext, vr bsonrw.ValueReader, v reflect.Value) error {

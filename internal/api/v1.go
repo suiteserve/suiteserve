@@ -78,12 +78,16 @@ func (v v1) newRouter() http.Handler {
 		Methods(http.MethodGet, http.MethodHead)
 
 	// cases
+	r.Handle("/cases", v.insertCaseHandler()).
+		Methods(http.MethodPost)
 	r.Handle("/cases/{id}", findByIdHandler(v.repo.Case)).
 		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/cases/{id}/logs", findByIdHandler(v.repo.CaseLogLines)).
 		Methods(http.MethodGet, http.MethodHead)
 
 	// logs
+	r.Handle("/logs", v.insertLogLineHandler()).
+		Methods(http.MethodPost)
 	r.Handle("/logs/{id}", findByIdHandler(v.repo.LogLine)).
 		Methods(http.MethodGet, http.MethodHead)
 
