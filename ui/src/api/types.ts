@@ -87,19 +87,9 @@ export interface Case extends Entity, VersionedEntity {
   finished_at?: number;
 }
 
-export enum LogLevelType {
-  TRACE = 'trace',
-  DEBUG = 'debug',
-  INFO = 'info',
-  WARN = 'warn',
-  ERROR = 'error',
-}
-
 export interface LogLine extends Entity {
   case_id: Id;
   idx: number;
-  level: LogLevelType | string;
-  trace?: string;
-  message?: string;
-  timestamp: number;
+  error?: boolean;
+  line?: string;
 }

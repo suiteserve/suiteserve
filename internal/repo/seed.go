@@ -277,38 +277,7 @@ func (r *Repo) seedLogLine(caseId Id) (*LogLine, error) {
 }
 
 func genLogLine(caseId Id) LogLine {
-	levels := []LogLevelType{
-		LogLevelTypeTrace,
-		LogLevelTypeDebug,
-		LogLevelTypeInfo,
-		LogLevelTypeWarn,
-		LogLevelTypeError,
-	}
-	traces := []string{
-		`panic: Hello, world!
-
-goroutine 1 [running]:
-main.f3(...)
-        /Users/username/scratch_1.go:16
-main.f2(...)
-        /Users/username/scratch_1.go:12
-main.f1(...)
-        /Users/username/scratch_1.go:8
-main.main()
-        /Users/username/scratch_1.go:4 +0x3b`,
-		`Exception in thread "main" java.lang.IllegalArgumentException: Hello, world!
-	at Main.f3(Main.java:16)
-	at Main.f2(Main.java:12)
-	at Main.f1(Main.java:8)
-	at Main.main(Main.java:4)`,
-		`Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
-  File "<stdin>", line 2, in f1
-  File "<stdin>", line 2, in f2
-  File "<stdin>", line 2, in f3
-ZeroDivisionError: division by zero`,
-	}
-	messages := []string{
+	lines := []string{
 		"Morbi blandit cursus risus at.",
 		"Elit duis tristique sollicitudin nibh sit.\nRhoncus mattis rhoncus " +
 			"urna neque viverra. Diam ut venenatis tellus in.",
@@ -319,12 +288,8 @@ ZeroDivisionError: division by zero`,
 	ll.CaseId = caseId
 	ll.Idx = seedLlIdx
 	seedLlIdx++
-	ll.Level = levels[genIdx(len(levels))]
-	if ll.Level == LogLevelTypeError {
-		ll.Trace = traces[genIdx(len(traces))]
-	}
-	ll.Message = messages[genIdx(len(messages))]
-	ll.Timestamp, _, _, _ = genTimestamps()
+	ll.Error = genBool(0.01)
+	ll.Line = lines[genIdx(len(lines))]
 	return ll
 }
 

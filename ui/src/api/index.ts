@@ -3,7 +3,6 @@ import * as api from './types';
 export * from './types';
 
 export interface Source {
-
   getAttachment(id: api.Id): Promise<api.Attachment>;
 
   getSuiteAttachments(id: api.Id): Promise<api.Attachment[]>;

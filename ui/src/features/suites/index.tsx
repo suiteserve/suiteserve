@@ -1,19 +1,21 @@
-import React, {useState, useEffect} from 'react';
+import React, { useEffect, useState } from 'react';
 import * as api from '../../api';
-import {SuiteResult, SuiteStatus} from '../../api';
+import { SuiteResult, SuiteStatus } from '../../api';
 import styles from './Suites.module.css';
-import {Link} from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export const Suites: React.FC = () => {
-  const [suites, setSuites] = useState([] as api.Suite[])
+  const [suites, setSuites] = useState([] as api.Suite[]);
 
   useEffect(() => {
-    new api.ServerSource().getSuitePage().then(suitePage => {
-      setSuites(suitePage.suites.sort((a, b) => {
-        return b.started_at - a.started_at;
-      }))
-    })
-  }, [])
+    new api.ServerSource().getSuitePage().then((suitePage) => {
+      setSuites(
+        suitePage.suites.sort((a, b) => {
+          return b.started_at - a.started_at;
+        })
+      );
+    });
+  }, []);
 
   return (
     <div className={styles.Suites}>
@@ -35,14 +37,24 @@ export const Suites: React.FC = () => {
           {suites.map((suite) => (
             <tr key={suite.id}>
               <td>
-                <Link to={`/suites/${suite.id}`}>
-                  {suite.name || suite.id}
-                </Link>
+                <Link to={`/suites/${suite.id}`}>{suite.name || suite.id}</Link>
               </td>
               <td>{suite.tags?.join(', ')}</td>
               <td>{suite.planned_cases || ''}</td>
-              <td className={suite.status === SuiteStatus.DISCONNECTED ? styles.Warn : ''}>{suite.status}</td>
-              <td className={suite.result === SuiteResult.PASSED ? styles.Good : styles.Bad}>{suite.result}</td>
+              <td
+                className={
+                  suite.status === SuiteStatus.DISCONNECTED ? styles.Warn : ''
+                }
+              >
+                {suite.status}
+              </td>
+              <td
+                className={
+                  suite.result === SuiteResult.PASSED ? styles.Good : styles.Bad
+                }
+              >
+                {suite.result}
+              </td>
               <td>{new Date(suite.started_at).toISOString()}</td>
               <td>
                 {!suite.finished_at
@@ -60,4 +72,4 @@ export const Suites: React.FC = () => {
       </table>
     </div>
   );
-}
+};
