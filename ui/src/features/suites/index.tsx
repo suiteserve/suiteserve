@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import * as api from '../../api';
-import { SuiteResult, SuiteStatus } from '../../api';
+import {SuiteResult, SuiteStatus} from '../../api';
 import styles from './Suites.module.css';
-import { Link } from 'react-router-dom';
+import {Link} from 'react-router-dom';
 
 export const Suites: React.FC = () => {
   const [suites, setSuites] = useState([] as api.Suite[]);
@@ -11,7 +11,7 @@ export const Suites: React.FC = () => {
     new api.ServerSource().getSuitePage().then((suitePage) => {
       setSuites(
         suitePage.suites.sort((a, b) => {
-          return b.started_at - a.started_at;
+          return b.startedAt - a.startedAt;
         })
       );
     });
@@ -40,7 +40,7 @@ export const Suites: React.FC = () => {
                 <Link to={`/suites/${suite.id}`}>{suite.name || suite.id}</Link>
               </td>
               <td>{suite.tags?.join(', ')}</td>
-              <td>{suite.planned_cases || ''}</td>
+              <td>{suite.plannedCases || ''}</td>
               <td
                 className={
                   suite.status === SuiteStatus.DISCONNECTED ? styles.Warn : ''
@@ -55,16 +55,16 @@ export const Suites: React.FC = () => {
               >
                 {suite.result}
               </td>
-              <td>{new Date(suite.started_at).toISOString()}</td>
+              <td>{new Date(suite.startedAt).toISOString()}</td>
               <td>
-                {!suite.finished_at
+                {!suite.finishedAt
                   ? ''
-                  : new Date(suite.finished_at).toISOString()}
+                  : new Date(suite.finishedAt).toISOString()}
               </td>
               <td>
-                {!suite.disconnected_at
+                {!suite.disconnectedAt
                   ? ''
-                  : new Date(suite.disconnected_at).toISOString()}
+                  : new Date(suite.disconnectedAt).toISOString()}
               </td>
             </tr>
           ))}

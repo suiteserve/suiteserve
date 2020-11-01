@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/suiteserve/suiteserve/internal/repo"
 	"log"
 	"net/http"
 	"os"
@@ -86,16 +85,12 @@ func userContentHandler(mr FileMetaRepo, dir string) errHandlerFunc {
 	}
 }
 
-func parseIdVar(r *http.Request, name string) (repo.Id, error) {
-	hex, ok := mux.Vars(r)[name]
+func getVar(r *http.Request, k string) string {
+	v, ok := mux.Vars(r)[k]
 	if !ok {
-		panic(name + " var not found")
+		panic(fmt.Sprintf("var %q not found", k))
 	}
-	id, err := repo.HexToId(hex)
-	if err != nil {
-		return nil, errHttp{code: http.StatusBadRequest, cause: err}
-	}
-	return id, nil
+	return v
 }
 
 func methodNotAllowed() http.HandlerFunc {

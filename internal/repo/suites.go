@@ -2,6 +2,8 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -16,6 +18,21 @@ const (
 
 type SuiteResult string
 
+func (r *SuiteResult) UnmarshalJSON(b []byte) error {
+	var res string
+	if err := json.Unmarshal(b, &res); err != nil {
+		return err
+	}
+	*r = SuiteResult(res)
+	switch *r {
+	case SuiteResultPassed:
+	case SuiteResultFailed:
+	default:
+		return errBadFormat{fmt.Errorf("unknown suiteresult %q", r)}
+	}
+	return nil
+}
+
 const (
 	SuiteResultPassed SuiteResult = "passed"
 	SuiteResultFailed SuiteResult = "failed"
@@ -27,12 +44,12 @@ type Suite struct {
 	SoftDeleteEntity `bson:",inline"`
 	Name             string      `json:"name,omitempty" bson:",omitempty"`
 	Tags             []string    `json:"tags,omitempty" bson:",omitempty"`
-	PlannedCases     int64       `json:"planned_cases,omitempty" bson:"planned_cases,omitempty"`
+	PlannedCases     int64       `json:"plannedCases,omitempty" bson:"planned_cases,omitempty"`
 	Status           SuiteStatus `json:"status"`
 	Result           SuiteResult `json:"result,omitempty" bson:",omitempty"`
-	DisconnectedAt   int64       `json:"disconnected_at,omitempty" bson:"disconnected_at,omitempty"`
-	StartedAt        int64       `json:"started_at" bson:"started_at"`
-	FinishedAt       int64       `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+	DisconnectedAt   Time        `json:"disconnectedAt,omitempty" bson:"disconnected_at,omitempty"`
+	StartedAt        Time        `json:"startedAt" bson:"started_at"`
+	FinishedAt       Time        `json:"finishedAt,omitempty" bson:"finished_at,omitempty"`
 }
 
 type SuitePage struct {
@@ -45,11 +62,7 @@ func (r *Repo) InsertSuite(ctx context.Context, s Suite) (Id, error) {
 }
 
 func (r *Repo) Suite(ctx context.Context, id Id) (interface{}, error) {
-	var s Suite
-	if err := r.findById(ctx, "suites", id, &s); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return r.findById(ctx, "suites", id, &Suite{})
 }
 
 func (r *Repo) SuitePage(ctx context.Context) (interface{}, error) {
@@ -60,7 +73,7 @@ func (r *Repo) SuitePage(ctx context.Context) (interface{}, error) {
 
 func (r *Repo) SuitePageAfter(ctx context.Context, id Id) (interface{}, error) {
 	var pivot Suite
-	err := r.findByIdProj(ctx, "suites", id, bson.D{
+	_, err := r.findByIdProj(ctx, "suites", id, bson.D{
 		{"started_at", 1},
 	}, &pivot)
 	if err != nil {
@@ -82,55 +95,46 @@ func (r *Repo) SuitePageAfter(ctx context.Context, id Id) (interface{}, error) {
 	})
 }
 
-func (r *Repo) suitePage(ctx context.Context, match bson.D) (interface{}, error) {
+func (r *Repo) suitePage(ctx context.Context, match bson.D) (res interface{}, err error) {
 	const limit = 100
-	c, err := r.db.Collection("suites").Aggregate(ctx, mongo.Pipeline{
-		{{"$match", match}},
-		{{"$sort", bson.D{
-			{"started_at", -1},
-			{"_id", -1},
-		}}},
-		{{"$limit", limit + 1}},
-		{{"$group", bson.D{
-			{"_id", nil},
-			{"suites", bson.D{
-				{"$push", "$$ROOT"},
-			}},
-		}}},
-		{{"$set", bson.D{
-			{"more", bson.D{
-				{"$eq", bson.A{
-					bson.D{{"$size", "$suites"}},
-					limit + 1,
+	return readOne(ctx, &SuitePage{Suites: []Suite{}}, func() (*mongo.Cursor, error) {
+		return r.db.Collection("suites").Aggregate(ctx, mongo.Pipeline{
+			{{"$match", match}},
+			{{"$sort", bson.D{
+				{"started_at", -1},
+				{"_id", -1},
+			}}},
+			{{"$limit", limit + 1}},
+			{{"$group", bson.D{
+				{"_id", nil},
+				{"suites", bson.D{
+					{"$push", "$$ROOT"},
 				}},
-			}},
-			{"suites", bson.D{
-				{"$slice", bson.A{"$suites", limit}},
-			}},
-		}}},
+			}}},
+			{{"$set", bson.D{
+				{"more", bson.D{
+					{"$eq", bson.A{
+						bson.D{{"$size", "$suites"}},
+						limit + 1,
+					}},
+				}},
+				{"suites", bson.D{
+					{"$slice", bson.A{"$suites", limit}},
+				}},
+			}}},
+		})
 	})
-	if err != nil {
-		return nil, err
-	}
-	s := []SuitePage{}
-	if err := c.All(ctx, &s); err != nil {
-		return nil, err
-	}
-	if len(s) == 0 {
-		return SuitePage{Suites: []Suite{}}, nil
-	}
-	return s[0], nil
 }
 
 func (r *Repo) WatchSuites(ctx context.Context) *Watcher {
 	return r.watch(ctx, "suites")
 }
 
-func (r *Repo) DeleteSuite(ctx context.Context, id Id, at int64) error {
+func (r *Repo) DeleteSuite(ctx context.Context, id Id, at Time) error {
 	return r.deleteById(ctx, "suites", id, at)
 }
 
-func (r *Repo) FinishSuite(ctx context.Context, id Id, res SuiteResult, at int64) error {
+func (r *Repo) FinishSuite(ctx context.Context, id Id, res SuiteResult, at Time) error {
 	return r.updateById(ctx, "suites", id, bson.D{
 		{"status", SuiteStatusFinished},
 		{"result", res},
@@ -138,7 +142,7 @@ func (r *Repo) FinishSuite(ctx context.Context, id Id, res SuiteResult, at int64
 	})
 }
 
-func (r *Repo) DisconnectSuite(ctx context.Context, id Id, at int64) error {
+func (r *Repo) DisconnectSuite(ctx context.Context, id Id, at Time) error {
 	return r.updateById(ctx, "suites", id, bson.D{
 		{"status", SuiteStatusDisconnected},
 		{"disconnected_at", at},

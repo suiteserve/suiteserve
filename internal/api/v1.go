@@ -23,13 +23,14 @@ type Repo interface {
 	SuitePage(ctx context.Context) (interface{}, error)
 	SuitePageAfter(ctx context.Context, id repo.Id) (interface{}, error)
 	WatchSuites(ctx context.Context) *repo.Watcher
-	DeleteSuite(ctx context.Context, id repo.Id, at int64) error
-	FinishSuite(ctx context.Context, id repo.Id, result repo.SuiteResult, at int64) error
-	DisconnectSuite(ctx context.Context, id repo.Id, at int64) error
+	DeleteSuite(ctx context.Context, id repo.Id, at repo.Time) error
+	FinishSuite(ctx context.Context, id repo.Id, result repo.SuiteResult, at repo.Time) error
+	DisconnectSuite(ctx context.Context, id repo.Id, at repo.Time) error
 
 	InsertCase(ctx context.Context, c repo.Case) (id repo.Id, err error)
 	Case(ctx context.Context, id repo.Id) (interface{}, error)
 	SuiteCases(ctx context.Context, suiteId repo.Id) (interface{}, error)
+	FinishCase(ctx context.Context, id repo.Id, result repo.CaseResult, at repo.Time) error
 
 	InsertLogLine(ctx context.Context, ll repo.LogLine) (id repo.Id, err error)
 	LogLine(ctx context.Context, id repo.Id) (interface{}, error)
@@ -62,8 +63,13 @@ func (v v1) newRouter() http.Handler {
 		Methods(http.MethodGet, http.MethodHead)
 
 	// suites
-	r.Handle("/suites", v.insertSuiteHandler()).
-		Methods(http.MethodPost)
+	r.Handle("/suites/{id}/cases", findByIdHandler(v.repo.SuiteCases)).
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/suites/{id}", v.finishSuiteHandler()).
+		Queries("finish", "true").
+		Methods(http.MethodPatch)
+	r.Handle("/suites/{id}", findByIdHandler(v.repo.Suite)).
+		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/suites", findByIdHandler(v.repo.SuitePageAfter)).
 		Queries("after", "{id}").
 		Methods(http.MethodGet, http.MethodHead)
@@ -72,18 +78,19 @@ func (v v1) newRouter() http.Handler {
 		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/suites", findAllHandler(v.repo.SuitePage)).
 		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/suites/{id}", findByIdHandler(v.repo.Suite)).
-		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/suites/{id}/cases", findByIdHandler(v.repo.SuiteCases)).
-		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/suites", v.insertSuiteHandler()).
+		Methods(http.MethodPost)
 
 	// cases
-	r.Handle("/cases", v.insertCaseHandler()).
-		Methods(http.MethodPost)
-	r.Handle("/cases/{id}", findByIdHandler(v.repo.Case)).
-		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/cases/{id}/logs", findByIdHandler(v.repo.CaseLogLines)).
 		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/cases/{id}", v.finishCaseHandler()).
+		Queries("finish", "true").
+		Methods(http.MethodPatch)
+	r.Handle("/cases/{id}", findByIdHandler(v.repo.Case)).
+		Methods(http.MethodGet, http.MethodHead)
+	r.Handle("/cases", v.insertCaseHandler()).
+		Methods(http.MethodPost)
 
 	// logs
 	r.Handle("/logs", v.insertLogLineHandler()).
@@ -105,6 +112,34 @@ func (v *v1) insertSuiteHandler() errHandlerFunc {
 			return err
 		}
 		return writeJson(w, r, id)
+	}
+}
+
+func (v *v1) finishSuiteHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id := getVar(r, "id")
+		var in struct {
+			Result repo.SuiteResult `json:"result"`
+			At     repo.Time        `json:"at"`
+		}
+		if err := readJson(r, &in); err != nil {
+			return err
+		}
+		return v.repo.FinishSuite(r.Context(), id, in.Result, in.At)
+	}
+}
+
+func (v *v1) finishCaseHandler() errHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		id := getVar(r, "id")
+		var in struct {
+			Result repo.CaseResult `json:"result"`
+			At     repo.Time       `json:"at"`
+		}
+		if err := readJson(r, &in); err != nil {
+			return err
+		}
+		return v.repo.FinishCase(r.Context(), id, in.Result, in.At)
 	}
 }
 
@@ -188,10 +223,6 @@ func findAllHandler(fn func(ctx context.Context) (interface{}, error)) errHandle
 
 func findByIdHandler(fn func(ctx context.Context, id repo.Id) (interface{}, error)) errHandlerFunc {
 	return findHandler(func(r *http.Request) (interface{}, error) {
-		id, err := parseIdVar(r, "id")
-		if err != nil {
-			return nil, err
-		}
-		return fn(r.Context(), id)
+		return fn(r.Context(), getVar(r, "id"))
 	})
 }

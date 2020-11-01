@@ -301,10 +301,10 @@ func genBool(chance float32) bool {
 	return seedRand.Float32() < chance
 }
 
-func genTimestamps() (int64, int64, int64, int64) {
+func genTimestamps() (Time, Time, Time, Time) {
 	first := seedRand.Int63n(1504110555541) + 93312000000
 	second := first + seedRand.Int63n(180000) + 500
 	third := second + seedRand.Int63n(180000) + 500
 	fourth := third + seedRand.Int63n(180000) + 500
-	return first, second, third, fourth
+	return Time(first), Time(second), Time(third), Time(fourth)
 }

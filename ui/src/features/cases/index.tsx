@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, {useEffect, useState} from 'react';
+import {Link, useParams} from 'react-router-dom';
 import styles from './Cases.module.css';
 import * as api from '../../api';
 
 export const Cases: React.FC = () => {
-  const { suiteId } = useParams<{ suiteId: string }>();
+  const {suiteId} = useParams<{ suiteId: string }>();
   const [cases, setCases] = useState([] as api.Case[]);
 
   useEffect(() => {
@@ -14,7 +14,7 @@ export const Cases: React.FC = () => {
           if (a.idx === b.idx) {
             return b.idx - a.idx;
           }
-          return b.created_at - a.created_at;
+          return b.createdAt - a.createdAt;
         })
       );
     });
@@ -63,12 +63,12 @@ export const Cases: React.FC = () => {
               >
                 {c.result}
               </td>
-              <td>{new Date(c.created_at).toISOString()}</td>
+              <td>{new Date(c.createdAt).toISOString()}</td>
               <td>
-                {!c.started_at ? '' : new Date(c.started_at).toISOString()}
+                {!c.startedAt ? '' : new Date(c.startedAt).toISOString()}
               </td>
               <td>
-                {!c.finished_at ? '' : new Date(c.finished_at).toISOString()}
+                {!c.finishedAt ? '' : new Date(c.finishedAt).toISOString()}
               </td>
             </tr>
           ))}

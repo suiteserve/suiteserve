@@ -46,3 +46,10 @@ func isNotFound(err error) bool {
 	}
 	return errors.As(err, &errNotFound)
 }
+
+func isBadInput(err error) bool {
+	var errBadInput interface {
+		BadInput()
+	}
+	return errors.As(err, &errBadInput)
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type CaseStatus string
@@ -27,7 +28,7 @@ const (
 type Case struct {
 	Entity          `bson:",inline"`
 	VersionedEntity `bson:",inline"`
-	SuiteId         Id                         `json:"suite_id" bson:"suite_id"`
+	SuiteId         Id                         `json:"suiteId" bson:"suite_id"`
 	Name            string                     `json:"name,omitempty" bson:",omitempty"`
 	Description     string                     `json:"description,omitempty" bson:",omitempty"`
 	Tags            []string                   `json:"tags,omitempty" bson:",omitempty"`
@@ -35,9 +36,9 @@ type Case struct {
 	Args            map[string]json.RawMessage `json:"args,omitempty" bson:",omitempty"`
 	Status          CaseStatus                 `json:"status"`
 	Result          CaseResult                 `json:"result,omitempty" bson:",omitempty"`
-	CreatedAt       int64                      `json:"created_at" bson:"created_at"`
-	StartedAt       int64                      `json:"started_at,omitempty" bson:"started_at,omitempty"`
-	FinishedAt      int64                      `json:"finished_at,omitempty" bson:"finished_at,omitempty"`
+	CreatedAt       Time                       `json:"createdAt" bson:"created_at"`
+	StartedAt       Time                       `json:"startedAt,omitempty" bson:"started_at,omitempty"`
+	FinishedAt      Time                       `json:"finishedAt,omitempty" bson:"finished_at,omitempty"`
 }
 
 func (r *Repo) InsertCase(ctx context.Context, c Case) (Id, error) {
@@ -45,21 +46,21 @@ func (r *Repo) InsertCase(ctx context.Context, c Case) (Id, error) {
 }
 
 func (r *Repo) Case(ctx context.Context, id Id) (interface{}, error) {
-	var c Case
-	if err := r.findById(ctx, "cases", id, &c); err != nil {
-		return nil, err
-	}
-	return c, nil
+	return r.findById(ctx, "cases", id, Case{})
 }
 
 func (r *Repo) SuiteCases(ctx context.Context, suiteId Id) (interface{}, error) {
-	res, err := r.db.Collection("cases").Find(ctx, bson.D{{"suite_id", suiteId}})
-	if err != nil {
-		return nil, err
-	}
-	c := []Case{}
-	if err := res.All(ctx, &c); err != nil {
-		return nil, err
-	}
-	return c, nil
+	return readAll(ctx, []Case{}, func() (*mongo.Cursor, error) {
+		return r.db.Collection("cases").Find(ctx, bson.D{
+			{"suite_id", bsonId{suiteId}},
+		})
+	})
+}
+
+func (r *Repo) FinishCase(ctx context.Context, id Id, res CaseResult, at Time) error {
+	return r.updateById(ctx, "cases", id, bson.D{
+		{"status", CaseStatusFinished},
+		{"result", res},
+		{"finished_at", at},
+	})
 }

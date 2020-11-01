@@ -13,6 +13,10 @@ type Watcher struct {
 	err error
 }
 
+func newWatcher() *Watcher {
+	return &Watcher{ch: make(chan Change)}
+}
+
 type Change struct {
 	Msg  json.RawMessage
 	Coll string
@@ -36,8 +40,8 @@ type watchEvent struct {
 }
 
 func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
-	w := Watcher{ch: make(chan Change)}
-	s, err := r.db.Collection(coll).Watch(ctx, mongo.Pipeline{
+	w := newWatcher()
+	stream, err := r.db.Collection(coll).Watch(ctx, mongo.Pipeline{
 		{{"$match", bson.D{
 			{"operationType", bson.D{
 				{"$in", bson.A{
@@ -62,35 +66,29 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 	if err != nil {
 		w.err = err
 		close(w.ch)
-		return &w
+		return w
 	}
 	go func() {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			if cerr := s.Close(ctx); cerr != nil && w.err == nil {
-				w.err = cerr
-			}
+			safeClose(ctx, stream, &w.err)
 		}()
 		defer close(w.ch)
-		for s.Next(ctx) {
-			var e watchEvent
-			if err := s.Decode(&e); err != nil {
+		for stream.Next(ctx) {
+			var evt watchEvent
+			if err := stream.Decode(&evt); err != nil {
 				w.err = err
 				return
 			}
-			b, err := json.Marshal(&e)
-			if err != nil {
-				panic(err)
-			}
 			w.ch <- Change{
-				Msg:  b,
-				Coll: e.coll,
+				Msg:  mustMarshalJSON(&evt),
+				Coll: evt.coll,
 			}
 		}
-		if s.Err() != nil && !errors.Is(s.Err(), context.Canceled) {
-			w.err = s.Err()
+		if stream.Err() != nil && !errors.Is(stream.Err(), context.Canceled) {
+			w.err = stream.Err()
 		}
 	}()
-	return &w
+	return w
 }

@@ -10,14 +10,14 @@ export interface VersionedEntity {
 
 export interface SoftDeleteEntity {
   deleted?: boolean;
-  deleted_at?: number;
+  deletedAt?: number;
 }
 
 export interface Attachment extends Entity, VersionedEntity, SoftDeleteEntity {
-  suite_id?: Id;
-  case_id?: Id;
+  suiteId?: Id;
+  caseId?: Id;
   filename: string;
-  content_type: string;
+  contentType: string;
   size: number;
   timestamp: number;
 }
@@ -36,12 +36,12 @@ export enum SuiteResult {
 export interface Suite extends Entity, VersionedEntity, SoftDeleteEntity {
   name?: string;
   tags?: string[];
-  planned_cases?: number;
+  plannedCases?: number;
   status: SuiteStatus | string;
   result?: SuiteResult | string;
-  disconnected_at?: number;
-  started_at: number;
-  finished_at?: number;
+  disconnectedAt?: number;
+  startedAt: number;
+  finishedAt?: number;
 }
 
 export interface SuitePage {
@@ -72,7 +72,7 @@ type JsonValue =
   | Array<JsonValue>;
 
 export interface Case extends Entity, VersionedEntity {
-  suite_id: Id;
+  suiteId: Id;
   name?: string;
   description?: string;
   tags?: string[];
@@ -82,13 +82,13 @@ export interface Case extends Entity, VersionedEntity {
   };
   status: CaseStatus | string;
   result?: CaseResult | string;
-  created_at: number;
-  started_at?: number;
-  finished_at?: number;
+  createdAt: number;
+  startedAt?: number;
+  finishedAt?: number;
 }
 
 export interface LogLine extends Entity {
-  case_id: Id;
+  caseId: Id;
   idx: number;
   error?: boolean;
   line?: string;
