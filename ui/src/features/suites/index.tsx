@@ -1,8 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import * as api from '../../api';
-import {SuiteResult, SuiteStatus} from '../../api';
+import { SuiteResult, SuiteStatus } from '../../api';
 import styles from './Suites.module.css';
-import {Link} from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export const Suites: React.FC = () => {
   const [suites, setSuites] = useState([] as api.Suite[]);
