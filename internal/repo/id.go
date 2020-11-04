@@ -23,13 +23,14 @@ func (i bsonId) MarshalBSONValue() (bsontype.Type, []byte, error) {
 	if s, ok := i.Id.(string); ok {
 		var err error
 		if v, err = primitive.ObjectIDFromHex(s); err != nil {
-			return 0, nil, err
+			return 0, nil, errBadId(err)
 		}
 	}
 	return bson.MarshalValue(v)
 }
 
-func encodeIdValue(_ bsoncodec.EncodeContext, vw bsonrw.ValueWriter, v reflect.Value) error {
+func encodeIdValue(_ bsoncodec.EncodeContext, vw bsonrw.ValueWriter,
+	v reflect.Value) error {
 	if !v.IsValid() || v.Type() != idType {
 		return bsoncodec.ValueEncoderError{
 			Name:     "EncodeIdValue",
@@ -45,15 +46,16 @@ func encodeIdValue(_ bsoncodec.EncodeContext, vw bsonrw.ValueWriter, v reflect.V
 	case string:
 		oid, err := primitive.ObjectIDFromHex(x)
 		if err != nil {
-			return errBadFormat{fmt.Errorf("bad id: %v", err)}
+			return errBadId(err)
 		}
 		return vw.WriteObjectID(oid)
 	default:
-		panic("exhausted allowed interface conversions for id type")
+		panic(fmt.Sprintf("bad val type %T", x))
 	}
 }
 
-func decodeIdValue(_ bsoncodec.DecodeContext, vr bsonrw.ValueReader, v reflect.Value) error {
+func decodeIdValue(_ bsoncodec.DecodeContext, vr bsonrw.ValueReader,
+	v reflect.Value) error {
 	if !v.IsValid() || v.Type() != idType {
 		return bsoncodec.ValueDecoderError{
 			Name:     "DecodeIdValue",

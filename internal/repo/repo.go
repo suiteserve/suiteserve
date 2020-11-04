@@ -18,23 +18,24 @@ type Entity struct {
 }
 
 type VersionedEntity struct {
-	Version int64 `json:"version"`
+	Version *int64 `json:"version"`
 }
 
 type SoftDeleteEntity struct {
-	Deleted   bool `json:"deleted,omitempty"`
-	DeletedAt Time `json:"deletedAt,omitempty" bson:"deleted_at,omitempty"`
+	Deleted   *bool `json:"deleted"`
+	DeletedAt *Time `json:"deletedAt,omitempty" bson:"deleted_at,omitempty"`
 }
 
 type Repo struct {
 	db *mongo.Database
 }
 
+var reg = bson.NewRegistryBuilder().
+	RegisterTypeEncoder(idType, bsoncodec.ValueEncoderFunc(encodeIdValue)).
+	RegisterTypeDecoder(idType, bsoncodec.ValueDecoderFunc(decodeIdValue)).
+	Build()
+
 func Open(addr, replSet, user, pass, db string) (*Repo, error) {
-	reg := bson.NewRegistryBuilder().
-		RegisterTypeEncoder(idType, bsoncodec.ValueEncoderFunc(encodeIdValue)).
-		RegisterTypeDecoder(idType, bsoncodec.ValueDecoderFunc(decodeIdValue)).
-		Build()
 	opts := options.Client().
 		SetHosts([]string{addr}).
 		SetReplicaSet(replSet).
@@ -102,14 +103,16 @@ func (r *Repo) updateById(ctx context.Context, coll string, id Id,
 	return nil
 }
 
-func (r *Repo) deleteById(ctx context.Context, coll string, id Id, at Time) error {
+func (r *Repo) deleteById(ctx context.Context, coll string, id Id,
+	at Time) error {
 	return r.updateById(ctx, coll, id, bson.D{
 		{"deleted", true},
 		{"deleted_at", at},
 	})
 }
 
-func readAll(ctx context.Context, v interface{}, fn func() (*mongo.Cursor, error)) (interface{}, error) {
+func readAll(ctx context.Context, v interface{},
+	fn func() (*mongo.Cursor, error)) (interface{}, error) {
 	c, err := fn()
 	if err != nil {
 		return nil, err

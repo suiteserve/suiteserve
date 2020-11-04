@@ -23,3 +23,7 @@ func (e errBadFormat) Unwrap() error {
 }
 
 func (e errBadFormat) BadFormat() {}
+
+func errBadId(err error) error {
+	return errBadFormat{fmt.Errorf("bad id: %v", err)}
+}

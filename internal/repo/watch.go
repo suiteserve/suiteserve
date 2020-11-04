@@ -4,9 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"reflect"
 )
+
+type Change struct {
+	Coll string
+	Msg  json.RawMessage
+}
 
 type Watcher struct {
 	ch  chan Change
@@ -15,11 +22,6 @@ type Watcher struct {
 
 func newWatcher() *Watcher {
 	return &Watcher{ch: make(chan Change)}
-}
-
-type Change struct {
-	Msg  json.RawMessage
-	Coll string
 }
 
 func (w *Watcher) Ch() <-chan Change {
@@ -31,10 +33,10 @@ func (w *Watcher) Err() error {
 }
 
 type watchEvent struct {
-	Id     `json:"id" bson:"_id"`
-	Insert interface{} `json:"insert,omitempty" bson:"fullDocument"`
-	Update interface{} `json:"update,omitempty"`
-	Delete interface{} `json:"delete,omitempty"`
+	Id     `json:"id"`
+	Insert interface{}   `json:"insert,omitempty"`
+	Update interface{}   `json:"update,omitempty"`
+	Delete []interface{} `json:"delete,omitempty"`
 
 	coll string
 }
@@ -51,14 +53,15 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 			}},
 		}}},
 		{{"$set", bson.D{
-			{"_id", "$documentKey._id"},
+			{"id", "$documentKey._id"},
 			{"coll", "$ns.coll"},
 			{"update", "$updateDescription.updatedFields"},
 			{"delete", "$updateDescription.removedFields"},
 		}}},
 		{{"$project", bson.D{
-			{"fullDocument", 1},
+			{"id", 1},
 			{"coll", 1},
+			{"fullDocument", 1},
 			{"update", 1},
 			{"delete", 1},
 		}}},
@@ -76,11 +79,12 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 		}()
 		defer close(w.ch)
 		for stream.Next(ctx) {
-			var evt watchEvent
-			if err := stream.Decode(&evt); err != nil {
+			var raw bson.Raw
+			if err := stream.Decode(&raw); err != nil {
 				w.err = err
 				return
 			}
+			evt := rawValueToWatchEvent(raw)
 			w.ch <- Change{
 				Msg:  mustMarshalJSON(&evt),
 				Coll: evt.coll,
@@ -91,4 +95,50 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 		}
 	}()
 	return w
+}
+
+type rawEvent struct {
+	Id     `bson:"id"`
+	Coll   string        `bson:"coll"`
+	Insert bson.Raw      `bson:"fullDocument"`
+	Update bson.Raw      `bson:"update"`
+	Delete []interface{} `bson:"delete"`
+}
+
+func rawValueToWatchEvent(raw bson.Raw) watchEvent {
+	var re rawEvent
+	if err := bson.UnmarshalWithRegistry(reg, raw, &re); err != nil {
+		panic(err)
+	}
+	var as reflect.Type
+	switch re.Coll {
+	case attachmentsColl:
+		as = attachmentType
+	case suitesColl:
+		as = suiteType
+	case casesColl:
+		as = caseType
+	case logsColl:
+		as = logLineType
+	default:
+		panic(fmt.Sprintf("unknown coll %q", re.Coll))
+	}
+	return watchEvent{
+		Id:     re.Id,
+		Insert: mustUnmarshalBSON(re.Insert, as),
+		Update: mustUnmarshalBSON(re.Update, as),
+		Delete: re.Delete,
+		coll:   re.Coll,
+	}
+}
+
+func mustUnmarshalBSON(raw bson.Raw, as reflect.Type) interface{} {
+	if len(raw) == 0 {
+		return nil
+	}
+	v := reflect.New(as).Interface()
+	if err := bson.UnmarshalWithRegistry(reg, raw, v); err != nil {
+		panic(err)
+	}
+	return v
 }

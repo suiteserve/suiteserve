@@ -15,6 +15,10 @@ export const Suites: React.FC = () => {
         })
       );
     });
+    const sse = new api.ServerSource().watch(0);
+    sse.addEventListener('suites', ((evt: MessageEvent) => {
+      setSuites(api.applyWatchEvent(evt.data));
+    }) as EventListener);
   }, []);
 
   return (

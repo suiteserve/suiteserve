@@ -33,7 +33,7 @@ func (r *Repo) Seed() error {
 				return err
 			}
 		}
-		for i := 0; i < int(s.PlannedCases); i++ {
+		for i := 0; i < int(*s.PlannedCases); i++ {
 			c, err := r.seedCase(s.Id)
 			if err != nil {
 				return err
@@ -108,13 +108,13 @@ func genAttachment(suiteId, caseId Id) Attachment {
 	var a Attachment
 	a.SuiteId = suiteId
 	a.CaseId = caseId
-	a.Filename = filenames[genIdx(len(filenames))]
-	a.ContentType = contentTypes[genIdx(len(contentTypes))]
-	a.Size = size
-	a.Timestamp = timestamp
-	if genBool(0.1) {
-		a.Deleted = true
-		a.DeletedAt = deletedAt
+	a.Filename = &filenames[genIdx(len(filenames))]
+	a.ContentType = &contentTypes[genIdx(len(contentTypes))]
+	a.Size = &size
+	a.Timestamp = &timestamp
+	if *genBool(0.1) {
+		a.Deleted = Bool(true)
+		a.DeletedAt = &deletedAt
 	}
 	return a
 }
@@ -161,21 +161,24 @@ func genSuite() Suite {
 		SuiteResultFailed,
 	}
 	var s Suite
-	s.Name = names[genIdx(len(names))]
+	s.Version = Int64(0)
+	s.Name = &names[genIdx(len(names))]
 	s.Tags = tags[genIdx(len(tags))]
-	s.PlannedCases = int64(genIdx(20))
-	s.Status = statuses[genIdx(len(statuses))]
-	switch s.Status {
+	s.PlannedCases = Int64(int64(genIdx(20)))
+	s.Status = &statuses[genIdx(len(statuses))]
+	switch *s.Status {
 	case SuiteStatusFinished:
-		s.Result = results[genIdx(len(results))]
-		s.FinishedAt = finishedAt
+		s.Result = &results[genIdx(len(results))]
+		s.FinishedAt = &finishedAt
 	case SuiteStatusDisconnected:
-		s.DisconnectedAt = disconnectedAt
+		s.DisconnectedAt = &disconnectedAt
 	}
-	s.StartedAt = startedAt
-	if genBool(0.1) {
-		s.Deleted = true
-		s.DeletedAt = deletedAt
+	s.StartedAt = &startedAt
+	if *genBool(0.1) {
+		s.Deleted = Bool(true)
+		s.DeletedAt = &deletedAt
+	} else {
+		s.Deleted = Bool(false)
 	}
 	return s
 }
@@ -246,21 +249,22 @@ func genCase(suiteId Id) Case {
 		CaseResultErrored,
 	}
 	var c Case
+	c.Version = Int64(0)
 	c.SuiteId = suiteId
-	c.Name = names[genIdx(len(names))]
-	c.Description = descriptions[genIdx(len(descriptions))]
+	c.Name = &names[genIdx(len(names))]
+	c.Description = &descriptions[genIdx(len(descriptions))]
 	c.Tags = tags[genIdx(len(tags))]
-	c.Idx = int64(genIdx(30))
+	c.Idx = Int64(int64(genIdx(30)))
 	c.Args = args[genIdx(len(args))]
-	c.Status = statuses[genIdx(len(statuses))]
-	switch c.Status {
+	c.Status = &statuses[genIdx(len(statuses))]
+	switch *c.Status {
 	case CaseStatusStarted:
-		c.StartedAt = startedAt
+		c.StartedAt = &startedAt
 	case CaseStatusFinished:
-		c.Result = results[genIdx(len(results))]
-		c.FinishedAt = finishedAt
+		c.Result = &results[genIdx(len(results))]
+		c.FinishedAt = &finishedAt
 	}
-	c.CreatedAt = createdAt
+	c.CreatedAt = &createdAt
 	return c
 }
 
@@ -286,10 +290,10 @@ func genLogLine(caseId Id) LogLine {
 	}
 	var ll LogLine
 	ll.CaseId = caseId
-	ll.Idx = seedLlIdx
+	ll.Idx = &seedLlIdx
 	seedLlIdx++
 	ll.Error = genBool(0.01)
-	ll.Line = lines[genIdx(len(lines))]
+	ll.Line = &lines[genIdx(len(lines))]
 	return ll
 }
 
@@ -297,8 +301,8 @@ func genIdx(max int) int {
 	return seedRand.Intn(max)
 }
 
-func genBool(chance float32) bool {
-	return seedRand.Float32() < chance
+func genBool(chance float32) *bool {
+	return Bool(seedRand.Float32() < chance)
 }
 
 func genTimestamps() (Time, Time, Time, Time) {

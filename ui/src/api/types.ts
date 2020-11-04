@@ -1,25 +1,29 @@
 export type Id = string | number;
 
 export interface Entity {
-  id: Id;
+  readonly id: Id;
 }
 
-export interface VersionedEntity {
-  version: number;
+export interface VersionedEntity extends Entity {
+  readonly version: number;
 }
 
-export interface SoftDeleteEntity {
-  deleted?: boolean;
-  deletedAt?: number;
+function isVersionedEntity(e: any): e is VersionedEntity {
+  return 'version' in e && typeof e['version'] === 'number';
+}
+
+export interface SoftDeleteEntity extends Entity {
+  readonly deleted?: boolean;
+  readonly deletedAt?: number;
 }
 
 export interface Attachment extends Entity, VersionedEntity, SoftDeleteEntity {
-  suiteId?: Id;
-  caseId?: Id;
-  filename: string;
-  contentType: string;
-  size: number;
-  timestamp: number;
+  readonly suiteId?: Id;
+  readonly caseId?: Id;
+  readonly filename: string;
+  readonly contentType: string;
+  readonly size: number;
+  readonly timestamp: number;
 }
 
 export enum SuiteStatus {
@@ -34,19 +38,19 @@ export enum SuiteResult {
 }
 
 export interface Suite extends Entity, VersionedEntity, SoftDeleteEntity {
-  name?: string;
-  tags?: string[];
-  plannedCases?: number;
-  status: SuiteStatus | string;
-  result?: SuiteResult | string;
-  disconnectedAt?: number;
-  startedAt: number;
-  finishedAt?: number;
+  readonly name?: string;
+  readonly tags?: string[];
+  readonly plannedCases?: number;
+  readonly status: SuiteStatus | string;
+  readonly result?: SuiteResult | string;
+  readonly disconnectedAt?: number;
+  readonly startedAt: number;
+  readonly finishedAt?: number;
 }
 
 export interface SuitePage {
-  more: boolean;
-  suites: Suite[];
+  readonly more: boolean;
+  readonly suites: Suite[];
 }
 
 export enum CaseStatus {
@@ -72,24 +76,68 @@ type JsonValue =
   | Array<JsonValue>;
 
 export interface Case extends Entity, VersionedEntity {
-  suiteId: Id;
-  name?: string;
-  description?: string;
-  tags?: string[];
-  idx: number;
-  args?: {
+  readonly suiteId: Id;
+  readonly name?: string;
+  readonly description?: string;
+  readonly tags?: string[];
+  readonly idx: number;
+  readonly args?: {
     [key: string]: JsonValue;
   };
-  status: CaseStatus | string;
-  result?: CaseResult | string;
-  createdAt: number;
-  startedAt?: number;
-  finishedAt?: number;
+  readonly status: CaseStatus | string;
+  readonly result?: CaseResult | string;
+  readonly createdAt: number;
+  readonly startedAt?: number;
+  readonly finishedAt?: number;
 }
 
 export interface LogLine extends Entity {
-  caseId: Id;
-  idx: number;
-  error?: boolean;
-  line?: string;
+  readonly caseId: Id;
+  readonly idx: number;
+  readonly error?: boolean;
+  readonly line?: string;
+}
+
+export type Watchable = Suite | Case | LogLine;
+
+export interface WatchEvent<E extends Watchable> extends Entity {
+  readonly type: string;
+  readonly insert?: E;
+  readonly update?: Partial<E>;
+  readonly delete?: (keyof E)[];
+}
+
+export function applyWatchEvent<E extends Watchable>(
+  evt: WatchEvent<E>
+): (es: E[]) => E[] {
+  return (es) => {
+    const e = es.find((e) => e.id === evt.id);
+    if (e === undefined) {
+      if (evt.insert === undefined) {
+        throw new Error('Entity not found for non-insert event.');
+      }
+      return es.concat(evt.insert);
+    }
+    if (
+      isVersionedEntity(evt.update) &&
+      isVersionedEntity(e) &&
+      evt.update.version < e.version
+    ) {
+      return es;
+    }
+    let res: E = {
+      ...e,
+    };
+    if (evt.update !== undefined) {
+      for (const k in evt.update) {
+        // noinspection JSUnfilteredForInLoop
+        res = {
+          ...e,
+          [k]: evt.update[k],
+        };
+      }
+    }
+    evt.delete?.forEach((k) => delete res[k]);
+    return es.filter((e) => e.id !== evt.id).concat(res);
+  };
 }
