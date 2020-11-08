@@ -1,25 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, {useContext, useEffect, useState} from 'react';
 import * as api from '../../api';
 import { SuiteResult, SuiteStatus } from '../../api';
 import styles from './Suites.module.css';
 import { Link } from 'react-router-dom';
 
 export const Suites: React.FC = () => {
+  const apiSource = useContext(api.APIContext);
   const [suites, setSuites] = useState([] as api.Suite[]);
 
   useEffect(() => {
-    new api.ServerSource().getSuitePage().then((suitePage) => {
-      setSuites(
-        suitePage.suites.sort((a, b) => {
-          return b.startedAt - a.startedAt;
-        })
-      );
+    apiSource.getSuitePage().then((page) => {
+      setSuites(page.suites.sort((a, b) => {
+        return b.startedAt - a.startedAt;
+      }));
     });
-    const sse = new api.ServerSource().watch(0);
-    sse.addEventListener('suites', ((evt: MessageEvent) => {
-      setSuites(api.applyWatchEvent(evt.data));
-    }) as EventListener);
-  }, []);
+    apiSource.watch('suites', (evt: api.WatchEvent<api.Suite>) => {
+      setSuites(suites => {
+        const newSuites = api.applyWatchEvent(evt)(suites);
+        if (newSuites === undefined) {
+          apiSource.getSuite(evt.id).then(s => {
+            setSuites(suites => suites.concat(s));
+          });
+          return suites;
+        }
+        return newSuites;
+      })
+    });
+    return () => apiSource.unwatch('suites');
+  }, [apiSource]);
 
   return (
     <div className={styles.Suites}>

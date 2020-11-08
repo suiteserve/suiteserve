@@ -1,4 +1,4 @@
-export type Id = string | number;
+export type Id = string;
 
 export interface Entity {
   readonly id: Id;
@@ -12,12 +12,7 @@ function isVersionedEntity(e: any): e is VersionedEntity {
   return 'version' in e && typeof e['version'] === 'number';
 }
 
-export interface SoftDeleteEntity extends Entity {
-  readonly deleted?: boolean;
-  readonly deletedAt?: number;
-}
-
-export interface Attachment extends Entity, VersionedEntity, SoftDeleteEntity {
+export interface Attachment extends Entity, VersionedEntity {
   readonly suiteId?: Id;
   readonly caseId?: Id;
   readonly filename: string;
@@ -37,7 +32,7 @@ export enum SuiteResult {
   FAILED = 'failed',
 }
 
-export interface Suite extends Entity, VersionedEntity, SoftDeleteEntity {
+export interface Suite extends Entity, VersionedEntity {
   readonly name?: string;
   readonly tags?: string[];
   readonly plannedCases?: number;
@@ -48,8 +43,10 @@ export interface Suite extends Entity, VersionedEntity, SoftDeleteEntity {
   readonly finishedAt?: number;
 }
 
+export type SuitePageCursor = string;
+
 export interface SuitePage {
-  readonly more: boolean;
+  readonly next: SuitePageCursor;
   readonly suites: Suite[];
 }
 
@@ -108,13 +105,13 @@ export interface WatchEvent<E extends Watchable> extends Entity {
 }
 
 export function applyWatchEvent<E extends Watchable>(
-  evt: WatchEvent<E>
-): (es: E[]) => E[] {
+  evt: WatchEvent<E>,
+): (es: E[]) => E[] | undefined {
   return (es) => {
     const e = es.find((e) => e.id === evt.id);
     if (e === undefined) {
       if (evt.insert === undefined) {
-        throw new Error('Entity not found for non-insert event.');
+        return undefined;
       }
       return es.concat(evt.insert);
     }

@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/suiteserve/suiteserve/internal/repo"
 	"log"
 	"net/http"
 	"os"
@@ -10,24 +11,18 @@ import (
 	"strings"
 )
 
-func logMw(h http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("<%s> %s %s", r.RemoteAddr, r.Method, r.URL)
-		h.ServeHTTP(w, r)
+func printLog(r *http.Request, err error) {
+	errMsg := ""
+	if err != nil {
+		errMsg = ": " + err.Error()
 	}
+	log.Printf("<%s> %s %s%s", r.RemoteAddr, r.Method, r.URL, errMsg)
 }
 
-func methodsMw(methods ...string) func(h http.Handler) http.HandlerFunc {
-	return func(h http.Handler) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			for _, m := range methods {
-				if m == r.Method {
-					h.ServeHTTP(w, r)
-					return
-				}
-			}
-			methodNotAllowed()(w, r)
-		}
+func logMw(h http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		printLog(r, nil)
+		h.ServeHTTP(w, r)
 	}
 }
 
@@ -91,6 +86,17 @@ func getVar(r *http.Request, k string) string {
 		panic(fmt.Sprintf("var %q not found", k))
 	}
 	return v
+}
+
+func getIdVar(r *http.Request) (repo.Id, error) {
+	id, err := repo.NewId(getVar(r, "id"))
+	if err != nil {
+		return repo.Id{}, errHttp{
+			code:  http.StatusBadRequest,
+			cause: err,
+		}
+	}
+	return id, nil
 }
 
 func methodNotAllowed() http.HandlerFunc {

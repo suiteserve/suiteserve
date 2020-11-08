@@ -5,36 +5,34 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/suiteserve/suiteserve/internal/repo"
 	"github.com/suiteserve/suiteserve/sse"
-	"io"
-	"log"
 	"net/http"
 	"time"
 )
 
 type Repo interface {
 	InsertAttachment(ctx context.Context, a repo.Attachment) (id repo.Id, err error)
-	Attachment(ctx context.Context, id repo.Id) (interface{}, error)
-	AllAttachments(ctx context.Context) (interface{}, error)
-	SuiteAttachments(ctx context.Context, suiteId repo.Id) (interface{}, error)
-	CaseAttachments(ctx context.Context, caseId repo.Id) (interface{}, error)
+	Attachment(ctx context.Context, id repo.Id) (repo.Attachment, error)
+	AllAttachments(ctx context.Context) ([]repo.Attachment, error)
+	SuiteAttachments(ctx context.Context, suiteId repo.Id) ([]repo.Attachment, error)
+	CaseAttachments(ctx context.Context, caseId repo.Id) ([]repo.Attachment, error)
 
 	InsertSuite(ctx context.Context, s repo.Suite) (id repo.Id, err error)
-	Suite(ctx context.Context, id repo.Id) (interface{}, error)
-	SuitePage(ctx context.Context) (interface{}, error)
-	SuitePageAfter(ctx context.Context, id repo.Id) (interface{}, error)
-	WatchSuites(ctx context.Context) *repo.Watcher
-	DeleteSuite(ctx context.Context, id repo.Id, at repo.Time) error
-	FinishSuite(ctx context.Context, id repo.Id, result repo.SuiteResult, at repo.Time) error
-	DisconnectSuite(ctx context.Context, id repo.Id, at repo.Time) error
+	Suite(ctx context.Context, id repo.Id) (repo.Suite, error)
+	SuitePage(ctx context.Context) (repo.SuitePage, error)
+	SuitePageAfter(ctx context.Context, cursor repo.SuitePageCursor) (repo.SuitePage, error)
+	FinishSuite(ctx context.Context, id repo.Id, result repo.SuiteResult, at repo.MsTime) error
+	DisconnectSuite(ctx context.Context, id repo.Id, at repo.MsTime) error
 
 	InsertCase(ctx context.Context, c repo.Case) (id repo.Id, err error)
-	Case(ctx context.Context, id repo.Id) (interface{}, error)
-	SuiteCases(ctx context.Context, suiteId repo.Id) (interface{}, error)
-	FinishCase(ctx context.Context, id repo.Id, result repo.CaseResult, at repo.Time) error
+	Case(ctx context.Context, id repo.Id) (repo.Case, error)
+	SuiteCases(ctx context.Context, suiteId repo.Id) ([]repo.Case, error)
+	FinishCase(ctx context.Context, id repo.Id, result repo.CaseResult, at repo.MsTime) error
 
 	InsertLogLine(ctx context.Context, ll repo.LogLine) (id repo.Id, err error)
-	LogLine(ctx context.Context, id repo.Id) (interface{}, error)
-	CaseLogLines(ctx context.Context, llId repo.Id) (interface{}, error)
+	LogLine(ctx context.Context, id repo.Id) (repo.LogLine, error)
+	CaseLogLines(ctx context.Context, llId repo.Id) ([]repo.LogLine, error)
+
+	Watch(ctx context.Context) (<-chan repo.Change, <-chan error)
 }
 
 type v1 struct {
@@ -51,43 +49,68 @@ func (v v1) newRouter() http.Handler {
 	r.MethodNotAllowedHandler = methodNotAllowed()
 
 	// attachments
-	r.Handle("/attachments", findByIdHandler(v.repo.SuiteAttachments)).
+	r.Handle("/attachments", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.SuiteAttachments(ctx, id)
+	})).
 		Queries("suite", "{id}").
 		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/attachments", findByIdHandler(v.repo.CaseAttachments)).
+	r.Handle("/attachments", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.CaseAttachments(ctx, id)
+	})).
 		Queries("case", "{id}").
 		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/attachments", findAllHandler(v.repo.AllAttachments)).
+	r.Handle("/attachments", findAllHandler(func(ctx context.Context) (interface{}, error) {
+		return v.repo.AllAttachments(ctx)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/attachments/{id}", findByIdHandler(v.repo.Attachment)).
+	r.Handle("/attachments/{id}", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.Attachment(ctx, id)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
 
 	// suites
-	r.Handle("/suites/{id}/cases", findByIdHandler(v.repo.SuiteCases)).
+	r.Handle("/suites/{id}/cases", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.SuiteCases(ctx, id)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/suites/{id}", v.finishSuiteHandler()).
 		Queries("finish", "true").
 		Methods(http.MethodPatch)
-	r.Handle("/suites/{id}", findByIdHandler(v.repo.Suite)).
+	r.Handle("/suites/{id}", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.Suite(ctx, id)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/suites", findByIdHandler(v.repo.SuitePageAfter)).
-		Queries("after", "{id}").
+	r.Handle("/suites", findHandler(func(r *http.Request) (interface{}, error) {
+		cursorStr := getVar(r, "cursor")
+		cursor, err := repo.NewSuitePageCursor(cursorStr)
+		if err != nil {
+			return nil, err
+		}
+		return v.repo.SuitePageAfter(r.Context(), cursor)
+	})).
+		Queries("from", "{cursor}").
 		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/suites", sse.NewMiddleware(v.watchSuitesHandler())).
+	r.Handle("/suites", sse.NewMiddleware(v.watchHandler())).
 		Queries("watch", "true").
 		Methods(http.MethodGet, http.MethodHead)
-	r.Handle("/suites", findAllHandler(v.repo.SuitePage)).
+	r.Handle("/suites", findAllHandler(func(ctx context.Context) (interface{}, error) {
+		return v.repo.SuitePage(ctx)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/suites", v.insertSuiteHandler()).
 		Methods(http.MethodPost)
 
 	// cases
-	r.Handle("/cases/{id}/logs", findByIdHandler(v.repo.CaseLogLines)).
+	r.Handle("/cases/{id}/logs", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.CaseLogLines(ctx, id)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/cases/{id}", v.finishCaseHandler()).
 		Queries("finish", "true").
 		Methods(http.MethodPatch)
-	r.Handle("/cases/{id}", findByIdHandler(v.repo.Case)).
+	r.Handle("/cases/{id}", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.Case(ctx, id)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
 	r.Handle("/cases", v.insertCaseHandler()).
 		Methods(http.MethodPost)
@@ -95,7 +118,9 @@ func (v v1) newRouter() http.Handler {
 	// logs
 	r.Handle("/logs", v.insertLogLineHandler()).
 		Methods(http.MethodPost)
-	r.Handle("/logs/{id}", findByIdHandler(v.repo.LogLine)).
+	r.Handle("/logs/{id}", findByIdHandler(func(ctx context.Context, id repo.Id) (interface{}, error) {
+		return v.repo.LogLine(ctx, id)
+	})).
 		Methods(http.MethodGet, http.MethodHead)
 
 	return r
@@ -117,10 +142,13 @@ func (v *v1) insertSuiteHandler() errHandlerFunc {
 
 func (v *v1) finishSuiteHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id := getVar(r, "id")
+		id, err := getIdVar(r)
+		if err != nil {
+			return err
+		}
 		var in struct {
 			Result repo.SuiteResult `json:"result"`
-			At     repo.Time        `json:"at"`
+			At     repo.MsTime      `json:"at"`
 		}
 		if err := readJson(r, &in); err != nil {
 			return err
@@ -131,10 +159,13 @@ func (v *v1) finishSuiteHandler() errHandlerFunc {
 
 func (v *v1) finishCaseHandler() errHandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) error {
-		id := getVar(r, "id")
+		id, err := getIdVar(r)
+		if err != nil {
+			return err
+		}
 		var in struct {
 			Result repo.CaseResult `json:"result"`
-			At     repo.Time       `json:"at"`
+			At     repo.MsTime     `json:"at"`
 		}
 		if err := readJson(r, &in); err != nil {
 			return err
@@ -171,38 +202,48 @@ func (v *v1) insertLogLineHandler() errHandlerFunc {
 	}
 }
 
-func (v *v1) watchSuitesHandler() http.HandlerFunc {
+func (v *v1) watchHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		watcher := v.repo.WatchSuites(r.Context())
-		var err error
-		for ok := true; ok; {
-			if ok, err = v.watchSuitesTick(w, watcher); err != nil {
-				log.Printf("<%s> %v", r.RemoteAddr, err)
+		changeCh, errCh := v.repo.Watch(r.Context())
+		for evts := range changesToSSE(changeCh) {
+			if _, err := sse.Send(w, evts...); err != nil {
+				printLog(r, err)
 				return
 			}
+		}
+		if err := <-errCh; err != nil {
+			printLog(r, err)
+			return
 		}
 	}
 }
 
-func (v *v1) watchSuitesTick(w io.Writer, watcher *repo.Watcher) (bool, error) {
-	timer := time.NewTimer(15 * time.Second)
-	defer timer.Stop()
-	select {
-	case c, ok := <-watcher.Ch():
-		if !ok {
-			return false, watcher.Err()
+func changesToSSE(ch <-chan repo.Change) <-chan []sse.Event {
+	out := make(chan []sse.Event)
+	go func() {
+		defer close(out)
+		for {
+			timer := time.NewTimer(15 * time.Second)
+			select {
+			case c, ok := <-ch:
+				if !timer.Stop() {
+					<-timer.C
+				}
+				if !ok {
+					return
+				}
+				out <- []sse.Event{
+					sse.WithEventType(string(c.Coll)),
+					sse.WithData(string(c.Msg)),
+				}
+			case <-timer.C:
+				out <- []sse.Event{
+					sse.WithComment("keep-alive"),
+				}
+			}
 		}
-		_, err := sse.Send(w, sse.WithEventType(c.Coll),
-			sse.WithData(string(c.Msg)))
-		if err != nil {
-			return false, err
-		}
-	case <-timer.C:
-		if _, err := sse.Send(w, sse.WithComment("keep-alive")); err != nil {
-			return false, err
-		}
-	}
-	return true, nil
+	}()
+	return out
 }
 
 func findHandler(fn func(r *http.Request) (interface{}, error)) errHandlerFunc {
@@ -223,6 +264,10 @@ func findAllHandler(fn func(ctx context.Context) (interface{}, error)) errHandle
 
 func findByIdHandler(fn func(ctx context.Context, id repo.Id) (interface{}, error)) errHandlerFunc {
 	return findHandler(func(r *http.Request) (interface{}, error) {
-		return fn(r.Context(), getVar(r, "id"))
+		id, err := getIdVar(r)
+		if err != nil {
+			return nil, err
+		}
+		return fn(r.Context(), id)
 	})
 }

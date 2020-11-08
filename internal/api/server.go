@@ -78,7 +78,6 @@ func readJson(r *http.Request, dst interface{}) error {
 	}
 	if err := json.Unmarshal(b, dst); err != nil {
 		return errHttp{
-			error: "bad json",
 			code:  http.StatusBadRequest,
 			cause: err,
 		}

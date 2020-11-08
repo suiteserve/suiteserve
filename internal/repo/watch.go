@@ -11,39 +11,23 @@ import (
 )
 
 type Change struct {
-	Coll string
+	Coll Coll
 	Msg  json.RawMessage
 }
 
-type Watcher struct {
-	ch  chan Change
-	err error
-}
-
-func newWatcher() *Watcher {
-	return &Watcher{ch: make(chan Change)}
-}
-
-func (w *Watcher) Ch() <-chan Change {
-	return w.ch
-}
-
-func (w *Watcher) Err() error {
-	return w.err
-}
-
 type watchEvent struct {
-	Id     `json:"id"`
-	Insert interface{}   `json:"insert,omitempty"`
-	Update interface{}   `json:"update,omitempty"`
-	Delete []interface{} `json:"delete,omitempty"`
+	Id     Id          `json:"id"`
+	Insert interface{} `json:"insert,omitempty"`
+	Update interface{} `json:"update,omitempty"`
+	Delete []string    `json:"delete,omitempty"`
 
-	coll string
+	coll Coll
 }
 
-func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
-	w := newWatcher()
-	stream, err := r.db.Collection(coll).Watch(ctx, mongo.Pipeline{
+func (r *Repo) Watch(ctx context.Context) (<-chan Change, <-chan error) {
+	changeCh := make(chan Change)
+	errCh := make(chan error, 1)
+	stream, err := r.db.Watch(ctx, mongo.Pipeline{
 		{{"$match", bson.D{
 			{"operationType", bson.D{
 				{"$in", bson.A{
@@ -67,61 +51,61 @@ func (r *Repo) watch(ctx context.Context, coll string) *Watcher {
 		}}},
 	})
 	if err != nil {
-		w.err = err
-		close(w.ch)
-		return w
+		close(changeCh)
+		errCh <- err
+		return changeCh, errCh
 	}
-	go func() {
+	go withErrChan(func() (err error) {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
-			safeClose(ctx, stream, &w.err)
+			safeClose(ctx, stream, &err)
 		}()
-		defer close(w.ch)
+		defer close(changeCh)
 		for stream.Next(ctx) {
 			var raw bson.Raw
 			if err := stream.Decode(&raw); err != nil {
-				w.err = err
-				return
+				return err
 			}
-			evt := rawValueToWatchEvent(raw)
-			w.ch <- Change{
+			evt := bsonToWatchEvent(raw)
+			changeCh <- Change{
 				Msg:  mustMarshalJSON(&evt),
 				Coll: evt.coll,
 			}
 		}
 		if stream.Err() != nil && !errors.Is(stream.Err(), context.Canceled) {
-			w.err = stream.Err()
+			return stream.Err()
 		}
-	}()
-	return w
+		return nil
+	}, errCh)
+	return changeCh, errCh
 }
 
 type rawEvent struct {
-	Id     `bson:"id"`
-	Coll   string        `bson:"coll"`
-	Insert bson.Raw      `bson:"fullDocument"`
-	Update bson.Raw      `bson:"update"`
-	Delete []interface{} `bson:"delete"`
+	Id     Id
+	Coll   Coll
+	Insert bson.Raw `bson:"fullDocument"`
+	Update bson.Raw
+	Delete []string
 }
 
-func rawValueToWatchEvent(raw bson.Raw) watchEvent {
+func bsonToWatchEvent(raw bson.Raw) watchEvent {
 	var re rawEvent
-	if err := bson.UnmarshalWithRegistry(reg, raw, &re); err != nil {
+	if err := bson.Unmarshal(raw, &re); err != nil {
 		panic(err)
 	}
 	var as reflect.Type
 	switch re.Coll {
-	case attachmentsColl:
+	case Attachments:
 		as = attachmentType
-	case suitesColl:
+	case Suites:
 		as = suiteType
-	case casesColl:
+	case Cases:
 		as = caseType
-	case logsColl:
+	case Logs:
 		as = logLineType
 	default:
-		panic(fmt.Sprintf("unknown coll %q", re.Coll))
+		panic(fmt.Sprintf("bad coll %q", re.Coll))
 	}
 	return watchEvent{
 		Id:     re.Id,
@@ -137,7 +121,7 @@ func mustUnmarshalBSON(raw bson.Raw, as reflect.Type) interface{} {
 		return nil
 	}
 	v := reflect.New(as).Interface()
-	if err := bson.UnmarshalWithRegistry(reg, raw, v); err != nil {
+	if err := bson.Unmarshal(raw, v); err != nil {
 		panic(err)
 	}
 	return v

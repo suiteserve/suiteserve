@@ -12,73 +12,12 @@
           "timestamp": -1,
           "_id": -1
         },
-        "name": "all",
-        "partialFilterExpression": {
-          "deleted": false
-        }
+        "name": "all"
       }
     ]
   },
   {
-    "create": "suites",
-    "validator": {
-      "$jsonSchema": {
-        "bsonType": "object",
-        "required": [
-          "version",
-          "deleted",
-          "status",
-          "started_at",
-        ],
-        "properties": {
-          "_id": {
-            "bsonType": "objectId"
-          },
-          "version": {
-            "bsonType": "int",
-            "minimum": 0,
-          },
-          "deleted": {
-            "bsonType": "bool"
-          },
-          "deleted_at": {
-            "bsonType": "int"
-          },
-          "name": {
-            "bsonType": "string"
-          },
-          "tags": {
-            "bsonType": "array",
-            "items": {
-              "bsonType": "string"
-            }
-          },
-          "planned_cases": {
-            "bsonType": "int",
-            "minimum": 0
-          },
-          "status": {
-            "enum": [
-              "started",
-              "finished",
-              "disconnected"
-            ]
-          },
-          "result": {
-            "enum": [ "passed", "failed" ]
-          },
-          "disconnected_at": {
-            "bsonType": "int"
-          },
-          "started_at": {
-            "bsonType": "int"
-          },
-          "finished_at": {
-            "bsonType": "int"
-          }
-        }
-      }
-    }
+    "create": "suites"
   },
   {
     "createIndexes": "suites",
@@ -88,10 +27,7 @@
           "started_at": -1,
           "_id": -1
         },
-        "name": "latest",
-        "partialFilterExpression": {
-          "deleted": false
-        }
+        "name": "latest"
       }
     ]
   },

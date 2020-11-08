@@ -80,7 +80,7 @@ func (r *Repo) shouldSeed() (bool, error) {
 	return true, nil
 }
 
-func (r *Repo) seedAttachment(suiteId, caseId Id) (*Attachment, error) {
+func (r *Repo) seedAttachment(suiteId, caseId *Id) (*Attachment, error) {
 	a := genAttachment(suiteId, caseId)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -88,11 +88,11 @@ func (r *Repo) seedAttachment(suiteId, caseId Id) (*Attachment, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.Id = id
+	a.Id = &id
 	return &a, nil
 }
 
-func genAttachment(suiteId, caseId Id) Attachment {
+func genAttachment(suiteId, caseId *Id) Attachment {
 	filenames := []string{
 		"test.txt",
 		"hello_world.png",
@@ -104,7 +104,7 @@ func genAttachment(suiteId, caseId Id) Attachment {
 		"text/html",
 	}
 	size := int64(genIdx(1 << 16))
-	timestamp, deletedAt, _, _ := genTimestamps()
+	timestamp, _, _ := genTimestamps()
 	var a Attachment
 	a.SuiteId = suiteId
 	a.CaseId = caseId
@@ -112,10 +112,6 @@ func genAttachment(suiteId, caseId Id) Attachment {
 	a.ContentType = &contentTypes[genIdx(len(contentTypes))]
 	a.Size = &size
 	a.Timestamp = &timestamp
-	if *genBool(0.1) {
-		a.Deleted = Bool(true)
-		a.DeletedAt = &deletedAt
-	}
 	return a
 }
 
@@ -127,12 +123,12 @@ func (r *Repo) seedSuite() (*Suite, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.Id = id
+	s.Id = &id
 	return &s, nil
 }
 
 func genSuite() Suite {
-	startedAt, disconnectedAt, finishedAt, deletedAt := genTimestamps()
+	startedAt, disconnectedAt, finishedAt := genTimestamps()
 	names := []string{
 		"Massa Tincidunt Dui",
 		"Auctor",
@@ -174,16 +170,10 @@ func genSuite() Suite {
 		s.DisconnectedAt = &disconnectedAt
 	}
 	s.StartedAt = &startedAt
-	if *genBool(0.1) {
-		s.Deleted = Bool(true)
-		s.DeletedAt = &deletedAt
-	} else {
-		s.Deleted = Bool(false)
-	}
 	return s
 }
 
-func (r *Repo) seedCase(suiteId Id) (*Case, error) {
+func (r *Repo) seedCase(suiteId *Id) (*Case, error) {
 	c := genCase(suiteId)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -191,12 +181,12 @@ func (r *Repo) seedCase(suiteId Id) (*Case, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Id = id
+	c.Id = &id
 	return &c, nil
 }
 
-func genCase(suiteId Id) Case {
-	createdAt, startedAt, finishedAt, _ := genTimestamps()
+func genCase(suiteId *Id) Case {
+	createdAt, startedAt, finishedAt := genTimestamps()
 	names := []string{
 		"Lorem ipsum dolor sit",
 		"Aliquam ut porttitor leo",
@@ -268,7 +258,7 @@ func genCase(suiteId Id) Case {
 	return c
 }
 
-func (r *Repo) seedLogLine(caseId Id) (*LogLine, error) {
+func (r *Repo) seedLogLine(caseId *Id) (*LogLine, error) {
 	ll := genLogLine(caseId)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -276,11 +266,11 @@ func (r *Repo) seedLogLine(caseId Id) (*LogLine, error) {
 	if err != nil {
 		return nil, err
 	}
-	ll.Id = id
+	ll.Id = &id
 	return &ll, nil
 }
 
-func genLogLine(caseId Id) LogLine {
+func genLogLine(caseId *Id) LogLine {
 	lines := []string{
 		"Morbi blandit cursus risus at.",
 		"Elit duis tristique sollicitudin nibh sit.\nRhoncus mattis rhoncus " +
@@ -305,10 +295,9 @@ func genBool(chance float32) *bool {
 	return Bool(seedRand.Float32() < chance)
 }
 
-func genTimestamps() (Time, Time, Time, Time) {
+func genTimestamps() (MsTime, MsTime, MsTime) {
 	first := seedRand.Int63n(1504110555541) + 93312000000
 	second := first + seedRand.Int63n(180000) + 500
 	third := second + seedRand.Int63n(180000) + 500
-	fourth := third + seedRand.Int63n(180000) + 500
-	return Time(first), Time(second), Time(third), Time(fourth)
+	return NewMsTime(first), NewMsTime(second), NewMsTime(third)
 }
