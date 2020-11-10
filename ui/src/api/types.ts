@@ -1,3 +1,5 @@
+import {EntityAdapter, EntityState} from '@reduxjs/toolkit';
+
 export type Id = string;
 
 export interface Entity {
@@ -101,40 +103,57 @@ export interface WatchEvent<E extends Watchable> extends Entity {
   readonly type: string;
   readonly insert?: E;
   readonly update?: Partial<E>;
-  readonly delete?: (keyof E)[];
 }
 
+export function upsertEntity<E extends Entity>(
+  adapter: EntityAdapter<E>,
+  state: EntityState<E>,
+  e: E,
+): EntityState<E> {
+  const existing = adapter.getSelectors().selectById(state, e.id);
+  if (existing === undefined) {
+    return adapter.addOne(state, e);
+  } else if (
+    isVersionedEntity(existing) &&
+    isVersionedEntity(e) &&
+    existing.version < e.version
+  ) {
+    return adapter.setAll(state, [e]);
+  }
+  return state;
+}
+
+export const upsertEntities = <E extends Entity>(
+  adapter: EntityAdapter<E>,
+  state: EntityState<E>,
+  es: E[],
+): EntityState<E> =>
+  es.reduce((state, e) => upsertEntity(adapter, state, e), state);
+
 export function applyWatchEvent<E extends Watchable>(
+  adapter: EntityAdapter<E>,
+  state: EntityState<E>,
   evt: WatchEvent<E>,
-): (es: E[]) => E[] | undefined {
-  return (es) => {
-    const e = es.find((e) => e.id === evt.id);
-    if (e === undefined) {
-      if (evt.insert === undefined) {
-        return undefined;
-      }
-      return es.concat(evt.insert);
+) {
+  const existing = adapter.getSelectors().selectById(state, evt.id);
+  if (existing === undefined) {
+    if (evt.insert === undefined) {
+      throw new Error('WatchEvent did not have a required insert field');
+    } else {
+      adapter.addOne(state, evt.insert);
     }
-    if (
-      isVersionedEntity(evt.update) &&
-      isVersionedEntity(e) &&
-      evt.update.version < e.version
-    ) {
-      return es;
-    }
-    let res: E = {
-      ...e,
-    };
-    if (evt.update !== undefined) {
-      for (const k in evt.update) {
-        // noinspection JSUnfilteredForInLoop
-        res = {
-          ...e,
-          [k]: evt.update[k],
-        };
-      }
-    }
-    evt.delete?.forEach((k) => delete res[k]);
-    return es.filter((e) => e.id !== evt.id).concat(res);
-  };
+  } else if (
+    isVersionedEntity(existing) &&
+    isVersionedEntity(evt.update) &&
+    existing.version >= evt.update.version
+  ) {
+    // do nothing
+  } else if (evt.update !== undefined) {
+    adapter.updateOne(state, {
+      id: evt.id,
+      changes: evt.update,
+    });
+  } else {
+    throw new Error('WatchEvent did not have a required update field');
+  }
 }

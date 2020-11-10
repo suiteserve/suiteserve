@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, {useState} from 'react';
 import * as api from '../../api';
-import { Link, useParams } from 'react-router-dom';
+import {Link, useParams} from 'react-router-dom';
 import styles from './Logs.module.css';
 
 export const Logs: React.FC = () => {
-  const { suiteId, caseId } = useParams<{ suiteId: string; caseId: string }>();
+  const {suiteId, caseId} = useParams<{ suiteId: string; caseId: string }>();
   const [logs, setLogs] = useState([] as api.LogLine[]);
 
-  useEffect(() => {
-    new api.ServerSource().getCaseLogs(caseId).then((logs) => {
-      setLogs(logs.sort((a, b) => a.idx - b.idx));
-    });
-  }, [caseId]);
+  // useEffect(() => {
+  //   new api.ServerSource().getCaseLogs(caseId).then((logs) => {
+  //     setLogs(logs.sort((a, b) => a.idx - b.idx));
+  //   });
+  // }, [caseId]);
 
   return (
     <div className={styles.Logs}>

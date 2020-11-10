@@ -14,11 +14,11 @@ import (
 const timeout = 10 * time.Second
 
 type Entity struct {
-	Id *Id `json:"id" bson:"_id,omitempty"`
+	Id *Id `json:"id,omitempty" bson:"_id,omitempty"`
 }
 
 type VersionedEntity struct {
-	Version *int64 `json:"version"`
+	Version *int64 `json:"version,omitempty"`
 }
 
 type Repo struct {

@@ -1,33 +1,17 @@
-import React, {useContext, useEffect, useState} from 'react';
-import * as api from '../../api';
-import { SuiteResult, SuiteStatus } from '../../api';
+import React, {useEffect} from 'react';
+import {SuiteResult, SuiteStatus} from '../../api';
 import styles from './Suites.module.css';
-import { Link } from 'react-router-dom';
+import {Link} from 'react-router-dom';
+import {useDispatch, useSelector} from 'react-redux';
+import {fetchPage, selectSuites} from './slice';
 
 export const Suites: React.FC = () => {
-  const apiSource = useContext(api.APIContext);
-  const [suites, setSuites] = useState([] as api.Suite[]);
+  const dispatch = useDispatch();
+  const suites = useSelector(selectSuites);
 
   useEffect(() => {
-    apiSource.getSuitePage().then((page) => {
-      setSuites(page.suites.sort((a, b) => {
-        return b.startedAt - a.startedAt;
-      }));
-    });
-    apiSource.watch('suites', (evt: api.WatchEvent<api.Suite>) => {
-      setSuites(suites => {
-        const newSuites = api.applyWatchEvent(evt)(suites);
-        if (newSuites === undefined) {
-          apiSource.getSuite(evt.id).then(s => {
-            setSuites(suites => suites.concat(s));
-          });
-          return suites;
-        }
-        return newSuites;
-      })
-    });
-    return () => apiSource.unwatch('suites');
-  }, [apiSource]);
+    dispatch(fetchPage());
+  }, [dispatch]);
 
   return (
     <div className={styles.Suites}>

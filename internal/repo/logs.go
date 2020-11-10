@@ -9,8 +9,8 @@ import (
 
 type LogLine struct {
 	Entity `bson:",inline"`
-	CaseId *Id      `json:"caseId" bson:"case_id"`
-	Idx    *int64  `json:"idx"`
+	CaseId *Id     `json:"caseId,omitempty" bson:"case_id"`
+	Idx    *int64  `json:"idx,omitempty"`
 	Error  *bool   `json:"error,omitempty" bson:",omitempty"`
 	Line   *string `json:"line,omitempty" bson:",omitempty"`
 }

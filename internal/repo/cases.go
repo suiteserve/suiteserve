@@ -29,15 +29,15 @@ const (
 type Case struct {
 	Entity          `bson:",inline"`
 	VersionedEntity `bson:",inline"`
-	SuiteId         *Id                        `json:"suiteId" bson:"suite_id"`
+	SuiteId         *Id                        `json:"suiteId,omitempty" bson:"suite_id"`
 	Name            *string                    `json:"name,omitempty" bson:",omitempty"`
 	Description     *string                    `json:"description,omitempty" bson:",omitempty"`
 	Tags            []string                   `json:"tags,omitempty" bson:",omitempty"`
-	Idx             *int64                     `json:"idx"`
+	Idx             *int64                     `json:"idx,omitempty"`
 	Args            map[string]json.RawMessage `json:"args,omitempty" bson:",omitempty"`
-	Status          *CaseStatus                `json:"status"`
+	Status          *CaseStatus                `json:"status,omitempty"`
 	Result          *CaseResult                `json:"result,omitempty" bson:",omitempty"`
-	CreatedAt       *MsTime                    `json:"createdAt" bson:"created_at"`
+	CreatedAt       *MsTime                    `json:"createdAt,omitempty" bson:"created_at"`
 	StartedAt       *MsTime                    `json:"startedAt,omitempty" bson:"started_at,omitempty"`
 	FinishedAt      *MsTime                    `json:"finishedAt,omitempty" bson:"finished_at,omitempty"`
 }

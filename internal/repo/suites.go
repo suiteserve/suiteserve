@@ -29,7 +29,9 @@ func (r *SuiteResult) UnmarshalJSON(b []byte) error {
 	}
 	switch SuiteResult(res) {
 	case SuiteResultPassed:
+		fallthrough
 	case SuiteResultFailed:
+		*r = SuiteResult(res)
 	default:
 		return errBadFormat{fmt.Errorf("bad suiteresult %q", res)}
 	}
@@ -47,10 +49,10 @@ type Suite struct {
 	Name            *string      `json:"name,omitempty" bson:",omitempty"`
 	Tags            []string     `json:"tags,omitempty" bson:",omitempty"`
 	PlannedCases    *int64       `json:"plannedCases,omitempty" bson:"planned_cases,omitempty"`
-	Status          *SuiteStatus `json:"status"`
+	Status          *SuiteStatus `json:"status,omitempty"`
 	Result          *SuiteResult `json:"result,omitempty" bson:",omitempty"`
 	DisconnectedAt  *MsTime      `json:"disconnectedAt,omitempty" bson:"disconnected_at,omitempty"`
-	StartedAt       *MsTime      `json:"startedAt" bson:"started_at"`
+	StartedAt       *MsTime      `json:"startedAt,omitempty" bson:"started_at"`
 	FinishedAt      *MsTime      `json:"finishedAt,omitempty" bson:"finished_at,omitempty"`
 }
 

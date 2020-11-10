@@ -1,24 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, {useState} from 'react';
+import {Link, useParams} from 'react-router-dom';
 import styles from './Cases.module.css';
 import * as api from '../../api';
 
 export const Cases: React.FC = () => {
-  const { suiteId } = useParams<{ suiteId: string }>();
+  const {suiteId} = useParams<{ suiteId: string }>();
   const [cases, setCases] = useState([] as api.Case[]);
 
-  useEffect(() => {
-    new api.ServerSource().getSuiteCases(suiteId).then((cases) => {
-      setCases(
-        cases.sort((a, b) => {
-          if (a.idx === b.idx) {
-            return b.idx - a.idx;
-          }
-          return b.createdAt - a.createdAt;
-        })
-      );
-    });
-  }, [suiteId]);
+  // useEffect(() => {
+  //   new api.ServerSource().getSuiteCases(suiteId).then((cases) => {
+  //     setCases(
+  //       cases.sort((a, b) => {
+  //         if (a.idx === b.idx) {
+  //           return b.idx - a.idx;
+  //         }
+  //         return b.createdAt - a.createdAt;
+  //       })
+  //     );
+  //   });
+  // }, [suiteId]);
 
   return (
     <div className={styles.Cases}>

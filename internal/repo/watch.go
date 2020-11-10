@@ -19,7 +19,6 @@ type watchEvent struct {
 	Id     Id          `json:"id"`
 	Insert interface{} `json:"insert,omitempty"`
 	Update interface{} `json:"update,omitempty"`
-	Delete []string    `json:"delete,omitempty"`
 
 	coll Coll
 }
@@ -40,14 +39,12 @@ func (r *Repo) Watch(ctx context.Context) (<-chan Change, <-chan error) {
 			{"id", "$documentKey._id"},
 			{"coll", "$ns.coll"},
 			{"update", "$updateDescription.updatedFields"},
-			{"delete", "$updateDescription.removedFields"},
 		}}},
 		{{"$project", bson.D{
 			{"id", 1},
 			{"coll", 1},
 			{"fullDocument", 1},
 			{"update", 1},
-			{"delete", 1},
 		}}},
 	})
 	if err != nil {
@@ -86,7 +83,6 @@ type rawEvent struct {
 	Coll   Coll
 	Insert bson.Raw `bson:"fullDocument"`
 	Update bson.Raw
-	Delete []string
 }
 
 func bsonToWatchEvent(raw bson.Raw) watchEvent {
@@ -111,7 +107,6 @@ func bsonToWatchEvent(raw bson.Raw) watchEvent {
 		Id:     re.Id,
 		Insert: mustUnmarshalBSON(re.Insert, as),
 		Update: mustUnmarshalBSON(re.Update, as),
-		Delete: re.Delete,
 		coll:   re.Coll,
 	}
 }

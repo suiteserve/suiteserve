@@ -8,14 +8,14 @@ import (
 )
 
 type Attachment struct {
-	Entity           `bson:",inline"`
-	VersionedEntity  `bson:",inline"`
-	SuiteId          *Id      `json:"suiteId,omitempty" bson:"suite_id"`
-	CaseId           *Id      `json:"caseId,omitempty" bson:"case_id"`
-	Filename         *string `json:"filename"`
-	ContentType      *string `json:"contentType" bson:"content_type"`
-	Size             *int64  `json:"size"`
-	Timestamp        *MsTime `json:"timestamp"`
+	Entity          `bson:",inline"`
+	VersionedEntity `bson:",inline"`
+	SuiteId         *Id     `json:"suiteId,omitempty" bson:"suite_id"`
+	CaseId          *Id     `json:"caseId,omitempty" bson:"case_id"`
+	Filename        *string `json:"filename,omitempty"`
+	ContentType     *string `json:"contentType,omitempty" bson:"content_type"`
+	Size            *int64  `json:"size,omitempty"`
+	Timestamp       *MsTime `json:"timestamp,omitempty"`
 }
 
 var attachmentType = reflect.TypeOf(Attachment{})
