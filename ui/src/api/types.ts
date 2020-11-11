@@ -1,4 +1,4 @@
-import {EntityAdapter, EntityState} from '@reduxjs/toolkit';
+import { EntityAdapter, EntityState } from '@reduxjs/toolkit';
 
 export type Id = string;
 
@@ -11,7 +11,7 @@ export interface VersionedEntity extends Entity {
 }
 
 function isVersionedEntity(e: any): e is VersionedEntity {
-  return 'version' in e && typeof e['version'] === 'number';
+  return typeof e.version === 'number';
 }
 
 export interface Attachment extends Entity, VersionedEntity {
@@ -38,8 +38,8 @@ export interface Suite extends Entity, VersionedEntity {
   readonly name?: string;
   readonly tags?: string[];
   readonly plannedCases?: number;
-  readonly status: SuiteStatus | string;
-  readonly result?: SuiteResult | string;
+  readonly status: SuiteStatus;
+  readonly result?: SuiteResult;
   readonly disconnectedAt?: number;
   readonly startedAt: number;
   readonly finishedAt?: number;
@@ -66,25 +66,14 @@ export enum CaseResult {
   ERRORED = 'errored',
 }
 
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | Map<string, JsonValue>
-  | Array<JsonValue>;
-
 export interface Case extends Entity, VersionedEntity {
   readonly suiteId: Id;
   readonly name?: string;
   readonly description?: string;
   readonly tags?: string[];
   readonly idx: number;
-  readonly args?: {
-    [key: string]: JsonValue;
-  };
-  readonly status: CaseStatus | string;
-  readonly result?: CaseResult | string;
+  readonly status: CaseStatus;
+  readonly result?: CaseResult;
   readonly createdAt: number;
   readonly startedAt?: number;
   readonly finishedAt?: number;
@@ -100,60 +89,66 @@ export interface LogLine extends Entity {
 export type Watchable = Suite | Case | LogLine;
 
 export interface WatchEvent<E extends Watchable> extends Entity {
-  readonly type: string;
   readonly insert?: E;
   readonly update?: Partial<E>;
 }
 
-export function upsertEntity<E extends Entity>(
-  adapter: EntityAdapter<E>,
-  state: EntityState<E>,
-  e: E,
-): EntityState<E> {
-  const existing = adapter.getSelectors().selectById(state, e.id);
-  if (existing === undefined) {
-    return adapter.addOne(state, e);
-  } else if (
-    isVersionedEntity(existing) &&
-    isVersionedEntity(e) &&
-    existing.version < e.version
-  ) {
-    return adapter.setAll(state, [e]);
-  }
-  return state;
+export interface InsertWatchEvent<E extends Watchable> extends Entity {
+  readonly insert: E;
 }
 
-export const upsertEntities = <E extends Entity>(
-  adapter: EntityAdapter<E>,
-  state: EntityState<E>,
-  es: E[],
-): EntityState<E> =>
-  es.reduce((state, e) => upsertEntity(adapter, state, e), state);
+export function isInsertWatchEvent<E extends Watchable>(
+  evt: WatchEvent<E>
+): evt is InsertWatchEvent<E> {
+  return evt.insert !== undefined;
+}
 
-export function applyWatchEvent<E extends Watchable>(
+export interface UpdateWatchEvent<E extends Watchable> extends Entity {
+  readonly update: Partial<E>;
+}
+
+export function isUpdateWatchEvent<E extends Watchable & VersionedEntity>(
+  evt: WatchEvent<E>
+): evt is UpdateWatchEvent<E> {
+  return evt.update !== undefined;
+}
+
+export function onEntityInserted<E extends Entity>(
   adapter: EntityAdapter<E>,
   state: EntityState<E>,
-  evt: WatchEvent<E>,
-) {
+  inserted: E
+): EntityState<E> {
+  const existing = adapter.getSelectors().selectById(state, inserted.id);
+  if (existing !== undefined) {
+    if (
+      isVersionedEntity(existing) &&
+      isVersionedEntity(inserted) &&
+      inserted.version <= existing.version
+    ) {
+      return state;
+    }
+    adapter.removeOne(state, inserted.id);
+  }
+  return adapter.addOne(state, inserted);
+}
+
+export function onEntityUpdated<E extends Watchable & VersionedEntity>(
+  adapter: EntityAdapter<E>,
+  state: EntityState<E>,
+  evt: UpdateWatchEvent<E>
+): EntityState<E> {
   const existing = adapter.getSelectors().selectById(state, evt.id);
   if (existing === undefined) {
-    if (evt.insert === undefined) {
-      throw new Error('WatchEvent did not have a required insert field');
-    } else {
-      adapter.addOne(state, evt.insert);
-    }
-  } else if (
-    isVersionedEntity(existing) &&
-    isVersionedEntity(evt.update) &&
-    existing.version >= evt.update.version
-  ) {
-    // do nothing
-  } else if (evt.update !== undefined) {
-    adapter.updateOne(state, {
-      id: evt.id,
-      changes: evt.update,
-    });
-  } else {
-    throw new Error('WatchEvent did not have a required update field');
+    throw new Error('Cannot update nonexistent entity.');
   }
+  if (
+    evt.update.version === undefined ||
+    evt.update.version <= existing.version
+  ) {
+    return state;
+  }
+  return adapter.updateOne(state, {
+    id: evt.id,
+    changes: evt.update,
+  });
 }

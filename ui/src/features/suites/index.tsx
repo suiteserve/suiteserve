@@ -1,9 +1,9 @@
-import React, {useEffect} from 'react';
-import {SuiteResult, SuiteStatus} from '../../api';
+import React, { useEffect } from 'react';
+import { SuiteResult, SuiteStatus } from '../../api';
 import styles from './Suites.module.css';
-import {Link} from 'react-router-dom';
-import {useDispatch, useSelector} from 'react-redux';
-import {fetchPage, selectSuites} from './slice';
+import { Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchPage, selectSuites } from './slice';
 
 export const Suites: React.FC = () => {
   const dispatch = useDispatch();

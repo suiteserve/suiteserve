@@ -2,7 +2,6 @@ package repo
 
 import (
 	"context"
-	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"reflect"
@@ -34,7 +33,6 @@ type Case struct {
 	Description     *string                    `json:"description,omitempty" bson:",omitempty"`
 	Tags            []string                   `json:"tags,omitempty" bson:",omitempty"`
 	Idx             *int64                     `json:"idx,omitempty"`
-	Args            map[string]json.RawMessage `json:"args,omitempty" bson:",omitempty"`
 	Status          *CaseStatus                `json:"status,omitempty"`
 	Result          *CaseResult                `json:"result,omitempty" bson:",omitempty"`
 	CreatedAt       *MsTime                    `json:"createdAt,omitempty" bson:"created_at"`

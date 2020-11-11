@@ -2,7 +2,6 @@ package repo
 
 import (
 	"context"
-	"encoding/json"
 	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"math/rand"
@@ -212,20 +211,6 @@ func genCase(suiteId *Id) Case {
 		nil,
 		nil,
 	}
-	args := []map[string]json.RawMessage{
-		nil,
-		{
-			"x": json.RawMessage("10"),
-			"y": json.RawMessage("6"),
-		},
-		{
-			"name": json.RawMessage(`"hello"`),
-			"obj":  json.RawMessage(`{"first":true,"second":null}`),
-		},
-		{
-			"arg": json.RawMessage(`null`),
-		},
-	}
 	statuses := []CaseStatus{
 		CaseStatusCreated,
 		CaseStatusStarted,
@@ -245,7 +230,6 @@ func genCase(suiteId *Id) Case {
 	c.Description = &descriptions[genIdx(len(descriptions))]
 	c.Tags = tags[genIdx(len(tags))]
 	c.Idx = Int64(int64(genIdx(30)))
-	c.Args = args[genIdx(len(args))]
 	c.Status = &statuses[genIdx(len(statuses))]
 	switch *c.Status {
 	case CaseStatusStarted:
