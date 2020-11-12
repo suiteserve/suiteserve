@@ -9,7 +9,7 @@ For the best development experience, install the following:
 - [mkcert](https://github.com/FiloSottile/mkcert)
 - [Node.js](https://nodejs.org) with [Yarn](https://yarnpkg.com/)
 
-## Run for Development
+## Run in Development
 First, run `make tls/cert.pem` to generate the TLS certificate and key for development-only use with SuiteServe, `webpack-dev-server`, and Mongo Express. This command also installs the root CA into your web browser in order to avoid security warnings, but you may have to restart your browser for that to take effect. You only have to do this once.
 
 Next, bring up MongoDB:
