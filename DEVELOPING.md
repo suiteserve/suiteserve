@@ -1,5 +1,4 @@
 # Developing
-
 For the best development experience, install the following:
 - [Docker](https://www.docker.com) with [Docker Compose](https://docs.docker.com/compose/install/)
 - [GNU Make](https://www.gnu.org/software/make/)
