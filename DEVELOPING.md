@@ -10,7 +10,7 @@ For the best development experience, install the following:
 - [mkcert](https://github.com/FiloSottile/mkcert)
 - [Node.js](https://nodejs.org) with [Yarn](https://yarnpkg.com/)
 
-### Run for Development
+## Run for Development
 First, run `make tls/cert.pem` to generate the TLS certificate and key for development-only use with SuiteServe, `webpack-dev-server`, and Mongo Express. This command also installs the root CA into your web browser in order to avoid security warnings, but you may have to restart your browser for that to take effect. You only have to do this once.
 
 Next, bring up MongoDB:
@@ -57,10 +57,10 @@ $ rm -rf ui/build
 $ make ui/build
 ```
 
-### Build for Production
+## Build for Production
 Run `make` to build the SuiteServe binary file named "suiteserve".
 
-### Build for Docker
+## Build for Docker
 Build the SuiteServe Docker image:
 ```bash
 $ docker build -t suiteserve .
