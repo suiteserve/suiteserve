@@ -128,7 +128,7 @@ func (r *Repo) seedSuite() (*Suite, error) {
 
 func genSuite() Suite {
 	startedAt, disconnectedAt, finishedAt := genTimestamps()
-	names := []string{
+	projects := []string{
 		"Massa Tincidunt Dui",
 		"Auctor",
 		"Sit Amet Luctus",
@@ -157,7 +157,7 @@ func genSuite() Suite {
 	}
 	var s Suite
 	s.Version = Int64(0)
-	s.Name = &names[genIdx(len(names))]
+	s.Project = &projects[genIdx(len(projects))]
 	s.Tags = tags[genIdx(len(tags))]
 	s.PlannedCases = Int64(int64(genIdx(20)))
 	s.Status = &statuses[genIdx(len(statuses))]

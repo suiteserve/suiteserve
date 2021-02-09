@@ -46,7 +46,7 @@ const (
 type Suite struct {
 	Entity          `bson:",inline"`
 	VersionedEntity `bson:",inline"`
-	Name            *string      `json:"name,omitempty" bson:",omitempty"`
+	Project         *string      `json:"project,omitempty" bson:",omitempty"`
 	Tags            []string     `json:"tags,omitempty" bson:",omitempty"`
 	PlannedCases    *int64       `json:"plannedCases,omitempty" bson:"planned_cases,omitempty"`
 	Status          *SuiteStatus `json:"status,omitempty"`

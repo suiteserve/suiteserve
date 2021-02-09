@@ -35,7 +35,7 @@ export enum SuiteResult {
 }
 
 export interface Suite extends Entity, VersionedEntity {
-  readonly name?: string;
+  readonly project?: string;
   readonly tags?: string[];
   readonly plannedCases?: number;
   readonly status: SuiteStatus;

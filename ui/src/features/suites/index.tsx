@@ -33,7 +33,7 @@ export const Suites: React.FC = () => {
           {suites.map((suite) => (
             <tr key={suite.id}>
               <td>
-                <Link to={`/suites/${suite.id}`}>{suite.name || suite.id}</Link>
+                <Link to={`/suites/${suite.id}`}>{suite.project || suite.id}</Link>
               </td>
               <td>{suite.tags?.join(', ')}</td>
               <td>{suite.plannedCases || ''}</td>
